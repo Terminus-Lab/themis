@@ -102,10 +102,25 @@ func main() {
 	judgeRunner := judge.NewJudgeRunner(judges, &logger)
 
 	// Aggregator
-	agg := aggregator.NewAggregator(aggregator.Weights{
-		PreChecks: precheckWeight,
-		LLMJudge:  llmJudgeWeight,
-	}, &logger)
+	verdictPassThreshold, _ := strconv.ParseFloat(os.Getenv("VERDICT_PASS_THRESHOLD"), 64)
+	if verdictPassThreshold == 0 {
+		verdictPassThreshold = 0.8
+	}
+	verdictReviewThreshold, _ := strconv.ParseFloat(os.Getenv("VERDICT_REVIEW_THRESHOLD"), 64)
+	if verdictReviewThreshold == 0 {
+		verdictReviewThreshold = 0.5
+	}
+	agg := aggregator.NewAggregator(
+		aggregator.Weights{
+			PreChecks: precheckWeight,
+			LLMJudge:  llmJudgeWeight,
+		},
+		aggregator.VerdictThresholds{
+			Pass:   verdictPassThreshold,
+			Review: verdictReviewThreshold,
+		},
+		&logger,
+	)
 
 	// Executor
 	earlyExit, _ := strconv.ParseFloat(os.Getenv("EARLY_EXIT_THRESHOLD"), 64)

@@ -18,15 +18,17 @@ import (
 )
 
 type Config struct {
-	AWSRegion             string
-	ClaudeModelID         string
-	OpenAIKey             string
-	OpenAIModelID         string
-	AzureOpenAIEndpoint   string
-	DefaultProvider       string
-	PrecheckWeight        float64
-	LLMJudgeWeight        float64
-	EarlyExitThreshold    float64
+	AWSRegion              string
+	ClaudeModelID          string
+	OpenAIKey              string
+	OpenAIModelID          string
+	AzureOpenAIEndpoint    string
+	DefaultProvider        string
+	PrecheckWeight         float64
+	LLMJudgeWeight         float64
+	EarlyExitThreshold     float64
+	VerdictPassThreshold   float64
+	VerdictReviewThreshold float64
 }
 
 type Dependencies struct {
@@ -37,15 +39,17 @@ type Dependencies struct {
 
 func LoadConfig() *Config {
 	return &Config{
-		AWSRegion:           getEnv("AWS_REGION", "us-east-1"),
-		ClaudeModelID:       getEnv("CLAUDE_MODEL_ID", ""),
-		OpenAIKey:           getEnv("OPEN_AI_KEY", ""),
-		OpenAIModelID:       getEnv("OPEN_AI_MODEL_ID", ""),
-		AzureOpenAIEndpoint: getEnv("AZURE_OPENAI_ENDPOINT", ""),
-		DefaultProvider:     getEnv("DEFAULT_LLM_PROVIDER", "bedrock"),
-		PrecheckWeight:      getEnvFloat("PRECHECK_WEIGHT", 0.3),
-		LLMJudgeWeight:      getEnvFloat("LLM_JUDGE_WEIGHT", 0.7),
-		EarlyExitThreshold:  getEnvFloat("EARLY_EXIT_THRESHOLD", 0.2),
+		AWSRegion:              getEnv("AWS_REGION", "us-east-1"),
+		ClaudeModelID:          getEnv("CLAUDE_MODEL_ID", ""),
+		OpenAIKey:              getEnv("OPEN_AI_KEY", ""),
+		OpenAIModelID:          getEnv("OPEN_AI_MODEL_ID", ""),
+		AzureOpenAIEndpoint:    getEnv("AZURE_OPENAI_ENDPOINT", ""),
+		DefaultProvider:        getEnv("DEFAULT_LLM_PROVIDER", "bedrock"),
+		PrecheckWeight:         getEnvFloat("PRECHECK_WEIGHT", 0.3),
+		LLMJudgeWeight:         getEnvFloat("LLM_JUDGE_WEIGHT", 0.7),
+		EarlyExitThreshold:     getEnvFloat("EARLY_EXIT_THRESHOLD", 0.2),
+		VerdictPassThreshold:   getEnvFloat("VERDICT_PASS_THRESHOLD", 0.8),
+		VerdictReviewThreshold: getEnvFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
 	}
 }
 
@@ -83,10 +87,17 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 	judgeFactory := judge.NewJudgeFactory(judges, logger)
 
 	// Aggregator
-	agg := aggregator.NewAggregator(aggregator.Weights{
-		PreChecks: cfg.PrecheckWeight,
-		LLMJudge:  cfg.LLMJudgeWeight,
-	}, logger)
+	agg := aggregator.NewAggregator(
+		aggregator.Weights{
+			PreChecks: cfg.PrecheckWeight,
+			LLMJudge:  cfg.LLMJudgeWeight,
+		},
+		aggregator.VerdictThresholds{
+			Pass:   cfg.VerdictPassThreshold,
+			Review: cfg.VerdictReviewThreshold,
+		},
+		logger,
+	)
 
 	// Executors
 	agentExec := executor.NewExecutor(stageRunner, judgeRunner, agg, cfg.EarlyExitThreshold, logger)
@@ -119,7 +130,6 @@ func getEnvFloat(key string, defaultValue float64) float64 {
 	return value
 }
 
-//TODO: Replace this with an proper llm_config.yaml file
 func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *config.JudgesConfig) (*llm.LLMClientRegistry, error) {
 	clients := make(map[llm.LLMFamily]map[string]llm.LLMClient)
 

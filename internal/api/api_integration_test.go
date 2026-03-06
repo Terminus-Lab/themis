@@ -449,10 +449,17 @@ func setupTestAPI(t *testing.T) *restful.Container {
 	judgeFactory := judge.NewJudgeFactory(judges, &logger)
 
 	// Aggregator
-	agg := aggregator.NewAggregator(aggregator.Weights{
-		PreChecks: 0.3,
-		LLMJudge:  0.7,
-	}, &logger)
+	agg := aggregator.NewAggregator(
+		aggregator.Weights{
+			PreChecks: 0.3,
+			LLMJudge:  0.7,
+		},
+		aggregator.VerdictThresholds{
+			Pass:   0.8,
+			Review: 0.5,
+		},
+		&logger,
+	)
 
 	// PreChecks
 	stageRunner := prechecks.NewStageRunner([]prechecks.Checker{

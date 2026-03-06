@@ -15,7 +15,7 @@ func newTestLogger() *zerolog.Logger {
 
 func TestAggregate_Pass(t *testing.T) {
 	weights := Weights{PreChecks: 0.3, LLMJudge: 0.7}
-	agg := NewAggregator(weights, newTestLogger())
+	agg := NewAggregator(weights, VerdictThresholds{Pass: 0.8, Review: 0.5}, newTestLogger())
 
 	stage1 := []models.StageResult{{Name: "precheck", Score: 0.8, Reason: "ok", Duration: 100 * time.Millisecond}}
 	stage2 := []models.StageResult{{Name: "judge", Score: 0.9, Reason: "good", Duration: 1 * time.Second}}
@@ -30,7 +30,7 @@ func TestAggregate_Pass(t *testing.T) {
 
 func TestAggregate_Review(t *testing.T) {
 	weights := Weights{PreChecks: 0.3, LLMJudge: 0.7}
-	agg := NewAggregator(weights, newTestLogger())
+	agg := NewAggregator(weights, VerdictThresholds{Pass: 0.8, Review: 0.5}, newTestLogger())
 
 	stage1 := []models.StageResult{{Name: "precheck", Score: 0.6, Reason: "ok", Duration: 100 * time.Millisecond}}
 	stage2 := []models.StageResult{{Name: "judge", Score: 0.7, Reason: "ok", Duration: 1 * time.Second}}
@@ -45,7 +45,7 @@ func TestAggregate_Review(t *testing.T) {
 
 func TestAggregate_Fail(t *testing.T) {
 	weights := Weights{PreChecks: 0.3, LLMJudge: 0.7}
-	agg := NewAggregator(weights, newTestLogger())
+	agg := NewAggregator(weights, VerdictThresholds{Pass: 0.8, Review: 0.5}, newTestLogger())
 
 	stage1 := []models.StageResult{{Name: "precheck", Score: 0.2, Reason: "bad", Duration: 100 * time.Millisecond}}
 	stage2 := []models.StageResult{{Name: "judge", Score: 0.4, Reason: "bad", Duration: 1 * time.Second}}
@@ -60,7 +60,7 @@ func TestAggregate_Fail(t *testing.T) {
 
 func TestAggregate_EmptyStages_Fail(t *testing.T) {
 	weights := Weights{PreChecks: 0.3, LLMJudge: 0.7}
-	agg := NewAggregator(weights, newTestLogger())
+	agg := NewAggregator(weights, VerdictThresholds{Pass: 0.8, Review: 0.5}, newTestLogger())
 
 	// Test empty stage1
 	result := agg.Aggregate("test", []models.StageResult{}, []models.StageResult{{Name: "j", Score: 1.0, Reason: "ok", Duration: 1 * time.Second}})

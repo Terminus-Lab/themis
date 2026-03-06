@@ -73,7 +73,8 @@ docker run --env-file .env themis-mcp
 
 3. **Aggregation** (`internal/aggregator/`): Weighted combination
    - `confidence = (avg_stage1 × 0.3) + (avg_stage2 × 0.7)`
-   - Verdict: `pass` (>0.8), `review` (>0.5), `fail` (≤0.5)
+   - Verdict thresholds are configurable via env vars (defaults: pass=0.8, review=0.5)
+   - Verdict: `pass` (> pass threshold), `review` (> review threshold), `fail` (≤ review threshold)
 
 ### Multi-Provider LLM Support
 
@@ -149,6 +150,8 @@ EVAL_AGENT_API_PORT=18082          # API server port
 EARLY_EXIT_THRESHOLD=0.2           # Precheck early exit threshold
 PRECHECK_WEIGHT=0.3                # Stage 1 weight in aggregation
 LLM_JUDGE_WEIGHT=0.7               # Stage 2 weight in aggregation
+VERDICT_PASS_THRESHOLD=0.8         # Confidence > this → "pass"
+VERDICT_REVIEW_THRESHOLD=0.5       # Confidence > this → "review", else "fail"
 ```
 
 ### Judge Configuration (configs/judges.yaml)

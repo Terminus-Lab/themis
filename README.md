@@ -81,6 +81,10 @@ EVAL_AGENT_API_PORT=18082
 EARLY_EXIT_THRESHOLD=0.2
 PRECHECK_WEIGHT=0.3
 LLM_JUDGE_WEIGHT=0.7
+
+# Verdict thresholds
+VERDICT_PASS_THRESHOLD=0.8      # Confidence > 0.8 → "pass"
+VERDICT_REVIEW_THRESHOLD=0.5    # Confidence > 0.5 → "review", else "fail"
 ```
 
 Judge configurations (prompts, models, weights) are defined in `configs/judges.yaml`:
@@ -151,6 +155,19 @@ Response:
   "verdict": "pass"
 }
 ```
+
+### Verdict Thresholds
+
+The verdict thresholds determine how confidence scores map to verdicts:
+- **Pass threshold (default 0.8)**: Confidence above this → `pass` verdict
+- **Review threshold (default 0.5)**: Confidence above this but below pass → `review` verdict
+- **Below review threshold** → `fail` verdict
+
+**When to adjust:**
+- **High-stakes decisions** (medical, financial): Increase pass threshold to 0.9
+- **Exploratory use cases**: Decrease pass threshold to 0.7
+- **Strict quality requirements**: Increase review threshold to 0.6-0.7
+- **A/B testing**: Experiment with different thresholds to optimize for your metrics
 
 ## How It Works
 

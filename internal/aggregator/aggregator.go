@@ -10,15 +10,22 @@ type Weights struct {
 	LLMJudge  float64
 }
 
-type Aggregator struct {
-	Weights Weights
-	logger  *zerolog.Logger
+type VerdictThresholds struct {
+	Pass   float64 // Confidence > Pass → "pass"
+	Review float64 // Confidence > Review → "review", else "fail"
 }
 
-func NewAggregator(weights Weights, logger *zerolog.Logger) *Aggregator {
+type Aggregator struct {
+	Weights    Weights
+	Thresholds VerdictThresholds
+	logger     *zerolog.Logger
+}
+
+func NewAggregator(weights Weights, thresholds VerdictThresholds, logger *zerolog.Logger) *Aggregator {
 	return &Aggregator{
-		Weights: weights,
-		logger:  logger,
+		Weights:    weights,
+		Thresholds: thresholds,
+		logger:     logger,
 	}
 }
 
@@ -77,10 +84,10 @@ func (a *Aggregator) Aggregate(id string, stage1 []models.StageResult, stage2 []
 }
 
 func (a *Aggregator) calculateVerdict(confidence float64) models.Verdict {
-	if confidence > 0.8 {
+	if confidence > a.Thresholds.Pass {
 		return models.VerdictPass
 	}
-	if confidence > 0.5 {
+	if confidence > a.Thresholds.Review {
 		return models.VerdictReview
 	}
 	return models.VerdictFail
