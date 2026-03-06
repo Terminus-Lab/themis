@@ -5,18 +5,11 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/Terminus-Lab/themis/internal/aggregator"
-	"github.com/Terminus-Lab/themis/internal/config"
-	"github.com/Terminus-Lab/themis/internal/executor"
-	"github.com/Terminus-Lab/themis/internal/judge"
-	"github.com/Terminus-Lab/themis/internal/llm"
-	"github.com/Terminus-Lab/themis/internal/llm/aws"
-	"github.com/Terminus-Lab/themis/internal/prechecks"
+	"github.com/Terminus-Lab/themis/internal/setup"
 	"github.com/Terminus-Lab/themis/internal/stream"
 	"github.com/Terminus-Lab/themis/internal/stream/redis"
 	"github.com/rs/zerolog"
@@ -37,27 +30,14 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// Initialize AWS Bedrock client
-	region := os.Getenv("AWS_REGION")
-	modelID := os.Getenv("DEFAULT_MODEL_ID")
-	modelFamily := os.Getenv("DEFAULT_MODEL_FAMILY")
-	if modelFamily == "" {
-		modelFamily = "anthropic"
-	}
-
-	awsClient, err := aws.NewClient(ctx, region, modelID)
+	// Load config and wire dependencies (shared with API, Batch, MCP)
+	cfg := setup.LoadConfig()
+	deps, err := setup.Wire(ctx, cfg, &logger)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create AWS Bedrock client")
+		log.Fatal().Err(err).Msg("Failed to wire dependencies")
 	}
 
-	// Create LLM client registry
-	registry := llm.NewLLMClientRegistry(map[llm.LLMFamily]map[string]llm.LLMClient{
-		llm.LLMFamily(modelFamily): {
-			modelID: awsClient,
-		},
-	})
-
-	// Redis client
+	// Redis stream configuration (streaming-specific)
 	streamCfg := &stream.StreamConfig{
 		Provider: os.Getenv("STREAM_PROVIDER"),
 		RedisConfig: redis.NewRedisStreamConfig(
@@ -69,67 +49,8 @@ func main() {
 		),
 	}
 
-	// Aggregator weights
-	precheckWeight, err := strconv.ParseFloat(os.Getenv("PRECHECK_WEIGHT"), 64)
-	if err != nil {
-		precheckWeight = 0.3
-	}
-	llmJudgeWeight, err := strconv.ParseFloat(os.Getenv("LLM_JUDGE_WEIGHT"), 64)
-	if err != nil {
-		llmJudgeWeight = 0.7
-	}
-
-	// Wire Components
-	// Stage 1 — PreChecks
-	stageRunner := prechecks.NewStageRunner([]prechecks.Checker{
-		&prechecks.LengthChecker{},
-		&prechecks.OverlapChecker{MinOverlapThreshold: 0.3},
-		&prechecks.FormatChecker{},
-	})
-
-	// Stage 2 — LLM Judges (from YAML config)
-	judgesConfig, err := config.LoadJudgesConfig()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load judges config")
-	}
-
-	judgePool := judge.NewJudgePool(registry, &logger)
-	judges, err := judgePool.BuildFromConfig(judgesConfig)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to build judges from config")
-	}
-
-	judgeRunner := judge.NewJudgeRunner(judges, &logger)
-
-	// Aggregator
-	verdictPassThreshold, _ := strconv.ParseFloat(os.Getenv("VERDICT_PASS_THRESHOLD"), 64)
-	if verdictPassThreshold == 0 {
-		verdictPassThreshold = 0.8
-	}
-	verdictReviewThreshold, _ := strconv.ParseFloat(os.Getenv("VERDICT_REVIEW_THRESHOLD"), 64)
-	if verdictReviewThreshold == 0 {
-		verdictReviewThreshold = 0.5
-	}
-	agg := aggregator.NewAggregator(
-		aggregator.Weights{
-			PreChecks: precheckWeight,
-			LLMJudge:  llmJudgeWeight,
-		},
-		aggregator.VerdictThresholds{
-			Pass:   verdictPassThreshold,
-			Review: verdictReviewThreshold,
-		},
-		&logger,
-	)
-
-	// Executor
-	earlyExit, _ := strconv.ParseFloat(os.Getenv("EARLY_EXIT_THRESHOLD"), 64)
-	if earlyExit == 0 {
-		earlyExit = 0.2
-	}
-	exec := executor.NewExecutor(stageRunner, judgeRunner, agg, earlyExit, &logger)
-
-	consumer, err := stream.NewStreamConsumer(ctx, streamCfg, exec, &logger)
+	// Create stream consumer with shared executor
+	consumer, err := stream.NewStreamConsumer(ctx, streamCfg, deps.Executor, &logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create stream consumer")
 	}
