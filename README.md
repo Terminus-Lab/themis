@@ -1,2 +1,222 @@
 # Themis
-LLM evaluation framework with validated judges. Multi-dimensional scoring (relevance, faithfulness, coherence) with built-in human correlation validation (Kendall's τ). API, batch, and annotation workflows. 
+
+**Themis** is an evaluation service for AI agent responses. It uses configurable LLM judges running in parallel to assess response quality across multiple dimensions.
+
+## What Is This?
+
+Themis is an **evaluation service/framework** that can be deployed in multiple modes for different use cases:
+
+- **HTTP API** - Fast synchronous evaluation for real-time checks
+- **Redis Streams** - Asynchronous stream processing for production monitoring
+- **CLI (Batch)** - Offline evaluation with statistical validation (Kendall's tau)
+- **MCP Server** - Integration with coding assistants (Claude Code, Claude Desktop, Cursor)
+
+It evaluates AI responses using a two-stage pipeline: fast heuristics (prechecks) followed by parallel LLM judge evaluation.
+
+## Philosophy
+
+### 1. Configurable Multi-Provider Judges
+
+Each judge is defined in `configs/judges.yaml` with complete flexibility:
+
+- **Different LLM providers**: Mix AWS Bedrock Claude and Azure OpenAI GPT in the same evaluation
+- **Different models per judge**: Each judge can use its own model (e.g., Judge A uses Claude Sonnet, Judge B uses GPT-4o-mini)
+- **Custom prompts**: Edit evaluation prompts without code changes
+- **Weighted scoring**: Each judge contributes differently to the final score
+
+**Example configuration**: Run the same prompt with both Claude and GPT, or run different prompts for different quality dimensions.
+
+### 2. Multiple Deployment Modes
+
+**API Mode** - For fast synchronous checks:
+```bash
+go run cmd/api/main.go
+curl -X POST http://localhost:18082/api/v1/evaluate -d '{...}'
+```
+
+**Redis Streams Mode** - For real-time stream analysis:
+```bash
+go run cmd/streaming/main.go
+```
+Designed to process streaming events of data for continuous production monitoring.
+
+**CLI Batch Mode** - For offline evaluation and judge validation:
+```bash
+go run cmd/batch/main.go -input dataset.jsonl -output results.jsonl
+```
+Unique features only available in CLI mode:
+- Kendall's tau correlation analysis against human annotations
+- Statistical validation reports (JSON output)
+- Summary generation with aggregated statistics
+
+**MCP Mode** - For local coding assistant integration:
+```bash
+go run cmd/mcp/main.go
+```
+
+### 3. Results Handling
+
+Results are currently **logged** via structured logging (zerolog). Depending on your use case, you can extend the service to:
+- Save results to a database
+- Publish to Kafka topics for downstream processing
+- Stream to observability platforms
+- Integrate with your existing monitoring infrastructure
+
+## Configuration
+
+Secrets and configuration are loaded from a `.env` file:
+
+```env
+# AWS Bedrock credentials (if using Claude)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+
+# Azure OpenAI credentials (if using GPT)
+OPEN_AI_KEY=your_azure_openai_api_key
+AZURE_OPENAI_ENDPOINT=https://...openai.azure.com/...
+
+# Service configuration
+EVAL_AGENT_API_PORT=18082
+EARLY_EXIT_THRESHOLD=0.2
+PRECHECK_WEIGHT=0.3
+LLM_JUDGE_WEIGHT=0.7
+```
+
+Judge configurations (prompts, models, weights) are defined in `configs/judges.yaml`:
+
+```yaml
+judges:
+  evaluators:
+    - name: relevance
+      enabled: true
+      weight: 0.25
+      model:
+        modelFamily: "anthropic"
+        modelID: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+      prompt: |
+        You are an evaluation judge...
+
+    - name: coherence
+      enabled: true
+      weight: 0.15
+      model:
+        modelFamily: "openai"
+        modelID: gpt-4o-mini
+      prompt: |
+        Evaluate logical consistency...
+```
+
+## Quick Start
+
+### Prerequisites
+- Go 1.21+
+- AWS Bedrock access (for Claude models) OR Azure OpenAI access (for GPT models)
+
+### Run API Server
+```bash
+# Create .env file with credentials
+cp .env.example .env  # Edit with your credentials
+
+# Start API server
+go run cmd/api/main.go
+```
+
+### Evaluate a Response
+```bash
+curl -X POST http://localhost:18082/api/v1/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "test-1",
+    "event_type": "agent_response",
+    "agent": {"name": "my-agent", "version": "1.0"},
+    "interaction": {
+      "user_query": "What is the capital of France?",
+      "answer": "Paris"
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "id": "test-1",
+  "stages": [
+    {"name": "length-checker", "score": 1.0},
+    {"name": "overlap-checker", "score": 0.85},
+    {"name": "relevance-judge", "score": 0.95},
+    {"name": "coherence-judge", "score": 1.0}
+  ],
+  "confidence": 0.92,
+  "verdict": "pass"
+}
+```
+
+## How It Works
+
+### Two-Stage Pipeline
+
+```
+Request → [Stage 1: Prechecks] → Early Exit Check → [Stage 2: LLM Judges] → Aggregation → Result
+```
+
+**Stage 1 (Prechecks)**: Fast heuristics without LLM calls
+- Length checker, overlap checker, format checker
+- If average score < 0.2, returns `fail` verdict immediately (saves 80% LLM cost)
+
+**Stage 2 (LLM Judges)**: Parallel execution of configured judges
+- Evaluates: relevance, faithfulness, coherence, completeness, instruction-following, correctness
+- Each judge runs concurrently (15s timeout)
+- Judges auto-skip if required fields are missing
+
+**Aggregation**: Weighted combination
+```
+confidence = (avg_stage1 × 0.3) + (avg_stage2 × 0.7)
+verdict = "pass" if > 0.8, "review" if > 0.5, else "fail"
+```
+
+## Documentation
+
+Comprehensive testing guides for each deployment mode:
+
+| Mode | Documentation |
+|------|---------------|
+| **API** | [docs/api_test_cases.md](docs/api_test_cases.md) |
+| **Redis Streams** | [docs/redis_test_cases.md](docs/redis_test_cases.md) |
+| **Batch/CLI** | [docs/batch_evaluation_test_cases.md](docs/batch_evaluation_test_cases.md) |
+| **MCP** | [docs/mcp_test_cases.md](docs/mcp_test_cases.md) |
+
+## Key Features
+
+- **Multi-Provider LLM Support**: Mix AWS Bedrock Claude and Azure OpenAI GPT in single pipeline
+- **Parallel Judge Execution**: All judges run concurrently for sub-5s latency
+- **YAML-Driven Configuration**: Edit prompts and models without code changes
+- **Statistical Validation**: Kendall's tau correlation against human annotations (CLI mode only)
+- **Early Exit Optimization**: Skip LLM calls for obviously poor responses
+- **Flexible Deployment**: API, streaming, batch, and MCP modes
+- **Extensible Results**: Log, store in DB, or publish to Kafka
+
+## Development
+
+### Run Tests
+```bash
+go test ./...
+```
+
+### Build Docker Image (MCP)
+```bash
+docker build -t themis-mcp .
+docker run --env-file .env themis-mcp
+```
+
+### Validate Judge Configuration
+```bash
+go run cmd/batch/main.go \
+  -input human_annotated_sample.jsonl \
+  -validate \
+  -correlation-threshold 0.3
+```
+
+## License
+
+MIT
