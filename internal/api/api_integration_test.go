@@ -10,8 +10,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/emicklei/go-restful/v3"
-	"github.com/joho/godotenv"
 	"github.com/Terminus-Lab/themis/internal/aggregator"
 	"github.com/Terminus-Lab/themis/internal/api"
 	"github.com/Terminus-Lab/themis/internal/config"
@@ -22,6 +20,8 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/prechecks"
+	"github.com/emicklei/go-restful/v3"
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 )
 
@@ -141,6 +141,13 @@ func TestAPI_Evaluate_FullPipeline(t *testing.T) {
 	if result.Confidence < 0 || result.Confidence > 1 {
 		t.Errorf("Expected confidence in [0,1], got %f", result.Confidence)
 	}
+
+	// Log results
+	t.Logf("Full Pipeline Result: verdict=%s, confidence=%.3f, stages=%d",
+		result.Verdict, result.Confidence, len(result.Stages))
+	t.Logf("Metrics: weighted_avg=%.3f, harmonic_mean=%.3f, median=%.3f, product=%.3f",
+		result.Metrics.Stage2WeightedAvg, result.Metrics.Stage2HarmonicMean,
+		result.Metrics.Stage2Median, result.Metrics.Stage2WeightedProduct)
 }
 
 /*
@@ -193,6 +200,12 @@ func TestAPI_EvaluateSingleJudge_Relevance(t *testing.T) {
 	if len(result.Stages) > 0 && result.Stages[0].Name != "relevance-judge" {
 		t.Errorf("Expected 'relevance-judge', got '%s'", result.Stages[0].Name)
 	}
+
+	// Log results
+	if len(result.Stages) > 0 {
+		t.Logf("Relevance Judge: verdict=%s, confidence=%.3f, score=%.3f",
+			result.Verdict, result.Confidence, result.Stages[0].Score)
+	}
 }
 
 /*
@@ -244,6 +257,12 @@ func TestAPI_EvaluateSingleJudge_Faithfulness(t *testing.T) {
 	if len(result.Stages) > 0 && result.Stages[0].Name != "faithfulness-judge" {
 		t.Errorf("Expected 'faithfulness-judge', got '%s'", result.Stages[0].Name)
 	}
+
+	// Log results
+	if len(result.Stages) > 0 {
+		t.Logf("Faithfulness Judge: verdict=%s, confidence=%.3f, score=%.3f",
+			result.Verdict, result.Confidence, result.Stages[0].Score)
+	}
 }
 
 /*
@@ -286,6 +305,11 @@ func TestAPI_Evaluate_MultipleJudges(t *testing.T) {
 		var result models.EvaluationResult
 		json.Unmarshal(recorder.Body.Bytes(), &result)
 
+		// Log results
+		if len(result.Stages) > 0 {
+			t.Logf("Judge %s: verdict=%s, confidence=%.3f, score=%.3f",
+				judgeName, result.Verdict, result.Confidence, result.Stages[0].Score)
+		}
 	}
 }
 
@@ -349,6 +373,9 @@ func TestAPI_Evaluate_EarlyExit(t *testing.T) {
 		t.Errorf("Expected 'fail' verdict for early exit, got '%s'", result.Verdict)
 	}
 
+	// Log results
+	t.Logf("Early Exit Result: verdict=%s, confidence=%.3f, stages=%d (prechecks only)",
+		result.Verdict, result.Confidence, len(result.Stages))
 }
 
 // setupTestAPI creates API with REAL LLM client
@@ -448,6 +475,20 @@ func setupTestAPI(t *testing.T) *restful.Container {
 	judgeRunner := judge.NewJudgeRunner(judges, &logger)
 	judgeFactory := judge.NewJudgeFactory(judges, &logger)
 
+	// Aggregator Config
+	var judgeAggMethod models.AggregationMethod
+	aggMethod := os.Getenv("JUDGE_AGGREGATION_METHOD")
+	if aggMethod == "" {
+		judgeAggMethod = models.MethodWeightedAverage
+	} else {
+		judgeAggMethod = models.AggregationMethod(aggMethod)
+	}
+
+	aggConfig := aggregator.AggregationConfig{
+		EnablePrecheck:         true,
+		JudgeAggregationMethod: judgeAggMethod,
+	}
+
 	// Aggregator
 	agg := aggregator.NewAggregator(
 		aggregator.Weights{
@@ -458,6 +499,7 @@ func setupTestAPI(t *testing.T) *restful.Container {
 			Pass:   0.8,
 			Review: 0.5,
 		},
+		aggConfig,
 		&logger,
 	)
 

@@ -62,17 +62,21 @@ docker run --env-file .env themis-mcp
 
 **Flow**: Request → Prechecks → Early Exit Check → LLM Judges (parallel) → Aggregation → Result
 
-1. **Prechecks** (`internal/prechecks/`): Fast heuristics without LLM calls
+1. **Prechecks** (`internal/prechecks/`): Fast heuristics without LLM calls (optional)
    - Length checker, overlap checker, format checker
    - If average score < 0.2, early exit with `fail` verdict (saves 80% LLM cost)
+   - Can be disabled via `ENABLE_PRECHECK=false` to use Stage 2 only
 
 2. **LLM Judges** (`internal/judge/`): Parallel execution of 6 judges
    - Relevance, faithfulness, coherence, completeness, instruction, correctness
    - Each judge runs concurrently (15s timeout per judge)
    - Skip logic: Judges auto-skip if required fields missing (e.g., correctness needs `expected_output`)
 
-3. **Aggregation** (`internal/aggregator/`): Weighted combination
-   - `confidence = (avg_stage1 × 0.3) + (avg_stage2 × 0.7)`
+3. **Aggregation** (`internal/aggregator/`): Configurable combination
+   - Stage 1 can be disabled via `ENABLE_PRECHECK=false`
+   - Stage 2 aggregation method configurable: `weighted_average`, `harmonic_mean`, `median`, `weighted_product`
+   - All 4 Stage 2 methods computed and returned in metrics
+   - `confidence = (avg_stage1 × 0.3) + (stage2_selected × 0.7)` if prechecks enabled, else `confidence = stage2_selected`
    - Verdict thresholds are configurable via env vars (defaults: pass=0.8, review=0.5)
    - Verdict: `pass` (> pass threshold), `review` (> review threshold), `fail` (≤ review threshold)
 
@@ -152,6 +156,8 @@ PRECHECK_WEIGHT=0.3                # Stage 1 weight in aggregation
 LLM_JUDGE_WEIGHT=0.7               # Stage 2 weight in aggregation
 VERDICT_PASS_THRESHOLD=0.8         # Confidence > this → "pass"
 VERDICT_REVIEW_THRESHOLD=0.5       # Confidence > this → "review", else "fail"
+ENABLE_PRECHECK=true               # Enable Stage 1 prechecks
+JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2: weighted_average, harmonic_mean, median, weighted_product
 ```
 
 ### Judge Configuration (configs/judges.yaml)
@@ -174,6 +180,29 @@ Each judge specifies:
 ### Skip Logic
 
 Judges with `requires_context: true` or `requires_expected_output: true` automatically skip if required field is missing in request. This maintains backwards compatibility - existing requests without optional fields continue working unchanged.
+
+### Stage 2 Aggregation Methods
+
+Four methods available for combining LLM judge scores (`JUDGE_AGGREGATION_METHOD`):
+
+1. **weighted_average** (default): Linear combination using judge weights from `judges.yaml`
+   - Formula: `sum(score × weight) / sum(weight)`
+   - Best for: General purpose, balanced evaluation
+
+2. **harmonic_mean**: Weighted harmonic mean - heavily penalizes low scores
+   - Formula: `sum(weight) / sum(weight/score)`
+   - Best for: Quality control where one bad judge matters
+   - Returns 0 if any score is 0
+
+3. **median**: Middle score value (ignores weights)
+   - Formula: Middle value after sorting, or average of two middle values if even count
+   - Best for: Robust to outliers, simple evaluation
+
+4. **weighted_product**: Multiplicative combination - one low score tanks everything
+   - Formula: `product(score^normalized_weight)`
+   - Best for: Strict evaluation where all judges must agree
+
+**All methods are computed on every request** and returned in `metrics` field for transparency and experimentation.
 
 ## Key Packages
 
@@ -220,6 +249,36 @@ Iterative prompt tuning workflow:
 2. Run batch evaluation on validation set
 3. Compare Kendall's τ with previous version
 4. Deploy if τ ≥ 0.3 and improved
+
+### Testing Aggregation Methods
+
+Experiment with different Stage 2 aggregation methods:
+```bash
+# Test with weighted average (default)
+JUDGE_AGGREGATION_METHOD=weighted_average go run cmd/api/main.go
+
+# Test with harmonic mean (penalizes low scores)
+JUDGE_AGGREGATION_METHOD=harmonic_mean go run cmd/api/main.go
+
+# Test with median (robust to outliers)
+JUDGE_AGGREGATION_METHOD=median go run cmd/api/main.go
+
+# Test with weighted product (strict - all must agree)
+JUDGE_AGGREGATION_METHOD=weighted_product go run cmd/api/main.go
+```
+
+Check metrics in response to compare all methods:
+```json
+{
+  "metrics": {
+    "stage2_weighted_avg": 0.85,
+    "stage2_harmonic_mean": 0.82,
+    "stage2_median": 0.87,
+    "stage2_weighted_product": 0.79,
+    "aggregation_method": "weighted_average"
+  }
+}
+```
 
 ### Adding LLM Provider Support
 

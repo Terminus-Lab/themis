@@ -5,6 +5,14 @@ import (
 )
 
 type Verdict string
+type AggregationMethod string
+
+const (
+	MethodWeightedAverage AggregationMethod = "weighted_average"
+	MethodHarmonicMean    AggregationMethod = "harmonic_mean"
+	MethodMedian          AggregationMethod = "median"
+	MethodWeightedProduct AggregationMethod = "weighted_product"
+)
 
 const (
 	VerdictPass   Verdict = "pass"
@@ -35,11 +43,11 @@ type Interaction struct {
 // Input message
 
 type EvaluationRequest struct {
-	EventID          string      `json:"event_id"`
-	EventType        EventType   `json:"event_type"`
-	Agent            Agent       `json:"agent"`
-	Interaction      Interaction `json:"interaction"`
-	HumanAnnotation  *string     `json:"human_annotation,omitempty"` // Optional: for validation mode
+	EventID         string      `json:"event_id"`
+	EventType       EventType   `json:"event_type"`
+	Agent           Agent       `json:"agent"`
+	Interaction     Interaction `json:"interaction"`
+	HumanAnnotation *string     `json:"human_annotation,omitempty"` // Optional: for validation mode
 }
 
 // Normalized internal object
@@ -63,8 +71,19 @@ type StageResult struct {
 
 // Final output emitted to Kafka
 type EvaluationResult struct {
-	ID         string        `json:"id"`
-	Stages     []StageResult `json:"stages"`
-	Confidence float64       `json:"confidence"`
-	Verdict    Verdict       `json:"verdict"`
+	ID         string             `json:"id"`
+	Stages     []StageResult      `json:"stages"`
+	Confidence float64            `json:"confidence"`
+	Verdict    Verdict            `json:"verdict"`
+	Metrics    AggregationMetrics `json:"metrics"`
+}
+
+type AggregationMetrics struct {
+	Stage1Avg             float64           `json:"stage1_avg"`
+	Stage2WeightedAvg     float64           `json:"stage2_weighted_avg"`
+	Stage2HarmonicMean    float64           `json:"stage2_harmonic_mean"`
+	Stage2Median          float64           `json:"stage2_median"`
+	Stage2WeightedProduct float64           `json:"stage2_weighted_product"`
+	FinalConfidence       float64           `json:"final_confidence"`
+	MethodUsed            AggregationMethod `json:"aggregation_method"`
 }

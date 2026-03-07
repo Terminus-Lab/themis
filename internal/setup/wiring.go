@@ -13,6 +13,7 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm"
 	"github.com/Terminus-Lab/themis/internal/llm/aws"
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
+	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/prechecks"
 	"github.com/rs/zerolog"
 )
@@ -24,11 +25,13 @@ type Config struct {
 	OpenAIModelID          string
 	AzureOpenAIEndpoint    string
 	DefaultProvider        string
+	EnablePrecheck         bool
 	PrecheckWeight         float64
 	LLMJudgeWeight         float64
 	EarlyExitThreshold     float64
 	VerdictPassThreshold   float64
 	VerdictReviewThreshold float64
+	JudgeAggregationMethod string
 }
 
 type Dependencies struct {
@@ -45,11 +48,13 @@ func LoadConfig() *Config {
 		OpenAIModelID:          getEnv("OPEN_AI_MODEL_ID", ""),
 		AzureOpenAIEndpoint:    getEnv("AZURE_OPENAI_ENDPOINT", ""),
 		DefaultProvider:        getEnv("DEFAULT_LLM_PROVIDER", "bedrock"),
+		EnablePrecheck:         getEnvBool("ENABLE_PRECHECK", true),
 		PrecheckWeight:         getEnvFloat("PRECHECK_WEIGHT", 0.3),
 		LLMJudgeWeight:         getEnvFloat("LLM_JUDGE_WEIGHT", 0.7),
 		EarlyExitThreshold:     getEnvFloat("EARLY_EXIT_THRESHOLD", 0.2),
 		VerdictPassThreshold:   getEnvFloat("VERDICT_PASS_THRESHOLD", 0.8),
 		VerdictReviewThreshold: getEnvFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
+		JudgeAggregationMethod: getEnv("JUDGE_AGGREGATION_METHOD", ""),
 	}
 }
 
@@ -87,6 +92,18 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 	judgeFactory := judge.NewJudgeFactory(judges, logger)
 
 	// Aggregator
+	var judgeAggMethod models.AggregationMethod
+	if cfg.JudgeAggregationMethod == "" {
+		judgeAggMethod = models.MethodWeightedAverage
+	} else {
+		judgeAggMethod = models.AggregationMethod(cfg.JudgeAggregationMethod)
+	}
+
+	aggConfig := aggregator.AggregationConfig{
+		EnablePrecheck:         cfg.EnablePrecheck,
+		JudgeAggregationMethod: judgeAggMethod,
+	}
+
 	agg := aggregator.NewAggregator(
 		aggregator.Weights{
 			PreChecks: cfg.PrecheckWeight,
@@ -96,6 +113,7 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 			Pass:   cfg.VerdictPassThreshold,
 			Review: cfg.VerdictReviewThreshold,
 		},
+		aggConfig,
 		logger,
 	)
 
@@ -109,6 +127,20 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 		Logger:        logger,
 	}, nil
 
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+
+	return parsed
 }
 
 func getEnv(key string, defaultValue string) string {

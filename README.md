@@ -85,6 +85,10 @@ LLM_JUDGE_WEIGHT=0.7
 # Verdict thresholds
 VERDICT_PASS_THRESHOLD=0.8      # Confidence > 0.8 → "pass"
 VERDICT_REVIEW_THRESHOLD=0.5    # Confidence > 0.5 → "review", else "fail"
+
+# Aggregation configuration
+ENABLE_PRECHECK=true                           # Enable/disable Stage 1 prechecks (default: true)
+JUDGE_AGGREGATION_METHOD=weighted_average      # Stage 2 method: weighted_average, harmonic_mean, median, weighted_product
 ```
 
 Judge configurations (prompts, models, weights) are defined in `configs/judges.yaml`:
@@ -152,7 +156,16 @@ Response:
     {"name": "coherence-judge", "score": 1.0}
   ],
   "confidence": 0.92,
-  "verdict": "pass"
+  "verdict": "pass",
+  "metrics": {
+    "stage1_avg": 0.85,
+    "stage2_weighted_avg": 0.92,
+    "stage2_harmonic_mean": 0.90,
+    "stage2_median": 0.93,
+    "stage2_weighted_product": 0.91,
+    "final_confidence": 0.92,
+    "aggregation_method": "weighted_average"
+  }
 }
 ```
 
@@ -169,6 +182,34 @@ The verdict thresholds determine how confidence scores map to verdicts:
 - **Strict quality requirements**: Increase review threshold to 0.6-0.7
 - **A/B testing**: Experiment with different thresholds to optimize for your metrics
 
+### Stage 2 Aggregation Methods
+
+Choose how LLM judge scores are combined using `JUDGE_AGGREGATION_METHOD`:
+
+| Method | Behavior | Use Case |
+|--------|----------|----------|
+| **weighted_average** (default) | Linear combination using judge weights | Balanced, general purpose |
+| **harmonic_mean** | Heavily penalizes low outliers | Quality control - one bad judge matters |
+| **median** | Middle value, ignores weights | Robust to extreme scores |
+| **weighted_product** | Multiplicative - one low score tanks result | Strict - all judges must agree |
+
+**Example configurations:**
+```env
+# Strict evaluation - all judges must agree
+JUDGE_AGGREGATION_METHOD=weighted_product
+
+# Balanced evaluation (default)
+JUDGE_AGGREGATION_METHOD=weighted_average
+
+# Robust to outliers
+JUDGE_AGGREGATION_METHOD=median
+
+# Quality control - penalize bad scores
+JUDGE_AGGREGATION_METHOD=harmonic_mean
+```
+
+**All methods are computed and returned in `metrics`** - you can experiment without re-running evaluations by examining different scores in the response.
+
 ## How It Works
 
 ### Two-Stage Pipeline
@@ -177,20 +218,33 @@ The verdict thresholds determine how confidence scores map to verdicts:
 Request → [Stage 1: Prechecks] → Early Exit Check → [Stage 2: LLM Judges] → Aggregation → Result
 ```
 
-**Stage 1 (Prechecks)**: Fast heuristics without LLM calls
+**Stage 1 (Prechecks)**: Fast heuristics without LLM calls (optional - can be disabled)
 - Length checker, overlap checker, format checker
 - If average score < 0.2, returns `fail` verdict immediately (saves 80% LLM cost)
+- Disable with `ENABLE_PRECHECK=false` to use Stage 2 only
 
 **Stage 2 (LLM Judges)**: Parallel execution of configured judges
 - Evaluates: relevance, faithfulness, coherence, completeness, instruction-following, correctness
 - Each judge runs concurrently (15s timeout)
 - Judges auto-skip if required fields are missing
+- **4 aggregation methods available**: weighted_average, harmonic_mean, median, weighted_product
 
-**Aggregation**: Weighted combination
+**Aggregation**: Configurable combination methods
 ```
-confidence = (avg_stage1 × 0.3) + (avg_stage2 × 0.7)
-verdict = "pass" if > 0.8, "review" if > 0.5, else "fail"
+# Stage 2 aggregation (choose method via JUDGE_AGGREGATION_METHOD)
+stage2_score = weighted_average | harmonic_mean | median | weighted_product
+
+# Final confidence (if prechecks enabled)
+confidence = (avg_stage1 × 0.3) + (stage2_score × 0.7)
+
+# Or if prechecks disabled (ENABLE_PRECHECK=false)
+confidence = stage2_score
+
+# Verdict (configurable thresholds)
+verdict = "pass" if > pass_threshold, "review" if > review_threshold, else "fail"
 ```
+
+**All 4 Stage 2 methods are computed and returned in `metrics`** for transparency and experimentation.
 
 ## Documentation
 
@@ -208,6 +262,10 @@ Comprehensive testing guides for each deployment mode:
 - **Multi-Provider LLM Support**: Mix AWS Bedrock Claude and Azure OpenAI GPT in single pipeline
 - **Parallel Judge Execution**: All judges run concurrently for sub-5s latency
 - **YAML-Driven Configuration**: Edit prompts and models without code changes
+- **Configurable Aggregation**: 4 methods (weighted_average, harmonic_mean, median, weighted_product)
+- **Optional Prechecks**: Enable/disable Stage 1 heuristics
+- **Configurable Thresholds**: Adjust pass/review/fail boundaries per use case
+- **Transparent Metrics**: All aggregation methods computed and returned in response
 - **Statistical Validation**: Kendall's tau correlation against human annotations (CLI mode only)
 - **Early Exit Optimization**: Skip LLM calls for obviously poor responses
 - **Flexible Deployment**: API, streaming, batch, and MCP modes
