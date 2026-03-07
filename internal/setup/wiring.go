@@ -13,6 +13,7 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm"
 	"github.com/Terminus-Lab/themis/internal/llm/aws"
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
+	"github.com/Terminus-Lab/themis/internal/llm/openaiplatform"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/prechecks"
 	"github.com/rs/zerolog"
@@ -211,7 +212,18 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 				clients[family] = make(map[string]llm.LLMClient)
 			}
 			clients[family][model.modelID] = client
-
+		case llm.FamilyOpenAIPlatform:
+			if cfg.OpenAIKey == "" {
+				return nil, fmt.Errorf("OPEN_AI_KEY required for openai_platform model %s", model.modelID)
+			}
+			client, err := openaiplatform.NewClient(ctx, cfg.OpenAIKey, model.modelID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create OpenAI Platform client for model %s: %w", model.modelID, err)
+			}
+			if clients[family] == nil {
+				clients[family] = make(map[string]llm.LLMClient)
+			}
+			clients[family][model.modelID] = client
 		default:
 			return nil, fmt.Errorf("unsupported model family: %s", model.family)
 		}

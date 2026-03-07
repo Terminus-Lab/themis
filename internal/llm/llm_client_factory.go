@@ -5,8 +5,9 @@ import "fmt"
 type LLMFamily string
 
 const (
-	FamilyAnthropic LLMFamily = "anthropic"
-	FamilyOpenAI    LLMFamily = "openai"
+	FamilyAnthropic      LLMFamily = "anthropic"
+	FamilyOpenAI         LLMFamily = "openai"
+	FamilyOpenAIPlatform LLMFamily = "openai_platform"
 )
 
 // LLMClientRegistry stores LLM clients organized by family and model ID
