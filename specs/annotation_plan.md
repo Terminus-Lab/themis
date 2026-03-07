@@ -1,13 +1,8 @@
-# Themis - Phase 2 Implementation Plan
-
-**Date**: 2026-03-06
-**Status**: Planning
-
----
+## Annotation
 
 ## Overview
 
-Phase 2 adds **persistent storage**, **query API**, and **annotation UI** to enable human-in-the-loop validation and continuous judge calibration.
+Add **persistent storage**, **query API**, and **annotation UI** to enable human-in-the-loop validation and continuous judge calibration.
 
 ### Goals
 
@@ -57,42 +52,7 @@ Phase 2 adds **persistent storage**, **query API**, and **annotation UI** to ena
 
 ---
 
-## Phase 1 Recap (Completed)
-
-- ✅ **Parallel judge execution** with configurable weights
-- ✅ **HTTP API** for single request evaluation
-- ✅ **Redis Stream consumer** for async processing
-- ✅ **Batch processing** with worker pools
-- ✅ **Judge validation** with Kendall's τ correlation
-- ✅ **MCP integration** for Claude Code/Desktop/Cursor
-- ✅ **Multi-provider support** (AWS Bedrock + Azure OpenAI)
-
-**Current limitation**: Results are returned but not persisted. No annotation workflow.
-
----
-
-## Phase 2 Components
-
-### 1. Repository Rename: eval-agent → themis
-
-**Rationale**: "Themis" (Greek goddess of justice) better represents the evaluation/judgment focus. Not an agent, not just a service - a judgment framework.
-
-**Tasks**:
-- [ ] Rename repository: `terminus-lab/themis`
-- [ ] Update all `go.mod` imports
-- [ ] Update Docker image names
-- [ ] Update README with new branding
-- [ ] Update all documentation references
-
-**README emphasis**:
-- **What it does**: Production LLM evaluation framework with validated judges
-- **Core capability**: Multi-dimensional quality scoring (relevance, faithfulness, coherence, etc.)
-- **Differentiator**: Only open-source LLM-as-Judge with built-in human validation (Kendall's τ)
-- **Extensibility**: Custom judges, weight calibration, annotation workflows
-
----
-
-### 2. Database Schema
+### 1. Database Schema
 
 **Technology**: PostgreSQL with partitioning (for TTL)
 
