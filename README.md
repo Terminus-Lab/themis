@@ -19,7 +19,7 @@ It evaluates AI responses using a two-stage pipeline: fast heuristics (prechecks
 
 Each judge is defined in `configs/judges.yaml` with complete flexibility:
 
-- **Different LLM providers**: Mix AWS Bedrock Claude and Azure OpenAI GPT in the same evaluation
+- **Different LLM providers**: Mix AWS Bedrock Claude, Azure OpenAI GPT, and OpenAI Platform in the same evaluation
 - **Different models per judge**: Each judge can use its own model (e.g., Judge A uses Claude Sonnet, Judge B uses GPT-4o-mini)
 - **Custom prompts**: Edit evaluation prompts without code changes
 - **Weighted scoring**: Each judge contributes differently to the final score
@@ -67,14 +67,17 @@ Results are currently **logged** via structured logging (zerolog). Depending on 
 Secrets and configuration are loaded from a `.env` file:
 
 ```env
-# AWS Bedrock credentials (if using Claude)
+# AWS Bedrock credentials (if using Claude models)
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
 
-# Azure OpenAI credentials (if using GPT)
+# Azure OpenAI credentials (if using Azure-hosted GPT models)
 OPEN_AI_KEY=your_azure_openai_api_key
 AZURE_OPENAI_ENDPOINT=https://...openai.azure.com/...
+
+# OpenAI Platform credentials (if using direct OpenAI API)
+OPEN_AI_KEY=sk-proj-...  # Standard OpenAI API key
 
 # Service configuration
 EVAL_AGENT_API_PORT=18082
@@ -95,6 +98,10 @@ Judge configurations (prompts, models, weights) are defined in `configs/judges.y
 
 ```yaml
 judges:
+  default_model:
+    modelFamily: "openai_platform"  # Options: anthropic, openai, openai_platform
+    modelID: gpt-4o-mini            # Default model for all judges
+
   evaluators:
     - name: relevance
       enabled: true
@@ -109,7 +116,7 @@ judges:
       enabled: true
       weight: 0.15
       model:
-        modelFamily: "openai"
+        modelFamily: "openai_platform"
         modelID: gpt-4o-mini
       prompt: |
         Evaluate logical consistency...
@@ -119,7 +126,10 @@ judges:
 
 ### Prerequisites
 - Go 1.21+
-- AWS Bedrock access (for Claude models) OR Azure OpenAI access (for GPT models)
+- One of the following LLM provider credentials:
+  - **OpenAI Platform** API key (simplest - just `OPEN_AI_KEY`)
+  - **AWS Bedrock** access (for Claude models)
+  - **Azure OpenAI** access (for Azure-hosted GPT models)
 
 ### Run API Server
 ```bash
@@ -259,7 +269,7 @@ Comprehensive testing guides for each deployment mode:
 
 ## Key Features
 
-- **Multi-Provider LLM Support**: Mix AWS Bedrock Claude and Azure OpenAI GPT in single pipeline
+- **Multi-Provider LLM Support**: Mix AWS Bedrock Claude, Azure OpenAI GPT, and OpenAI Platform in single pipeline
 - **Parallel Judge Execution**: All judges run concurrently for sub-5s latency
 - **YAML-Driven Configuration**: Edit prompts and models without code changes
 - **Configurable Aggregation**: 4 methods (weighted_average, harmonic_mean, median, weighted_product)

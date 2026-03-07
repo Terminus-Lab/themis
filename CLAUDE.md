@@ -85,11 +85,14 @@ docker run --env-file .env themis-mcp
 **Registry Pattern** (`internal/llm/`): Single pipeline can use multiple LLM providers simultaneously.
 
 - Each judge in `configs/judges.yaml` specifies its own `modelFamily` and `modelID`
-- Supported families: `anthropic` (AWS Bedrock Claude), `openai` (Azure OpenAI GPT)
+- Supported families:
+  - `anthropic` - AWS Bedrock Claude models
+  - `openai` - Azure OpenAI GPT models
+  - `openai_platform` - OpenAI Platform (direct API with standard API key)
 - LLM client registry (`internal/llm/llm_client_factory.go`) maintains per-model clients
 - Judge pool (`internal/judge/pool.go`) automatically selects correct client per judge
 
-**Example**: Judge A uses Claude Sonnet, Judge B uses GPT-4o-mini, Judge C uses Claude Haiku - all in same evaluation.
+**Example**: Judge A uses Claude Sonnet, Judge B uses GPT-4o-mini from OpenAI Platform, Judge C uses Azure-hosted GPT-4 - all in same evaluation.
 
 ### Dependency Injection
 
@@ -97,7 +100,7 @@ docker run --env-file .env themis-mcp
 
 Order of initialization:
 1. Load `configs/judges.yaml` to discover required models
-2. Create LLM client registry with all referenced models (AWS Bedrock + Azure OpenAI)
+2. Create LLM client registry with all referenced models (AWS Bedrock + Azure OpenAI + OpenAI Platform)
 3. Build prechecks stage runner
 4. Build judge pool from config (creates LLMJudge instances)
 5. Create judge runner (parallel execution) and judge factory (single execution)
@@ -138,14 +141,17 @@ All entry points use same core dependencies via `setup.Wire()`.
 
 Required credentials (provider-dependent):
 ```bash
-# AWS Bedrock Claude
+# AWS Bedrock Claude (modelFamily: "anthropic")
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 
-# Azure OpenAI GPT
+# Azure OpenAI GPT (modelFamily: "openai")
 OPEN_AI_KEY=...
 AZURE_OPENAI_ENDPOINT=https://...openai.azure.com/openai/deployments/...
+
+# OpenAI Platform (modelFamily: "openai_platform")
+OPEN_AI_KEY=sk-proj-...  # Standard OpenAI API key - simplest option
 ```
 
 Pipeline configuration:
@@ -170,12 +176,12 @@ Each judge specifies:
 - `weight`: Contribution to final score
 - `requires_context`: Whether judge needs retrieved context (for RAG evaluation)
 - `requires_expected_output`: Whether judge needs ground truth (for correctness evaluation)
-- `model.modelFamily`: "anthropic" or "openai"
+- `model.modelFamily`: "anthropic", "openai", or "openai_platform"
 - `model.modelID`: Specific model identifier
 - `model.max_tokens`, `temperature`, `retry`: Model settings
 - `prompt`: Judge-specific evaluation prompt (uses Go template syntax)
 
-**Important**: Each judge can use a different model. Mix Claude and GPT in same pipeline.
+**Important**: Each judge can use a different model and provider. Mix Claude, Azure GPT, and OpenAI Platform GPT in same pipeline.
 
 ### Skip Logic
 
@@ -282,12 +288,14 @@ Check metrics in response to compare all methods:
 
 ### Adding LLM Provider Support
 
-To add a new LLM provider (e.g., Anthropic direct API, Vertex AI):
-1. Create new package in `internal/llm/<provider>/`
+To add a new LLM provider (e.g., Anthropic direct API, Vertex AI, Cohere):
+1. Create new package in `internal/llm/<provider>/` (e.g., `internal/llm/vertexai/`)
 2. Implement `LLMClient` interface from `internal/llm/client.go`
-3. Add new `LLMFamily` constant to `internal/llm/types.go`
-4. Update `createLLMClientRegistry()` in `internal/setup/wiring.go`
-5. Add provider credentials to `.env` and `Config` struct
+3. Add new `LLMFamily` constant to `internal/llm/llm_client_factory.go`
+4. Update `createLLMClientRegistry()` in `internal/setup/wiring.go` with new case
+5. Add provider credentials to `.env` and `Config` struct in `internal/setup/wiring.go`
+
+**Example**: See `internal/llm/openaiplatform/` for reference implementation.
 
 ### Parallel Execution
 
