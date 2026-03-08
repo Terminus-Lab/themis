@@ -7,7 +7,7 @@
 Themis is an **evaluation service/framework** that can be deployed in multiple modes for different use cases:
 
 - **HTTP API** - Fast synchronous evaluation for real-time checks
-- **Redis Streams** - Asynchronous stream processing for production monitoring
+- **API + Streaming** - Unified service running HTTP API and Redis stream consumer together
 - **CLI (Batch)** - Offline evaluation with statistical validation (Kendall's tau)
 - **MCP Server** - Integration with coding assistants (Claude Code, Claude Desktop, Cursor)
 
@@ -28,17 +28,25 @@ Each judge is defined in `configs/judges.yaml` with complete flexibility:
 
 ### 2. Multiple Deployment Modes
 
-**API Mode** - For fast synchronous checks:
+**API Mode** (Default) - For fast synchronous checks:
 ```bash
 go run cmd/api/main.go
 curl -X POST http://localhost:18082/api/v1/evaluate -d '{...}'
 ```
 
-**Redis Streams Mode** - For real-time stream analysis:
+**API + Streaming Mode** - Unified service for both HTTP and stream processing:
 ```bash
-go run cmd/streaming/main.go
+STREAMING_ENABLED=true go run cmd/api/main.go
 ```
-Designed to process streaming events of data for continuous production monitoring.
+- HTTP API available for manual testing and metrics (`/metrics` endpoint)
+- Redis stream consumer runs in background for continuous monitoring
+- Single deployment, single metrics endpoint, single health check
+
+**Benefits of unified mode:**
+- ✅ Prometheus metrics for both API and streaming
+- ✅ Manual testing via API while streaming runs
+- ✅ Simpler deployment (one service instead of two)
+- ✅ Graceful shutdown handles both HTTP and streaming
 
 **CLI Batch Mode** - For offline evaluation and judge validation:
 ```bash
@@ -52,6 +60,18 @@ Unique features only available in CLI mode:
 **MCP Mode** - For local coding assistant integration:
 ```bash
 go run cmd/mcp/main.go
+```
+
+**Horizontal Scaling** - Multiple streaming workers sharing load:
+```bash
+# Worker 1
+STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 go run cmd/api/main.go
+
+# Worker 2 (different port for metrics)
+STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 go run cmd/api/main.go
+
+# Each worker processes messages from same Redis stream
+# Redis consumer groups ensure no duplicate processing
 ```
 
 ### 3. Results Handling
@@ -84,6 +104,14 @@ EVAL_AGENT_API_PORT=18082
 EARLY_EXIT_THRESHOLD=0.2
 PRECHECK_WEIGHT=0.3
 LLM_JUDGE_WEIGHT=0.7
+
+# Streaming configuration (for API + Streaming mode)
+STREAMING_ENABLED=false           # Set to true to enable Redis stream consumer
+REDIS_ADDR=localhost:6379
+REDIS_PASSWORD=
+REDIS_STREAM_KEY=eval-events
+REDIS_CONSUMER_GROUP=eval-group
+REDIS_CONSUMER_NAME=consumer-1    # Unique per instance for horizontal scaling
 
 # Verdict thresholds
 VERDICT_PASS_THRESHOLD=0.8      # Confidence > 0.8 → "pass"
