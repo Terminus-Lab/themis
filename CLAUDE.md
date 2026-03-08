@@ -16,14 +16,14 @@ Module path: `github.com/Terminus-Lab/themis`
 
 ### Running Services
 ```bash
-# API server (HTTP endpoints)
+# API server (HTTP endpoints only)
 go run cmd/api/main.go
+
+# API + Streaming (unified service - recommended for production)
+STREAMING_ENABLED=true go run cmd/api/main.go
 
 # Batch evaluation (offline datasets)
 go run cmd/batch/main.go -input dataset.jsonl -output results.jsonl -workers 5
-
-# Redis stream consumer (asynchronous processing)
-go run cmd/streaming/main.go
 
 # MCP server (Claude Code/Desktop integration)
 go run cmd/mcp/main.go
@@ -109,29 +109,33 @@ Order of initialization:
 
 ### Entry Points
 
-Five independent entry points sharing core evaluation logic:
+Four entry points sharing core evaluation logic:
 
 1. **API** (`cmd/api/main.go`): REST endpoints with go-restful framework
    - `POST /api/v1/evaluate` - full pipeline
    - `POST /api/v1/evaluate/judge/{name}` - single judge
    - CORS enabled, structured logging
+   - **Can run in two modes:**
+     - **API only** (default): HTTP endpoints only
+     - **API + Streaming** (`STREAMING_ENABLED=true`): HTTP + Redis consumer in same process
+   - **Unified mode benefits:**
+     - Single deployment for both HTTP and streaming
+     - Prometheus `/metrics` endpoint for both modes
+     - Manual testing via API while streaming runs
+     - Graceful shutdown handles both HTTP and streaming
+     - Horizontal scaling with multiple consumer instances
 
 2. **Batch** (`cmd/batch/main.go`): CLI with concurrent worker pool
    - JSONL input/output formats
    - Validation mode with Kendall's τ correlation
    - Progress tracking, graceful shutdown
 
-3. **Streaming** (`cmd/streaming/main.go`): Redis Streams consumer
-   - Long-running consumer with acknowledgment
-   - Horizontal scaling support
-   - Fault tolerance via Redis persistence
-
-4. **MCP** (`cmd/mcp/main.go`): Model Context Protocol server
+3. **MCP** (`cmd/mcp/main.go`): Model Context Protocol server
    - Stdio-based communication
    - Exposes `evaluate_response` and `evaluate_single_judge` tools
    - Docker deployment for Claude Code/Desktop/Cursor
 
-5. **Producer** (`cmd/producer/main.go`): Test data generator for Redis
+4. **Producer** (`cmd/producer/main.go`): Test data generator for Redis
 
 All entry points use same core dependencies via `setup.Wire()`.
 
@@ -164,6 +168,14 @@ VERDICT_PASS_THRESHOLD=0.8         # Confidence > this → "pass"
 VERDICT_REVIEW_THRESHOLD=0.5       # Confidence > this → "review", else "fail"
 ENABLE_PRECHECK=true               # Enable Stage 1 prechecks
 JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2: weighted_average, harmonic_mean, median, weighted_product
+
+# Streaming configuration (unified API + Streaming mode)
+STREAMING_ENABLED=false            # Enable Redis stream consumer alongside API
+REDIS_ADDR=localhost:6379          # Redis server address
+REDIS_PASSWORD=                    # Redis password (optional)
+REDIS_STREAM_KEY=eval-events       # Redis stream key
+REDIS_CONSUMER_GROUP=eval-group    # Consumer group name
+REDIS_CONSUMER_NAME=consumer-1     # Unique consumer name (for horizontal scaling)
 ```
 
 ### Judge Configuration (configs/judges.yaml)

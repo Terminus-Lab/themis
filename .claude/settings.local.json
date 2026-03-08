@@ -3,7 +3,8 @@
     "allow": [
       "Bash(find .:*)",
       "Bash(go test:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(ls:*)"
     ]
   }
 }

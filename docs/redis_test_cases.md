@@ -1,10 +1,11 @@
 # Redis Stream Consumer Mode
 
-Advanced usage guide for running eval-agent as a Redis Stream consumer for asynchronous evaluation.
+Advanced usage guide for running Themis with Redis Stream consumer for asynchronous evaluation.
 
 ## Overview
 
-In Redis Stream consumer mode, eval-agent:
+In unified API + Streaming mode, Themis:
+- Runs HTTP API for synchronous requests and metrics
 - Connects to a Redis instance
 - Joins a consumer group (`eval-group`)
 - Consumes messages from the `eval-events` stream
@@ -15,42 +16,61 @@ In Redis Stream consumer mode, eval-agent:
 
 - **High-throughput evaluation**: Process evaluation requests asynchronously
 - **Decoupled architecture**: Separate evaluation from agent response generation
-- **Multiple consumers**: Scale horizontally with multiple eval-agent instances
+- **Multiple consumers**: Scale horizontally with multiple Themis instances
 - **Fault tolerance**: Redis Streams provide message persistence and redelivery
+- **Observability**: Prometheus `/metrics` endpoint exposes streaming metrics
 
 ---
 
 ## Configuration
 
-Add Redis configuration to your `.env`:
+Add streaming configuration to your `.env`:
 
 ```env
+# Enable streaming consumer alongside API
+STREAMING_ENABLED=true
+
 # Redis Stream Configuration
 REDIS_ADDR=localhost:6379
 REDIS_PASSWORD=
-REDIS_STREAM_NAME=eval-events
+REDIS_STREAM_KEY=eval-events
 REDIS_CONSUMER_GROUP=eval-group
-REDIS_CONSUMER_NAME=eval-consumer-1
+REDIS_CONSUMER_NAME=consumer-1  # Unique per instance
 ```
 
 ---
 
 ## Running the Consumer
 
-Start the Redis Stream consumer:
+Start Themis in unified API + Streaming mode:
 
 ```bash
-cd eval-agent
-go run cmd/streaming/main.go
+STREAMING_ENABLED=true go run cmd/api/main.go
 ```
 
 **Expected output:**
 ```
-{"level":"info","message":"Starting eval-agent Redis Stream consumer"}
-{"level":"info","stream":"eval-events","group":"eval-group","message":"Consumer started"}
+{"level":"info","message":"Streaming mode enabled - starting Redis consumer"}
+{"level":"info","stream_key":"eval-events","consumer_group":"eval-group","consumer_name":"consumer-1","message":"Starting streaming consumer"}
+{"level":"info","address":":18082","streaming_enabled":true,"message":"Starting Themis Server"}
 ```
 
-The consumer will block and wait for messages on the stream.
+The service will:
+- Start HTTP API on port 18082
+- Start streaming consumer in background
+- Expose `/metrics` endpoint for Prometheus
+
+**API is available while streaming runs:**
+```bash
+# Health check
+curl http://localhost:18082/api/v1/health
+
+# Manual evaluation
+curl -X POST http://localhost:18082/api/v1/evaluate -d '{...}'
+
+# Prometheus metrics
+curl http://localhost:18082/metrics
+```
 
 ---
 

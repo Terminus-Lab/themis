@@ -3,11 +3,10 @@ package setup
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/Terminus-Lab/themis/internal/aggregator"
 	"github.com/Terminus-Lab/themis/internal/config"
+	"github.com/Terminus-Lab/themis/internal/env"
 	"github.com/Terminus-Lab/themis/internal/executor"
 	"github.com/Terminus-Lab/themis/internal/judge"
 	"github.com/Terminus-Lab/themis/internal/llm"
@@ -43,19 +42,19 @@ type Dependencies struct {
 
 func LoadConfig() *Config {
 	return &Config{
-		AWSRegion:              getEnv("AWS_REGION", "us-east-1"),
-		ClaudeModelID:          getEnv("CLAUDE_MODEL_ID", ""),
-		OpenAIKey:              getEnv("OPEN_AI_KEY", ""),
-		OpenAIModelID:          getEnv("OPEN_AI_MODEL_ID", ""),
-		AzureOpenAIEndpoint:    getEnv("AZURE_OPENAI_ENDPOINT", ""),
-		DefaultProvider:        getEnv("DEFAULT_LLM_PROVIDER", "bedrock"),
-		EnablePrecheck:         getEnvBool("ENABLE_PRECHECK", true),
-		PrecheckWeight:         getEnvFloat("PRECHECK_WEIGHT", 0.3),
-		LLMJudgeWeight:         getEnvFloat("LLM_JUDGE_WEIGHT", 0.7),
-		EarlyExitThreshold:     getEnvFloat("EARLY_EXIT_THRESHOLD", 0.2),
-		VerdictPassThreshold:   getEnvFloat("VERDICT_PASS_THRESHOLD", 0.8),
-		VerdictReviewThreshold: getEnvFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
-		JudgeAggregationMethod: getEnv("JUDGE_AGGREGATION_METHOD", ""),
+		AWSRegion:              env.GetString("AWS_REGION", "us-east-1"),
+		ClaudeModelID:          env.GetString("CLAUDE_MODEL_ID", ""),
+		OpenAIKey:              env.GetString("OPEN_AI_KEY", ""),
+		OpenAIModelID:          env.GetString("OPEN_AI_MODEL_ID", ""),
+		AzureOpenAIEndpoint:    env.GetString("AZURE_OPENAI_ENDPOINT", ""),
+		DefaultProvider:        env.GetString("DEFAULT_LLM_PROVIDER", "bedrock"),
+		EnablePrecheck:         env.GetBool("ENABLE_PRECHECK", true),
+		PrecheckWeight:         env.GetFloat("PRECHECK_WEIGHT", 0.3),
+		LLMJudgeWeight:         env.GetFloat("LLM_JUDGE_WEIGHT", 0.7),
+		EarlyExitThreshold:     env.GetFloat("EARLY_EXIT_THRESHOLD", 0.2),
+		VerdictPassThreshold:   env.GetFloat("VERDICT_PASS_THRESHOLD", 0.8),
+		VerdictReviewThreshold: env.GetFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
+		JudgeAggregationMethod: env.GetString("JUDGE_AGGREGATION_METHOD", ""),
 	}
 }
 
@@ -128,39 +127,6 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 		Logger:        logger,
 	}, nil
 
-}
-
-func getEnvBool(key string, defaultValue bool) bool {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return defaultValue
-	}
-
-	return parsed
-}
-
-func getEnv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaultValue
-	}
-
-	return value
-}
-
-func getEnvFloat(key string, defaultValue float64) float64 {
-	valueStr := os.Getenv(key)
-	value, err := strconv.ParseFloat(valueStr, 64)
-	if err != nil {
-		value = defaultValue
-	}
-
-	return value
 }
 
 func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *config.JudgesConfig) (*llm.LLMClientRegistry, error) {
