@@ -3,10 +3,18 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
+	"github.com/Terminus-Lab/themis/internal/env"
 	"gopkg.in/yaml.v3"
+)
+
+// Configuration file search paths
+const (
+	ConfigFileNameJudges          = "judges.yaml"
+	ConfigDirConfigFileNameJudges = "config/judges.yaml"
 )
 
 // JudgesConfig is the root configuration structure
@@ -28,7 +36,7 @@ type JudgeConfiguration struct {
 	RequiresContext        bool         `yaml:"requires_context"`
 	RequiresExpectedOutput bool         `yaml:"requires_expected_output"` // For correctness evaluation
 	Prompt                 string       `yaml:"prompt"`
-	Model                  *ModelConfig `yaml:"model,omitempty"` // Optional override
+	Model                  *ModelConfig `yaml:"model,omitempty"`  // Optional override
 	Weight                 float64      `yaml:"weight,omitempty"` // Weight for this judge (0.0-1.0)
 }
 
@@ -42,29 +50,78 @@ type ModelConfig struct {
 }
 
 // LoadJudgesConfig loads and validates the judges configuration from YAML
+// Search priority:
+//  1. JUDGES_CONFIG_PATH env var (explicit override)
+//  2. ./judges.yaml (next to binary)
+//  3. ./configs/judges.yaml (configs folder next to binary)
+//
+// Returns error if no configuration file is found.
 func LoadJudgesConfig() (*JudgesConfig, error) {
-	path := os.Getenv("JUDGES_CONFIG_PATH")
-	if path == "" {
-		path = "configs/judges.yaml"
-	}
+	var data []byte
+	var source string
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+	// Explicit path via environment variable
+	if customPath := env.GetString("JUDGES_CONFIG_PATH", ""); customPath != "" {
+		var err error
+		data, err = os.ReadFile(customPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read config file %s: %w", customPath, err)
+		}
+		source = customPath
+	} else {
+		// Search next to binary
+		exePath, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get executable path: %w", err)
+		}
+		exeDir := filepath.Dir(exePath)
+
+		searchPaths := []string{
+			filepath.Join(exeDir, ConfigFileNameJudges),
+			filepath.Join(exeDir, ConfigDirConfigFileNameJudges),
+		}
+
+		found := false
+		for _, path := range searchPaths {
+			if fileExists(path) {
+				data, err = os.ReadFile(path)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+				}
+				source = path
+				found = true
+				break
+			}
+		}
+
+		// No config found - return error
+		if !found {
+			return nil, fmt.Errorf("judges.yaml not found. Searched:\n  - JUDGES_CONFIG_PATH env var\n  - %s\n  - %s\nPlease provide a configuration file",
+				searchPaths[0], searchPaths[1])
+		}
 	}
 
 	var cfg JudgesConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		return nil, fmt.Errorf("failed to parse YAML from %s: %w", source, err)
 	}
 
 	applyDefaults(&cfg)
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
+		return nil, fmt.Errorf("config validation failed (%s): %w", source, err)
 	}
 
 	return &cfg, nil
+}
+
+// fileExists checks if a file exists and is not a directory
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 func applyDefaults(cfg *JudgesConfig) {

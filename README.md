@@ -122,7 +122,16 @@ ENABLE_PRECHECK=true                           # Enable/disable Stage 1 precheck
 JUDGE_AGGREGATION_METHOD=weighted_average      # Stage 2 method: weighted_average, harmonic_mean, median, weighted_product
 ```
 
-Judge configurations (prompts, models, weights) are defined in `configs/judges.yaml`:
+Judge configurations (prompts, models, weights) are defined in `judges.yaml`.
+
+**Configuration locations** (priority order):
+1. `JUDGES_CONFIG_PATH` env var (explicit override)
+2. `./judges.yaml` (next to binary)
+3. `./config/judges.yaml` (config folder next to binary)
+
+**Note:** Configuration file is required.
+
+**Example configuration:**
 
 ```yaml
 judges:

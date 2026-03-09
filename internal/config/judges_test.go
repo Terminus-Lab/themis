@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -132,8 +133,8 @@ func TestLoadJudgesConfig_DefaultPath(t *testing.T) {
 		t.Log("Default config file loaded successfully")
 	} else {
 		// Check that error mentions the default path
-		if !contains(err.Error(), "configs/judges.yaml") {
-			t.Errorf("Expected error to mention default path 'configs/judges.yaml', got: %v", err)
+		if !contains(err.Error(), "config/judges.yaml") {
+			t.Errorf("Expected error to mention default path 'config/judges.yaml', got: %v", err)
 		}
 	}
 }
@@ -542,6 +543,76 @@ Expected: {{.ExpectedOutput}}`,
 	if err != nil {
 		t.Errorf("Expected validation to pass for judge with both {{.Context}} and {{.ExpectedOutput}}, got: %v", err)
 	}
+}
+
+func TestLoadJudgesConfig_SearchOrder(t *testing.T) {
+	t.Run("returns error when no config found", func(t *testing.T) {
+		os.Unsetenv("JUDGES_CONFIG_PATH")
+
+		tmpDir := t.TempDir()
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		_, err := LoadJudgesConfig()
+		if err == nil {
+			t.Fatal("Expected error when no config found, got nil")
+		}
+
+		if !strings.Contains(err.Error(), "judges.yaml not found") {
+			t.Errorf("Expected helpful error message, got: %v", err)
+		}
+
+		t.Logf("Correctly returned error: %v", err)
+	})
+
+	// Test that JUDGES_CONFIG_PATH takes priority
+	t.Run("respects JUDGES_CONFIG_PATH override", func(t *testing.T) {
+		// Create temp config file
+		tmpDir := t.TempDir()
+		customConfigPath := filepath.Join(tmpDir, "custom-judges.yaml")
+
+		customConfig := `
+judges:
+  default_model:
+    modelFamily: "openai_platform"
+    modelID: "gpt-4o-mini"
+    max_tokens: 256
+    temperature: 0.0
+  evaluators:
+    - name: test-judge
+      enabled: true
+      weight: 1.0
+      prompt: |
+        Test prompt
+        Query: {{.Query}}
+        Answer: {{.Answer}}
+        Output: {"score": 1.0, "reason": "test"}
+`
+		if err := os.WriteFile(customConfigPath, []byte(customConfig), 0644); err != nil {
+			t.Fatalf("Failed to write test config: %v", err)
+		}
+
+		// Set env var
+		os.Setenv("JUDGES_CONFIG_PATH", customConfigPath)
+		defer os.Unsetenv("JUDGES_CONFIG_PATH")
+
+		// Load config
+		cfg, err := LoadJudgesConfig()
+		if err != nil {
+			t.Fatalf("Failed to load custom config: %v", err)
+		}
+
+		if len(cfg.Judges.Evaluators) != 1 {
+			t.Errorf("Expected 1 judge from custom config, got %d", len(cfg.Judges.Evaluators))
+		}
+
+		if cfg.Judges.Evaluators[0].Name != "test-judge" {
+			t.Errorf("Expected judge name 'test-judge', got '%s'", cfg.Judges.Evaluators[0].Name)
+		}
+
+		t.Log("Successfully loaded custom config via JUDGES_CONFIG_PATH")
+	})
 }
 
 // Helper function
