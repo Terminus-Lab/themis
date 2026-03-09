@@ -1,17 +1,23 @@
 package storage
 
-import "time"
+import "github.com/Terminus-Lab/themis/internal/models"
 
 type QueryFilters struct {
-	AgentName    string
-	AgentVersion string
-	Verdict      string
-	FromDate     time.Time
-	ToDate       time.Time
-	Limit        int
-	Offset       int
-	OrderBy      string
+	AgentName string
+	Verdict   string
+	Limit     int
+	Offset    int
+	Count     int
 }
 
-type QueryResult struct {
+type Evaluation struct {
+	EventID      string
+	AgentName    string
+	AgentVersion string
+	UserQuery    string
+	Answer       string
+	Context      string
+	Confidence   float64
+	Verdict      string
+	StageScores  []models.StageResult
 }

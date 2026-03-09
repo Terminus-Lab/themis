@@ -1,1 +1,1 @@
-DROP TABLE eval_results;
+DROP TABLE if EXISTS eval_results CASCADE;
