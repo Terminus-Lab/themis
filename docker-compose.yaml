@@ -1,0 +1,29 @@
+services:
+  vector-db:
+    hostname: themis-db
+    image: postgres:16
+    ports:
+      - 5432:5432
+    restart: always
+    environment:
+      - POSTGRES_DB=${THEMIS_DB_DATABASE}
+      - POSTGRES_USER=${THEMIS_DB_USER}
+      - POSTGRES_PASSWORD=${THEMIS_DB_DATABASE}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  redis:
+    container_name: kg-agent-redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: always 
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:  # Define named volume

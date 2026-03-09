@@ -1,0 +1,1 @@
+DROP TABLE eval_results;
