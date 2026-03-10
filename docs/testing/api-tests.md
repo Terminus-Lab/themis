@@ -1,6 +1,17 @@
+---
+title: API Test Cases
+description: Comprehensive test scenarios for Themis HTTP API endpoints
+version: 1.0.0
+tags: [testing, api, http, test-cases, endpoints]
+related:
+  - deployment/api-mode.md
+  - api-reference/endpoints.md
+  - testing/batch-tests.md
+---
+
 # API Test Cases
 
-Comprehensive test scenarios for the eval-agent HTTP API.
+Comprehensive test scenarios for the Themis HTTP API.
 
 **Important:** Expected responses show **representative results**. Actual LLM judge scores may vary slightly (±0.1) due to model variability, but the overall patterns (high/medium/low scores, verdicts, stage counts) should match. Focus on validating behavior patterns rather than exact numeric matches.
 
@@ -29,7 +40,7 @@ Judges are configured in `configs/judges.yaml`. The system dynamically creates L
 ### Start the Server
 
 ```bash
-cd eval-agent
+cd themis
 go run cmd/api/main.go
 ```
 
@@ -65,7 +76,6 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   }'
 ```
 
-**Expected Response (truncated, full response has 8 stages):**
 **Expected:**
 - Status Code: 200
 - `confidence` > 0.8
@@ -254,6 +264,11 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
     }
   }'
 ```
+
+**Expected:**
+- Status Code: 400
+- Error message about missing required field
+
 ---
 
 ## Performance Tests
@@ -403,336 +418,93 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
 
 ---
 
-## Correctness Judge Tests (Ground Truth Comparison)
+## Result Query Tests
 
-The correctness judge evaluates semantic similarity between an answer and expected output (ground truth). It's disabled by default and requires `expected_output` field in requests.
-
-**Quick Start:** For automated validation of your correctness judge setup, see [VALIDATION_CORRECTNESS.md](VALIDATION_CORRECTNESS.md) - includes a script to test all scenarios automatically.
-
-**Important Notes:**
-- These test cases show **expected patterns** - actual scores may vary slightly depending on the LLM's response
-- **Enable the correctness judge first** (see Test Case 17) before running tests 18-24
-- Scores should be in the expected range (±0.1) even if not exact matches
-- The key behaviors to validate:
-  - Exact matches score ~1.0
-  - Semantic matches (e.g., "4" vs "four") score ~0.8-0.9
-  - Wrong answers score ~0.0-0.2
-  - Auto-skip works when `expected_output` is missing
-
-### Test Case 14: Enable Correctness Judge
-
-**Setup:**
-Enable the correctness judge in `configs/judges.yaml`:
-
-```yaml
-judges:
-  evaluators:
-    # ... other judges ...
-
-    - name: correctness
-      enabled: true  # Change from false to true
-      description: "Evaluates semantic similarity between answer and expected output"
-      requires_context: false
-      requires_expected_output: true
-      prompt: |
-        You are a correctness evaluation judge.
-        Compare the provided answer with the expected output (ground truth).
-        Score based on semantic equivalence, not exact string match.
-
-        Answer: {{.Answer}}
-        Expected Output: {{.ExpectedOutput}}
-
-        Scoring guidelines:
-        - 1.0: Semantically identical
-        - 0.8-0.9: Mostly correct, minor differences
-        - 0.5-0.7: Partially correct
-        - 0.2-0.4: Somewhat related but different
-        - 0.0-0.1: Completely different
-
-        Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
-        {"score": <float>, "reason": "<string>"}
-      model:
-        max_tokens: 200
-        temperature: 0.0
-        retry: true
-```
-
-**Restart the API server** after enabling the judge.
-
-### Test Case 15: Single Correctness Judge - Exact Match
+### Test Case 14: Query All Results
 
 **Request:**
 ```bash
-curl -X POST "http://localhost:18082/api/v1/evaluate/judge/correctness?threshold=0.8" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-correctness-001",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "type": "qa", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is the capital of France?",
-      "answer": "Paris",
-      "expected_output": "Paris"
-    }
-  }'
+curl "http://localhost:18082/api/v1/results?limit=10&offset=0"
 ```
 
 **Expected:**
 - Status Code: 200
-- `confidence` = 1.0 (exact match)
-- `verdict` = "pass"
-- Only 1 stage (correctness judge)
-- Response time: ~1-2 seconds
+- Returns paginated results
+- Includes `total`, `count`, `has_more` fields
 
-### Test Case 16: Single Correctness Judge - Semantic Match
+### Test Case 15: Filter by Agent Name
 
 **Request:**
 ```bash
-curl -X POST "http://localhost:18082/api/v1/evaluate/judge/correctness?threshold=0.8" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-correctness-002",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "type": "qa", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is 2+2?",
-      "answer": "The answer is four",
-      "expected_output": "4"
-    }
-  }'
+curl "http://localhost:18082/api/v1/results?agent_name=my-agent&limit=20"
 ```
 
 **Expected:**
 - Status Code: 200
-- `confidence` ~0.9 (semantic match despite different format)
-- `verdict` = "pass"
-- Demonstrates that judge understands "four" = "4"
+- Returns only results for specified agent
+- All results have `agent_name` = "my-agent"
 
-### Test Case 17 Single Correctness Judge - Wrong Answer
+### Test Case 16: Filter by Verdict
 
 **Request:**
 ```bash
-curl -X POST "http://localhost:18082/api/v1/evaluate/judge/correctness?threshold=0.7" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-correctness-003",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "type": "qa", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is the capital of Italy?",
-      "answer": "Milan",
-      "expected_output": "Rome"
-    }
-  }'
+curl "http://localhost:18082/api/v1/results?verdict=fail&limit=10"
 ```
 
 **Expected:**
 - Status Code: 200
-- `confidence` ~0.1 (wrong answer)
-- `verdict` = "fail"
-- Correctly identifies that Milan ≠ Rome
+- Returns only failed evaluations
+- All results have `verdict` = "fail"
 
-### Test Case 18: Full Pipeline with Correctness - All Judges Pass
-
-**Request:**
-```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-correctness-pipeline-001",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is the capital of France?",
-      "context": "France is a country in Western Europe. Paris is its capital city.",
-      "answer": "The capital of France is Paris.",
-      "expected_output": "Paris"
-    }
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "id": "test-correctness-pipeline-001",
-  "stages": [
-    {"name": "length-checker", "score": 1.0, "duration_ns": 15000},
-    {"name": "overlap-checker", "score": 0.85, "duration_ns": 12000},
-    {"name": "format-checker", "score": 1.0, "duration_ns": 10000},
-    {"name": "relevance-judge", "score": 0.95, "duration_ns": 1850000000},
-    {"name": "faithfulness-judge", "score": 1.0, "duration_ns": 1820000000},
-    {"name": "coherence-judge", "score": 1.0, "duration_ns": 1780000000},
-    {"name": "completeness-judge", "score": 1.0, "duration_ns": 1750000000},
-    {"name": "instruction-judge", "score": 1.0, "duration_ns": 1690000000},
-    {"name": "correctness-judge", "score": 1.0, "reason": "Semantically identical to expected output", "duration_ns": 1650000000}
-  ],
-  "confidence": 0.96,
-  "verdict": "pass"
-}
-```
-
-**Expected:**
-- Status Code: 200
-- `confidence` > 0.9
-- `verdict` = "pass"
-- **9 stages** (3 prechecks + 6 judges including correctness)
-- All judges score high
-- Response time: ~3-4 seconds (judges run in parallel)
-
-### Test Case 18: Full Pipeline with Correctness - Factually Wrong but Well-Formed Answer
+### Test Case 17: Get Single Result by ID
 
 **Request:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-correctness-pipeline-002",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is the largest planet in our solar system?",
-      "context": "The solar system contains eight planets orbiting the Sun.",
-      "answer": "The largest planet in our solar system is Saturn, which is known for its distinctive ring system.",
-      "expected_output": "Jupiter"
-    }
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "id": "test-correctness-pipeline-002",
-  "stages": [
-    {"name": "length-checker", "score": 1.0, "duration_ns": 14000},
-    {"name": "overlap-checker", "score": 0.75, "duration_ns": 11000},
-    {"name": "format-checker", "score": 1.0, "duration_ns": 9000},
-    {"name": "relevance-judge", "score": 0.9, "duration_ns": 1950000000},
-    {"name": "faithfulness-judge", "score": 0.8, "duration_ns": 1880000000},
-    {"name": "coherence-judge", "score": 1.0, "duration_ns": 1820000000},
-    {"name": "completeness-judge", "score": 1.0, "duration_ns": 1790000000},
-    {"name": "instruction-judge", "score": 1.0, "duration_ns": 1750000000},
-    {"name": "correctness-judge", "score": 0.1, "reason": "Incorrect - Saturn is not the largest planet. The expected answer is Jupiter.", "duration_ns": 1680000000}
-  ],
-  "confidence": 0.72,
-  "verdict": "review"
-}
+curl "http://localhost:18082/api/v1/results/test-001"
 ```
 
 **Expected:**
-- Status Code: 200
-- `confidence` ~0.72 (only correctness is low, other judges score high)
-- `verdict` = "review"
-- 9 stages (full pipeline)
-- **Key insight**: Other judges score well because the answer is:
-  - **Relevant**: Directly addresses "largest planet" question (0.9)
-  - **Faithful**: Talks about solar system planets from context (0.8)
-  - **Coherent**: Logically structured and well-formed (1.0)
-  - **Complete**: Fully answers the question asked (1.0)
-  - **Instruction-following**: No format violations (1.0)
-- **Correctness judge: 0.1** - Only judge that catches Saturn ≠ Jupiter
-- Demonstrates that correctness is orthogonal to quality - you can have a well-formed, coherent answer that's factually wrong
-
-### Test Case 19: Correctness Judge Auto-Skip (No Expected Output)
-
-**Request:**
-```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-correctness-skip",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is machine learning?",
-      "context": "ML is a subset of AI.",
-      "answer": "Machine learning is a method where computers learn from data."
-    }
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "id": "test-correctness-skip",
-  "stages": [
-    {"name": "length-checker", "score": 1.0, "duration_ns": 15000},
-    {"name": "overlap-checker", "score": 0.75, "duration_ns": 12000},
-    {"name": "format-checker", "score": 1.0, "duration_ns": 10000},
-    {"name": "relevance-judge", "score": 0.95, "duration_ns": 1850000000},
-    {"name": "faithfulness-judge", "score": 0.9, "duration_ns": 1820000000},
-    {"name": "coherence-judge", "score": 1.0, "duration_ns": 1780000000},
-    {"name": "completeness-judge", "score": 0.9, "duration_ns": 1750000000},
-    {"name": "instruction-judge", "score": 1.0, "duration_ns": 1690000000}
-  ],
-  "confidence": 0.89,
-  "verdict": "pass"
-}
-```
-
-**Expected:**
-- Status Code: 200
-- **8 stages** (3 prechecks + 5 judges - correctness judge auto-skipped)
-- No correctness stage in results (because `expected_output` not provided)
-- No errors or warnings
-- Demonstrates backwards compatibility - requests without `expected_output` work unchanged
-
-**Server logs:**
-```
-DEBUG skipping judge - expected_output not provided judge=correctness
-DEBUG all judges completed judgeCount=5
-```
+- Status Code: 200 (if exists) or 404 (if not found)
+- Returns single evaluation result with full details
 
 ---
 
-## Batch Evaluation with Correctness
+## Dashboard Tests
 
-### Test Case 20: Batch Correctness Evaluation
+### Test Case 18: Access Dashboard
 
-**Setup:**
-Create a test file `test_correctness_batch.jsonl`:
-
-```jsonl
-{"event_id": "batch-001", "event_type": "agent_response", "agent": {"name": "test"}, "interaction": {"user_query": "Capital of France?", "answer": "Paris", "expected_output": "Paris"}}
-{"event_id": "batch-002", "event_type": "agent_response", "agent": {"name": "test"}, "interaction": {"user_query": "2+2?", "answer": "4", "expected_output": "Four"}}
-{"event_id": "batch-003", "event_type": "agent_response", "agent": {"name": "test"}, "interaction": {"user_query": "Capital of Italy?", "answer": "Milan", "expected_output": "Rome"}}
-{"event_id": "batch-004", "event_type": "agent_response", "agent": {"name": "test"}, "interaction": {"user_query": "What is Go?", "answer": "A programming language", "expected_output": "Go is a programming language created by Google"}}
-```
-
-**Run batch evaluation:**
+**Request:**
 ```bash
-go run cmd/batch/main.go \
-  -input test_correctness_batch.jsonl \
-  -output correctness_results.jsonl \
-  -workers 2
+curl http://localhost:18082/
 ```
 
-**Expected output (showing full pipeline):**
+**Expected:**
+- Status Code: 200
+- Returns HTML content
+- Dashboard loads in browser at http://localhost:18082
 
-Each record will have 9 stages (3 prechecks + 6 judges). Example for batch-001:
-```json
-{
-  "id": "batch-001",
-  "stages": [
-    {"name": "length-checker", "score": 1.0},
-    {"name": "overlap-checker", "score": 0.9},
-    {"name": "format-checker", "score": 1.0},
-    {"name": "relevance-judge", "score": 0.95},
-    {"name": "faithfulness-judge", "score": 0.9},
-    {"name": "coherence-judge", "score": 1.0},
-    {"name": "completeness-judge", "score": 1.0},
-    {"name": "instruction-judge", "score": 1.0},
-    {"name": "correctness-judge", "score": 1.0, "reason": "Exact match"}
-  ],
-  "confidence": 0.96,
-  "verdict": "pass"
-}
-```
+### Test Case 19: Dashboard Filter Functionality
 
-**Note:** Full pipeline runs (all judges + prechecks). For brevity, examples below show only correctness-judge scores.
+**Manual test in browser:**
+1. Open http://localhost:18082
+2. Enter agent name in filter
+3. Click "Fetch Results"
+4. Verify results filtered correctly
 
-**Console summary:**
-```
-INFO Starting batch evaluation input=test_correctness_batch.jsonl output=correctness_results.jsonl workers=2
-INFO Worker pool finished
-INFO Batch evaluation complete duration=8.234s total_records=4 success=4 errors=0
-```
+**Expected:**
+- Results update based on filter
+- Pagination works
+- Expandable rows show details
+
+---
+
+## Complete Test Reference
+
+For comprehensive test scenarios including correctness judge tests, see the original [`api_test_cases.md`](../api_test_cases.md) file.
+
+## Next Steps
+
+- [Batch Test Cases](batch-tests.md) - CLI evaluation testing
+- [MCP Test Cases](mcp-tests.md) - Claude Code integration
+- [Streaming Test Cases](streaming-tests.md) - Redis consumer testing
+- [API Reference](../api-reference/endpoints.md) - Complete API documentation

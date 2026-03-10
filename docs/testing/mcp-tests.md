@@ -1,35 +1,51 @@
+---
+title: MCP Integration Test Cases
+description: Test scenarios for Themis MCP server with Claude Code, Claude Desktop, and Cursor
+version: 1.0.0
+tags: [testing, mcp, claude-code, claude-desktop, cursor, integration]
+related:
+  - deployment/mcp-mode.md
+  - testing/api-tests.md
+  - getting-started/installation.md
+---
+
 # MCP Integration Test Cases
 
-Test scenarios for eval-agent MCP server integration with Claude Code, Claude Desktop, and Cursor.
+Test scenarios for Themis MCP server integration with Claude Code, Claude Desktop, and Cursor.
+
+## Overview
+
+The MCP (Model Context Protocol) server enables AI assistants to evaluate responses directly within development environments. This provides seamless integration for:
+- **Claude Code** - CLI-based AI assistant
+- **Claude Desktop** - Desktop application
+- **Cursor** - AI-powered IDE
 
 ## Setup
 
 ### Build MCP Server
 
 ```bash
-cd eval-agent
-go build -o bin/eval-mcp cmd/mcp/main.go
+cd themis
+go build -o bin/themis-mcp cmd/mcp/main.go
 ```
 
 ### Add to Claude Code
 
 ```bash
-claude mcp add --transport stdio --scope project eval-agent \
+claude mcp add --transport stdio --scope project themis \
   --env AWS_REGION=us-east-1 \
   --env AWS_ACCESS_KEY_ID=your-key \
   --env AWS_SECRET_ACCESS_KEY=your-secret \
   --env DEFAULT_MODEL_ID=us.anthropic.claude-3-5-haiku-20241022-v1:0 \
-  -- /path/to/eval-agent/bin/eval-mcp
+  -- /path/to/themis/bin/themis-mcp
 ```
 
 ### Verify Installation
 
 ```bash
 claude mcp list
-# Should show: eval-agent (stdio) - Ready
+# Should show: themis (stdio) - Ready
 ```
-
----
 
 ## Tool Discovery Tests
 
@@ -43,18 +59,16 @@ claude mcp list
 **Expected Output:**
 ```
 MCP Servers:
-- eval-agent (stdio) - Ready
+- themis (stdio) - Ready
   Tools:
   - evaluate_response: Evaluate an AI agent response...
   - evaluate_single_judge: Evaluate with a single judge...
 ```
 
 **Verification:**
-- eval-agent server shows as "Ready"
+- themis server shows as "Ready"
 - Two tools are listed
 - Tool descriptions are visible
-
----
 
 ## evaluate_response Tool Tests
 
@@ -84,8 +98,8 @@ Answer: "The capital of France is Paris."
 {
   "id": "<event_id>",
   "stages": [
-    {"name": "length-checker", "score": 1.0, "...": "..."},
-    {"name": "relevance-judge", "score": 0.95, "...": "..."}
+    {"name": "length-checker", "score": 1.0},
+    {"name": "relevance-judge", "score": 0.95}
   ],
   "confidence": 0.92,
   "verdict": "pass"
@@ -153,8 +167,6 @@ Answer: "AI is artificial intelligence."
 - Tool accepts empty context
 - Evaluation proceeds normally
 - Context field is optional
-
----
 
 ## evaluate_single_judge Tool Tests
 
@@ -224,8 +236,6 @@ Evaluate with judge "invalid_judge"
 - Proper error message
 - Claude explains valid judge names
 
----
-
 ## Error Handling Tests
 
 ### Test Case 9: Missing Required Fields
@@ -242,15 +252,13 @@ Use evaluate_response but don't provide the answer field
 ### Test Case 10: MCP Server Not Running
 
 **Action:**
-1. Stop eval-agent MCP server
+1. Stop themis MCP server
 2. Try using evaluate_response tool
 
 **Expected Behavior:**
 - MCP connection error
 - Claude shows "tool unavailable" message
 - User can see error in `/mcp` status
-
----
 
 ## Integration Tests
 
@@ -291,8 +299,6 @@ Evaluate these 3 answers:
 - Multiple tool calls work correctly
 - Results are aggregated properly
 
----
-
 ## Performance Tests
 
 ### Test Case 13: Response Time
@@ -325,25 +331,23 @@ Evaluate 5 different answers at once:
 - No conflicts or race conditions
 - Results for all 5 provided
 
----
-
 ## Docker MCP Tests
 
 ### Test Case 15: Docker MCP Server
 
 **Setup:**
 ```bash
-docker build -t eval-agent-mcp .
+docker build -t themis-mcp .
 
 # Add to Claude Code with Docker
-claude mcp add --transport stdio --scope project eval-agent \
+claude mcp add --transport stdio --scope project themis \
   --env AWS_REGION=us-east-1 \
   --env AWS_ACCESS_KEY_ID=key \
   --env AWS_SECRET_ACCESS_KEY=secret \
   --env DEFAULT_MODEL_ID=model \
   -- docker run -i --rm \
     -e AWS_REGION -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e DEFAULT_MODEL_ID \
-    eval-agent-mcp:latest
+    themis-mcp:latest
 ```
 
 **Test:**
@@ -356,8 +360,6 @@ Use evaluate_response tool
 - Docker container starts/stops correctly
 - No environment variable issues
 
----
-
 ## Claude Desktop / Cursor Tests
 
 ### Test Case 16: Cursor Integration
@@ -366,8 +368,8 @@ Use evaluate_response tool
 ```json
 {
   "mcpServers": {
-    "eval-agent": {
-      "command": "/path/to/eval-agent/bin/eval-mcp"
+    "themis": {
+      "command": "/path/to/themis/bin/themis-mcp"
     }
   }
 }
@@ -383,13 +385,26 @@ Use evaluate_response tool
 
 **Setup:** Add to `claude_desktop_config.json`
 
+```json
+{
+  "mcpServers": {
+    "themis": {
+      "command": "/path/to/themis/bin/themis-mcp",
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_ACCESS_KEY_ID": "your-key",
+        "AWS_SECRET_ACCESS_KEY": "your-secret"
+      }
+    }
+  }
+}
+```
+
 **Test:** Use tool in Claude Desktop chat
 
 **Expected:**
 - Tool available in Claude Desktop
 - Same functionality as CLI
-
----
 
 ## Troubleshooting Test Cases
 
@@ -422,11 +437,70 @@ cat ~/.local/share/claude-code/mcp.log
 - Tool call fails
 - Error indicates model not found or not enabled
 
----
+## Advanced Use Cases
+
+### Test Case 21: Correctness Judge with Ground Truth
+
+**Prompt:**
+```
+Evaluate this answer against the expected output:
+
+Query: "What is 2+2?"
+Answer: "The answer is four"
+Expected Output: "4"
+
+Use the correctness judge to check semantic similarity.
+```
+
+**Expected:**
+- Correctness judge scores ~0.9 (semantic match)
+- Claude explains "four" matches "4" semantically
+
+**Note:** Requires correctness judge enabled in `judges.yaml`
+
+### Test Case 22: Compare Multiple Models
+
+**Prompt:**
+```
+Evaluate the same query/answer pair twice:
+1. First time with all judges
+2. Second time with only relevance judge
+
+Compare the results and response times.
+```
+
+**Expected:**
+- Full pipeline: 8 stages, ~3-4s
+- Single judge: 1 stage, ~1-2s
+- Claude summarizes performance difference
+
+### Test Case 23: Streaming Context
+
+**Prompt:**
+```
+I'm building an AI assistant. For each response it generates,
+I want to evaluate it. Let's start:
+
+Response 1: "The capital of France is Paris."
+[evaluate]
+
+Response 2: "Water boils at 100°C."
+[evaluate]
+
+Response 3: "Yes."
+[evaluate]
+
+Which response had the lowest quality?
+```
+
+**Expected:**
+- Claude evaluates all 3 responses
+- Tracks results across conversation
+- Correctly identifies Response 3 as lowest quality
 
 ## Summary
 
-**Total Test Cases:** 20
+**Total Test Cases:** 23
 
 **Categories:**
 - Tool Discovery: 1 test
@@ -438,6 +512,7 @@ cat ~/.local/share/claude-code/mcp.log
 - Docker: 1 test
 - Platform Integration: 2 tests
 - Troubleshooting: 3 tests
+- Advanced Use Cases: 3 tests
 
 **Expected Pass Rate:** 100% with proper setup
 
@@ -449,3 +524,10 @@ cat ~/.local/share/claude-code/mcp.log
 - [ ] Error messages are clear and helpful
 - [ ] Response times are acceptable (< 5s for full pipeline)
 - [ ] Works across Claude Code, Desktop, and Cursor
+
+## Next Steps
+
+- [MCP Deployment Guide](../deployment/mcp-mode.md) - Detailed deployment instructions
+- [API Test Cases](api-tests.md) - HTTP endpoint testing
+- [Integration Examples](../guides/integration-examples.md) - Code integration patterns
+- [Troubleshooting Guide](../guides/troubleshooting.md) - Common issues and solutions

@@ -1,6 +1,17 @@
-# Batch Evaluation CLI
+---
+title: Batch CLI Test Cases
+description: Test scenarios for Themis batch evaluation CLI
+version: 1.0.0
+tags: [testing, batch, cli, offline, validation, kendall]
+related:
+  - deployment/batch-mode.md
+  - guides/validation.md
+  - testing/api-tests.md
+---
 
-Process multiple evaluation requests from a JSONL file using a worker pool for concurrent execution.
+# Batch Evaluation CLI Test Cases
+
+Test scenarios for processing multiple evaluation requests from JSONL files using concurrent workers.
 
 ## Overview
 
@@ -10,11 +21,23 @@ The batch CLI enables offline evaluation of datasets without running the API ser
 - Generating evaluation reports for dataset quality assessment
 - Research workflows and correlation analysis
 
-## Quick Start
+## Setup
 
-```bash
-cd eval-agent
-go run cmd/batch/main.go -input dataset.jsonl -output results.jsonl
+### Prerequisites
+
+Ensure your `.env` file is configured:
+
+```env
+# LLM Provider (at least one required)
+OPEN_AI_KEY=sk-proj-...
+# OR
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+
+# Pipeline configuration
+ENABLE_PRECHECK=true
+EARLY_EXIT_THRESHOLD=0.2
 ```
 
 ## Command Line Flags
@@ -55,17 +78,8 @@ Each line is a JSON object with the same structure as the API request:
 One evaluation result per line, directly pipeable to `jq`:
 
 ```jsonl
-{"id":"eval-001","stages":[{"name":"length-checker","score":1.0,"reason":"Answer Length is acceptable","duration_ns":12500},{"name":"overlap-checker","score":0.85,"duration_ns":10000},{"name":"format-checker","score":1.0,"duration_ns":8500},{"name":"relevance-judge","score":0.95,"duration_ns":1850000000},{"name":"faithfulness-judge","score":1.0,"duration_ns":1820000000},{"name":"coherence-judge","score":1.0,"duration_ns":1780000000},{"name":"completeness-judge","score":1.0,"duration_ns":1750000000},{"name":"instruction-judge","score":1.0,"duration_ns":1690000000}],"confidence":0.92,"verdict":"pass"}
-{"id":"eval-002","stages":[{"name":"length-checker","score":1.0,"duration_ns":14000},{"name":"overlap-checker","score":0.78,"duration_ns":11000},{"name":"format-checker","score":1.0,"duration_ns":9000},{"name":"relevance-judge","score":0.88,"reason":"Relevant answer","duration_ns":1820000000},{"name":"faithfulness-judge","score":0.9,"duration_ns":1780000000},{"name":"coherence-judge","score":1.0,"duration_ns":1750000000},{"name":"completeness-judge","score":0.9,"duration_ns":1720000000},{"name":"instruction-judge","score":1.0,"duration_ns":1680000000}],"confidence":0.85,"verdict":"pass"}
+{"id":"eval-001","stages":[{"name":"length-checker","score":1.0,"reason":"Answer Length is acceptable","duration_ns":12500},{"name":"overlap-checker","score":0.85,"duration_ns":10000},{"name":"format-checker","score":1.0,"duration_ns":8500},{"name":"relevance-judge","score":0.95,"duration_ns":1850000000}],"confidence":0.92,"verdict":"pass"}
 ```
-
-**Response structure** (same as API):
-- `id`: Event ID from input
-- `stages`: Array of all checker and judge results
-  - **8 stages** when correctness judge disabled (3 prechecks + 5 judges)
-  - **9 stages** when correctness judge enabled (3 prechecks + 6 judges)
-- `confidence`: Aggregated confidence score (0.0-1.0)
-- `verdict`: Final verdict ("pass", "review", or "fail")
 
 ### Summary Output
 
@@ -78,160 +92,6 @@ Aggregate statistics in JSON format:
   "fail_count": 3,
   "review_count": 2,
   "avg_confidence": 0.847
-}
-```
-
-## Usage Examples
-
-### Basic Batch Evaluation
-
-```bash
-go run cmd/batch/main.go \
-  -input test-dataset.jsonl \
-  -output results.jsonl
-```
-
-### High Concurrency for Large Datasets
-
-```bash
-go run cmd/batch/main.go \
-  -input large-dataset.jsonl \
-  -workers 10 \
-  -output results.jsonl
-```
-
-### Summary Report Only
-
-```bash
-go run cmd/batch/main.go \
-  -input dataset.jsonl \
-  -format summary \
-  -output summary.json
-```
-
-### Combined: Results + Summary
-
-```bash
-go run cmd/batch/main.go \
-  -input resources/dataset.jsonl \
-  -output resources/results.jsonl \
-  -summary resources/summary.json
-```
-
-### Pipeline from stdin
-
-```bash
-cat dataset.jsonl | go run cmd/batch/main.go -input - | jq 'select(.verdict=="fail")'
-```
-
-### Dry Run Validation
-
-```bash
-go run cmd/batch/main.go \
-  -input dataset.jsonl \
-  -dry-run
-```
-
-### Validation Mode (Human Annotation Correlation)
-
-Validate LLM judge accuracy against human annotations by computing Kendall's correlation.
-
-**Requirements:**
-- Input file must have `human_annotation` field for each record
-- Valid values: `"pass"`, `"review"`, `"fail"`
-
-**Example:**
-```bash
-go run cmd/batch/main.go \
-  -input annotated_sample.jsonl \
-  -validate \
-  -correlation-threshold 0.3
-```
-
-**Input record with human annotation:**
-```jsonl
-{
-  "event_id":"val-001",
-  "event_type":"agent_response",
-  "agent":{"name":"test","type":"rag","version":"1.0"},
-  "interaction":{
-    "user_query":"What is the capital of France?",
-    "context":"France is a country...",
-    "answer":"The capital of France is Paris."
-  },
-  "human_annotation":"pass"
-}
-```
-
-**Output (JSON to stdout):**
-```json
-{
-  "total_records": 20,
-  "agreement_count": 15,
-  "agreement_rate": 0.75,
-  "kendall_tau": 0.42,
-  "threshold": 0.3,
-  "passed": true,
-  "confusion_matrix": {
-    "pass_pass": 7,
-    "pass_review": 1,
-    "pass_fail": 0,
-    "review_pass": 1,
-    "review_review": 5,
-    "review_fail": 1,
-    "fail_pass": 0,
-    "fail_review": 0,
-    "fail_fail": 5
-  },
-  "interpretation": "Moderate agreement"
-}
-```
-
-**Logs (to stderr):**
-```
-INFO Validation mode enabled
-INFO Evaluating 20 records with human annotations...
-INFO Evaluation complete duration=15.2s
-INFO Computing Kendall's correlation...
-INFO Validation complete records=20 agreement=15 agreement_rate=0.75 kendall_tau=0.42 threshold=0.3 status="PASSED" interpretation="Moderate agreement"
-INFO Validation summary written file=validation-summary.json
-INFO LLM judge validated against human annotations
-INFO Safe to evaluate full dataset with these judge prompts
-```
-
-**If correlation is below threshold:**
-```
-ERROR Validation failed: Kendall's tau below threshold tau=0.18 threshold=0.3
-ERROR Review configs/judges.yaml prompts and re-run validation
-```
-
-**Output format:**
-
-The validation result is output as JSON to **stdout** (for piping to tools like `jq`), and also saved to `validation-summary.json`:
-
-```bash
-# Pipe to jq
-go run cmd/batch/main.go -input annotated.jsonl -validate | jq '.kendall_tau'
-
-# Save to file
-go run cmd/batch/main.go -input annotated.jsonl -validate > my-validation.json
-```
-
-The JSON structure:
-```json
-{
-  "total_records": 20,
-  "agreement_count": 15,
-  "agreement_rate": 0.75,
-  "kendall_tau": 0.42,
-  "threshold": 0.3,
-  "passed": true,
-  "confusion_matrix": {
-    "pass_pass": 7,
-    "pass_review": 1,
-    ...
-  },
-  "interpretation": "Moderate agreement"
 }
 ```
 
@@ -288,7 +148,7 @@ go run cmd/batch/main.go -input test-mixed.jsonl -dry-run
 - Exit code: 1 (fails on validation errors)
 - Error log: "Validation error" for invalid line
 - Final log: "Validation failed" with error count
-- No evaluations performed (no AWS calls)
+- No evaluations performed (no LLM calls)
 
 ### Test Case 4: Summary Format
 
@@ -354,6 +214,10 @@ go run cmd/batch/main.go -input test.jsonl -format csv
 
 **Input:** `resources/annotated_sample.jsonl` (20 records with human annotations)
 
+```jsonl
+{"event_id":"val-001","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country...","answer":"The capital of France is Paris."},"human_annotation":"pass"}
+```
+
 **Command:**
 ```bash
 go run cmd/batch/main.go \
@@ -371,6 +235,28 @@ go run cmd/batch/main.go \
   - Status: "PASSED"
 - `validation-summary.json` file created
 - Message: "LLM judge validated against human annotations"
+
+**Console output:**
+```
+INFO Validation mode enabled
+INFO Evaluating 25 records with human annotations...
+INFO Evaluation complete duration=12.3s
+INFO Computing Kendall's correlation...
+
+┌──────────────────────────────────────────┐
+│ VALIDATION RESULTS                       │
+├──────────────────────────────────────────┤
+│ Records evaluated: 25                    │
+│ Agreement:         19 / 25 (76%)        │
+│ Kendall's τ:       0.42                 │
+│ Threshold:         0.3                   │
+│ Status:            ✅ PASSED             │
+│ Interpretation:    Moderate agreement    │
+└──────────────────────────────────────────┘
+
+✅ LLM judge validated against human annotations
+→ Safe to evaluate full dataset with these judge prompts
+```
 
 **Expected Output (if correlation fails):**
 - Exit code: 1
@@ -393,51 +279,195 @@ go run cmd/batch/main.go -input test-no-annotation.jsonl -validate
 - Error: "Validation mode requires all records to have 'human_annotation' field"
 - Lists records missing annotations
 
-## Performance
+### Test Case 9: Combined Results + Summary
 
-- **Throughput:** ~5-10 evaluations/second with 5 workers (depends on LLM latency)
-- **Memory:** Loads all records into memory before processing (suitable for datasets up to ~10K records)
-- **Cost:** Each evaluation = 1 precheck + 5 LLM calls (unless early exit)
+**Command:**
+```bash
+go run cmd/batch/main.go \
+  -input resources/dataset.jsonl \
+  -output resources/results.jsonl \
+  -summary resources/summary.json
+```
 
-## Troubleshooting
+**Expected:**
+- `results.jsonl` contains detailed evaluation results
+- `summary.json` contains aggregate statistics
+- Both files created successfully
 
-### "required flag -input not provided"
-Ensure you specify `-input` flag with a valid file path.
+### Test Case 10: Pipeline from stdin
 
-### "Failed to open input file"
-Check file exists and has read permissions.
+**Command:**
+```bash
+cat dataset.jsonl | go run cmd/batch/main.go -input - | jq 'select(.verdict=="fail")'
+```
 
-### Worker pool processes 0 records
-Check for parse errors in input JSONL. Use `-dry-run` to validate.
+**Expected:**
+- Reads from stdin
+- Outputs to stdout
+- Pipes successfully to jq for filtering
+- Only failed evaluations displayed
 
-### High memory usage
-Dataset is loaded into memory. For very large datasets (>100K), consider splitting into smaller batches.
+## Performance Tests
+
+### Test Case 11: Large Dataset Performance
+
+**Input:** 1000 records
+
+**Command:**
+```bash
+time go run cmd/batch/main.go \
+  -input dataset-1000.jsonl \
+  -output results-1000.jsonl \
+  -workers 10
+```
+
+**Expected:**
+- **Throughput**: ~5-10 evaluations/second with 10 workers
+- **Memory**: Loads all records into memory (suitable for datasets up to ~10K records)
+- **Cost**: Each evaluation = 1 precheck + 5 LLM calls (unless early exit)
+- Processing time significantly faster than sequential
+
+### Test Case 12: Worker Pool Scaling
+
+Test with different worker counts:
+
+```bash
+# 1 worker (sequential)
+time go run cmd/batch/main.go -input dataset-100.jsonl -workers 1 -output /dev/null
+
+# 5 workers (default)
+time go run cmd/batch/main.go -input dataset-100.jsonl -workers 5 -output /dev/null
+
+# 20 workers (high concurrency)
+time go run cmd/batch/main.go -input dataset-100.jsonl -workers 20 -output /dev/null
+```
+
+**Expected:**
+- Performance improves with more workers (up to a point)
+- Diminishing returns after ~10-15 workers (LLM API rate limits)
+- No errors or race conditions
 
 ## Integration with Analysis Tools
 
-### Filter failed evaluations with jq
+### Filter Failed Evaluations with jq
+
 ```bash
 go run cmd/batch/main.go -input dataset.jsonl | jq 'select(.verdict=="fail")'
 ```
 
-### Calculate average confidence with jq
+### Calculate Average Confidence with jq
+
 ```bash
 go run cmd/batch/main.go -input dataset.jsonl | jq -s 'map(.confidence) | add/length'
 ```
 
 ### Import to pandas (Python)
+
 ```python
 import pandas as pd
 
 # Read JSONL output
 df = pd.read_json('results.jsonl', lines=True)
 print(df.describe())
+
+# Filter by verdict
+fails = df[df['verdict'] == 'fail']
+print(fails[['id', 'confidence', 'verdict']])
 ```
 
-## Future Enhancements
+## Troubleshooting
 
-- [ ] CSV output format with dynamic columns
-- [ ] Progress bar / live progress tracking
-- [ ] Resume from checkpoint for large datasets
-- [ ] Streaming output (write results as they complete)
-- [ ] Per-judge statistics in summary
+### Issue: "required flag -input not provided"
+
+**Solution:** Ensure you specify `-input` flag with a valid file path.
+
+```bash
+go run cmd/batch/main.go -input dataset.jsonl
+```
+
+### Issue: "Failed to open input file"
+
+**Solution:** Check file exists and has read permissions.
+
+```bash
+ls -la dataset.jsonl
+chmod 644 dataset.jsonl
+```
+
+### Issue: Worker Pool Processes 0 Records
+
+**Solution:** Check for parse errors in input JSONL. Use `-dry-run` to validate.
+
+```bash
+go run cmd/batch/main.go -input dataset.jsonl -dry-run
+```
+
+### Issue: High Memory Usage
+
+**Solution:** Dataset is loaded into memory. For very large datasets (>100K), consider splitting into smaller batches.
+
+```bash
+split -l 10000 large-dataset.jsonl batch-
+# Process each batch separately
+```
+
+### Issue: LLM API Rate Limits
+
+**Solution:** Reduce worker count to stay within rate limits.
+
+```bash
+go run cmd/batch/main.go -input dataset.jsonl -workers 3
+```
+
+## Validation Mode Details
+
+### Kendall's Tau Correlation
+
+Validation mode computes Kendall's tau (τ) correlation between LLM verdicts and human annotations:
+
+- **τ ≥ 0.3**: Judge prompts validated (proceed to production)
+- **τ < 0.3**: Judge prompts need improvement
+
+### Confusion Matrix
+
+Shows agreement between human and LLM verdicts:
+
+```
+                Human
+          pass  review  fail
+   pass    12      2     0
+   review   1      3     1    LLM
+   fail     0      2     4
+```
+
+### Workflow
+
+1. **Collect human annotations** - Sample 25+ records from your dataset
+2. **Add `human_annotation` field** - "pass", "review", or "fail"
+3. **Run validation** - Compute correlation with LLM judges
+4. **Iterate prompts** - If τ < 0.3, improve judge prompts in `judges.yaml`
+5. **Deploy** - Once τ ≥ 0.3, safe to evaluate full dataset
+
+See [Validation Guide](../guides/validation.md) for complete details.
+
+## Performance Benchmarks
+
+**Test environment**: MacBook Pro M1, 10 workers
+
+| Dataset Size | Processing Time | Throughput |
+|--------------|-----------------|------------|
+| 10 records   | ~5 seconds      | 2 eval/s   |
+| 100 records  | ~45 seconds     | 2.2 eval/s |
+| 1000 records | ~7 minutes      | 2.4 eval/s |
+
+**Notes**:
+- Early exit significantly improves throughput for low-quality responses
+- Performance limited by LLM API latency (not CPU)
+- Memory usage: ~1MB per 1000 records
+
+## Next Steps
+
+- [Validation Guide](../guides/validation.md) - Deep dive on Kendall's tau validation
+- [API Test Cases](api-tests.md) - HTTP endpoint testing
+- [Batch Mode Deployment](../deployment/batch-mode.md) - Deployment guide
+- [Configuration](../getting-started/configuration.md) - Tune pipeline settings
