@@ -70,3 +70,8 @@ func (c *Config) ConnectionString() string {
 	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s", c.User, c.Password, c.Host, c.Port, c.Database, c.SSLMode)
 
 }
+
+func (d *DB) Close() error {
+	d.Pool.Close()
+	return nil
+}

@@ -87,3 +87,11 @@ type AggregationMetrics struct {
 	FinalConfidence       float64           `json:"final_confidence"`
 	MethodUsed            AggregationMethod `json:"aggregation_method"`
 }
+
+type QueryFilters struct {
+	AgentName string
+	Verdict   string
+	Limit     int
+	Offset    int
+	Count     int
+}

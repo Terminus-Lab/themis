@@ -2,9 +2,11 @@ package storage
 
 import (
 	"context"
+
+	"github.com/Terminus-Lab/themis/internal/models"
 )
 
 type Repository interface {
-	Store(ctx context.Context, evaluation *Evaluation)
-	Query(ctx context.Context, filters QueryFilters) ([]Evaluation, int, error)
+	Store(ctx context.Context, evaluation *Evaluation) error
+	Query(ctx context.Context, filters models.QueryFilters) ([]Evaluation, int, error)
 }

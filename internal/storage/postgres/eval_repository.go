@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/rs/zerolog"
 )
@@ -57,6 +58,6 @@ func (e *EvalRepository) Store(ctx context.Context, evaluation *storage.Evaluati
 	return nil
 }
 
-func (e *EvalRepository) Query(ctx context.Context, filters storage.QueryFilters) ([]storage.Evaluation, int, error) {
+func (e *EvalRepository) Query(ctx context.Context, filters models.QueryFilters) ([]storage.Evaluation, int, error) {
 	return nil, 0, nil
 }
