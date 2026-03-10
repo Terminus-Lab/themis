@@ -8,6 +8,7 @@ import (
 
 	"github.com/Terminus-Lab/themis/internal/executor/mocks"
 	"github.com/Terminus-Lab/themis/internal/models"
+	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/rs/zerolog"
 	"go.uber.org/mock/gomock"
 )
@@ -15,6 +16,22 @@ import (
 func testLogger() *zerolog.Logger {
 	logger := zerolog.Nop()
 	return &logger
+}
+
+// Setup SQLite in-memory database for testing
+func setupTestDB(t *testing.T) *sqlite.DB {
+	t.Helper()
+
+	db, err := sqlite.New(context.Background(), ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create in-memory database: %v", err)
+	}
+
+	if err := db.InitSchema(context.Background()); err != nil {
+		t.Fatalf("Failed to initialize schema: %v", err)
+	}
+
+	return db
 }
 
 func TestJudgeExecutor_Execute(t *testing.T) {
@@ -113,6 +130,11 @@ func TestJudgeExecutor_Execute(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
+			// Setup SQLite in-memory database
+			db := setupTestDB(t)
+			defer db.Close()
+			repo := sqlite.NewEvalRepository(db, testLogger())
+
 			mockJudgeFactory := mocks.NewMockJudgeFactory(ctrl)
 			mockJudge := mocks.NewMockJudge(ctrl)
 
@@ -125,7 +147,7 @@ func TestJudgeExecutor_Execute(t *testing.T) {
 			}
 
 			// Execute
-			executor := NewJudgeExecutor(mockJudgeFactory, testLogger())
+			executor := NewJudgeExecutor(mockJudgeFactory, repo, testLogger())
 			result, err := executor.Execute(context.Background(), tt.judgeName, tt.threshold, tt.evalCtx)
 
 			// Assert error
@@ -172,6 +194,36 @@ func TestJudgeExecutor_Execute(t *testing.T) {
 			if stage.Reason != tt.stageResult.Reason {
 				t.Errorf("expected stage reason %s, got %s", tt.stageResult.Reason, stage.Reason)
 			}
+
+			// NEW: Verify result was stored in database
+			stored, err := repo.QueryById(context.Background(), tt.evalCtx.RequestID)
+			if err != nil {
+				t.Fatalf("failed to query stored result: %v", err)
+			}
+
+			if stored.EventID != tt.evalCtx.RequestID {
+				t.Errorf("stored EventID mismatch: expected %s, got %s", tt.evalCtx.RequestID, stored.EventID)
+			}
+
+			if stored.Confidence != tt.expectScore {
+				t.Errorf("stored Confidence mismatch: expected %.2f, got %.2f", tt.expectScore, stored.Confidence)
+			}
+
+			if stored.Verdict != string(tt.expectVerdict) {
+				t.Errorf("stored Verdict mismatch: expected %s, got %s", tt.expectVerdict, stored.Verdict)
+			}
+
+			if stored.UserQuery != tt.evalCtx.Query {
+				t.Errorf("stored UserQuery mismatch: expected %s, got %s", tt.evalCtx.Query, stored.UserQuery)
+			}
+
+			if stored.Answer != tt.evalCtx.Answer {
+				t.Errorf("stored Answer mismatch: expected %s, got %s", tt.evalCtx.Answer, stored.Answer)
+			}
+
+			if len(stored.StageScores) != 1 {
+				t.Errorf("stored StageScores count mismatch: expected 1, got %d", len(stored.StageScores))
+			}
 		})
 	}
 }
@@ -179,6 +231,11 @@ func TestJudgeExecutor_Execute(t *testing.T) {
 func TestJudgeExecutor_Execute_ContextCancellation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+
+	// Setup SQLite in-memory database
+	db := setupTestDB(t)
+	defer db.Close()
+	repo := sqlite.NewEvalRepository(db, testLogger())
 
 	mockJudgeFactory := mocks.NewMockJudgeFactory(ctrl)
 	mockJudge := mocks.NewMockJudge(ctrl)
@@ -205,7 +262,7 @@ func TestJudgeExecutor_Execute_ContextCancellation(t *testing.T) {
 	mockJudgeFactory.EXPECT().Get("relevance").Return(mockJudge, nil)
 	mockJudge.EXPECT().Evaluate(ctx, evalCtx).Return(stageResult)
 
-	executor := NewJudgeExecutor(mockJudgeFactory, testLogger())
+	executor := NewJudgeExecutor(mockJudgeFactory, repo, testLogger())
 	result, err := executor.Execute(ctx, "relevance", 0.7, evalCtx)
 
 	if err != nil {
@@ -215,5 +272,107 @@ func TestJudgeExecutor_Execute_ContextCancellation(t *testing.T) {
 	// Should return result even with cancelled context (judge handles it)
 	if result.Verdict != models.VerdictFail {
 		t.Errorf("expected verdict Fail for cancelled context, got %s", result.Verdict)
+	}
+
+	// Note: Storage may fail with cancelled context - this is expected behavior
+	// The executor doesn't check Store errors (fire-and-forget pattern)
+}
+
+func TestJudgeExecutor_Execute_VerifyStorageIntegration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Setup SQLite in-memory database
+	db := setupTestDB(t)
+	defer db.Close()
+	repo := sqlite.NewEvalRepository(db, testLogger())
+
+	mockJudgeFactory := mocks.NewMockJudgeFactory(ctrl)
+	mockJudge := mocks.NewMockJudge(ctrl)
+
+	// Run multiple evaluations
+	tests := []struct {
+		requestID string
+		judgeName string
+		score     float64
+		verdict   models.Verdict
+	}{
+		{"req-001", "relevance", 0.9, models.VerdictPass},
+		{"req-002", "coherence", 0.3, models.VerdictFail},
+		{"req-003", "faithfulness", 0.85, models.VerdictPass},
+	}
+
+	for _, tt := range tests {
+		evalCtx := models.EvaluationContext{
+			RequestID: tt.requestID,
+			Query:     "test query",
+			Answer:    "test answer",
+			Context:   "test context",
+			CreatedAt: time.Now(),
+		}
+
+		stageResult := models.StageResult{
+			Name:     tt.judgeName,
+			Score:    tt.score,
+			Reason:   "test reason",
+			Duration: 100 * time.Millisecond,
+		}
+
+		mockJudgeFactory.EXPECT().Get(tt.judgeName).Return(mockJudge, nil)
+		mockJudge.EXPECT().Evaluate(gomock.Any(), evalCtx).Return(stageResult)
+
+		executor := NewJudgeExecutor(mockJudgeFactory, repo, testLogger())
+		_, err := executor.Execute(context.Background(), tt.judgeName, 0.7, evalCtx)
+		if err != nil {
+			t.Fatalf("execution failed: %v", err)
+		}
+	}
+
+	// Verify all 3 evaluations are stored
+	allResults, count, err := repo.Query(context.Background(), models.QueryFilters{Limit: 10})
+	if err != nil {
+		t.Fatalf("failed to query all results: %v", err)
+	}
+
+	if count != 3 {
+		t.Errorf("expected 3 stored evaluations, got %d", count)
+	}
+
+	if len(allResults) != 3 {
+		t.Errorf("expected 3 results, got %d", len(allResults))
+	}
+
+	// Verify we can query by verdict
+	passResults, passCount, err := repo.Query(context.Background(), models.QueryFilters{
+		Verdict: "pass",
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("failed to query pass results: %v", err)
+	}
+
+	if passCount != 2 {
+		t.Errorf("expected 2 pass verdicts, got %d", passCount)
+	}
+
+	if len(passResults) != 2 {
+		t.Errorf("expected 2 pass results, got %d", len(passResults))
+	}
+
+	// Verify fail verdict
+	failResults, failCount, err := repo.Query(context.Background(), models.QueryFilters{
+		Verdict: "fail",
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("failed to query fail results: %v", err)
+	}
+
+	if failCount != 1 {
+		t.Errorf("expected 1 fail verdict, got %d", failCount)
+	}
+
+	if len(failResults) != 1 {
+		t.Errorf("expected 1 fail result, got %d", len(failResults))
 	}
 }

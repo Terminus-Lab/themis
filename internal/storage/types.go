@@ -13,7 +13,3 @@ type Evaluation struct {
 	Verdict      string
 	StageScores  []models.StageResult
 }
-
-type DB interface {
-	Close() error
-}

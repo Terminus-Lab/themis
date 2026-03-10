@@ -124,9 +124,19 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 		logger,
 	)
 
+	db, err := getDatabaseClient(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("unable tot create db client. error: %w", err)
+	}
+
+	repository, err := NewEvalRepository(db, logger)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get evaluation repository. Error: %w", err)
+	}
+
 	// Executors
-	agentExec := executor.NewExecutor(stageRunner, judgeRunner, agg, cfg.EarlyExitThreshold, logger)
-	judgeExec := executor.NewJudgeExecutor(judgeFactory, logger)
+	agentExec := executor.NewExecutor(stageRunner, repository, judgeRunner, agg, cfg.EarlyExitThreshold, logger)
+	judgeExec := executor.NewJudgeExecutor(judgeFactory, repository, logger)
 
 	return &Dependencies{
 		Executor:      agentExec,
@@ -209,10 +219,9 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 	return llm.NewLLMClientRegistry(clients), nil
 }
 
-func getDatabaseClient(ctx context.Context, cfg Config) (storage.DB, error) {
+func getDatabaseClient(ctx context.Context, cfg *Config) (storage.DB, error) {
 	if cfg.InMemoryDB {
-		localDB := "themis-db.sql"
-		client, err := sqlite.New(ctx, localDB)
+		client, err := sqlite.New(ctx, ":memory:")
 		if err != nil {
 			return nil, err
 		}
@@ -225,5 +234,16 @@ func getDatabaseClient(ctx context.Context, cfg Config) (storage.DB, error) {
 		}
 
 		return client, nil
+	}
+}
+
+func NewEvalRepository(db storage.DB, logger *zerolog.Logger) (storage.Repository, error) {
+	switch d := db.(type) {
+	case *postgres.DB:
+		return postgres.NewEvalRepository(d, logger), nil
+	case *sqlite.DB:
+		return sqlite.NewEvalRepository(d, logger), nil
+	default:
+		return nil, fmt.Errorf("unsupported db type %T", db)
 	}
 }
