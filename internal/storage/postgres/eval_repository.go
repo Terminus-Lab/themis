@@ -146,3 +146,35 @@ func (e *EvalRepository) Query(ctx context.Context, filters models.QueryFilters)
 
 	return evaluations, totalCount, nil
 }
+
+func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storage.Evaluation, error) {
+	query := `
+		SELECT event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		FROM eval_results
+		WHERE event_id = $1
+	`
+
+	var evaluation storage.Evaluation
+	var stageScoreJSON []byte
+
+	err := e.db.Pool.QueryRow(ctx, query, eventID).Scan(
+		&evaluation.EventID,
+		&evaluation.AgentName,
+		&evaluation.AgentVersion,
+		&evaluation.UserQuery,
+		&evaluation.Answer,
+		&evaluation.Context,
+		&evaluation.Confidence,
+		&evaluation.Verdict,
+		&stageScoreJSON,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query by id. Error: %w", err)
+	}
+
+	if err := json.Unmarshal(stageScoreJSON, &evaluation.StageScores); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal stage_scores. Error: %w", err)
+	}
+
+	return &evaluation, nil
+}
