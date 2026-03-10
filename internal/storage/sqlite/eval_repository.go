@@ -25,9 +25,9 @@ func NewEvalRepository(db *DB, logger *zerolog.Logger) *EvalRepository {
 
 func (e *EvalRepository) Store(ctx context.Context, eval *storage.Evaluation) error {
 	query := `
-			INSERT INTO eval_results
-			(id, event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+		INSERT INTO eval_results
+		(id, event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
 	`
 
 	id := uuid.New().String()
@@ -61,25 +61,39 @@ func (e *EvalRepository) Store(ctx context.Context, eval *storage.Evaluation) er
 }
 
 func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFilters) ([]storage.Evaluation, int, error) {
-	query := `
-			SELECT id, event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at
-			FROM eval_results
-			WHERE 1=1
-	`
-
+	// Build WHERE clause and args
+	whereClause := "WHERE 1=1"
 	args := []any{}
 
 	if queryFilters.AgentName != "" {
-		query += " AND agent_name = ?"
+		whereClause += " AND agent_name = ?"
 		args = append(args, queryFilters.AgentName)
 	}
 
 	if queryFilters.Verdict != "" {
-		query += " AND verdict = ?"
+		whereClause += " AND verdict = ?"
 		args = append(args, queryFilters.Verdict)
 	}
 
-	query += " ORDER BY created_at DESC"
+	// Get total count for pagination
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM eval_results %s", whereClause)
+	var totalCount int
+	if err := e.db.client.QueryRowContext(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %w", err)
+	}
+
+	// Short-circuit if no results
+	if totalCount == 0 {
+		return []storage.Evaluation{}, 0, nil
+	}
+
+	// Build data query
+	query := fmt.Sprintf(`
+		SELECT event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		FROM eval_results
+		%s
+		ORDER BY created_at DESC
+	`, whereClause)
 
 	if queryFilters.Limit > 0 {
 		query += " LIMIT ?"
@@ -91,24 +105,18 @@ func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFil
 		args = append(args, queryFilters.Offset)
 	}
 
-	evaluations := []storage.Evaluation{}
-
 	rows, err := e.db.client.QueryContext(ctx, query, args...)
 	if err != nil {
-		return evaluations, len(evaluations), fmt.Errorf("unable to query storage. Error: %w", err)
+		return nil, 0, fmt.Errorf("unable to query storage. Error: %w", err)
 	}
-	defer rows.Close() 
+	defer rows.Close()
 
-	var (
-		id             string
-		createdAt      string
-		stageScoreJSON string
-	)
+	evaluations := []storage.Evaluation{}
+	var stageScoreJSON string
 
 	for rows.Next() {
 		var evaluation storage.Evaluation
 		if err := rows.Scan(
-			&id,
 			&evaluation.EventID,
 			&evaluation.AgentName,
 			&evaluation.AgentVersion,
@@ -118,17 +126,21 @@ func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFil
 			&evaluation.Confidence,
 			&evaluation.Verdict,
 			&stageScoreJSON,
-			&createdAt,
 		); err != nil {
-			return nil, len(evaluations), fmt.Errorf("failed to deserialize row. Error: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan row. Error: %w", err)
 		}
 
 		if err := json.Unmarshal([]byte(stageScoreJSON), &evaluation.StageScores); err != nil {
-			return evaluations, len(evaluations), fmt.Errorf("unable to query storage. Error: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal stage_scores. Error: %w", err)
 		}
 
 		evaluations = append(evaluations, evaluation)
 	}
 
-	return evaluations, len(evaluations), nil
+	// Check for errors from iteration
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return evaluations, totalCount, nil
 }
