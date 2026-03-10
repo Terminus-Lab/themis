@@ -1,0 +1,169 @@
+# LLM Judge Configuration for Eval Agent
+# This file defines all evaluation judges, their prompts, and model settings
+
+judges:
+  # Default model configuration applied to all judges unless overridden
+  default_model:
+    modelFamily: "anthropic"
+    modelID: us.anthropic.claude-3-5-haiku-20241022-v1:0
+    max_tokens: 256
+    temperature: 0.0
+    retry: true
+
+  # Individual judge configurations
+  evaluators:
+    # Relevance Judge: Evaluates if the answer addresses the query
+    - name: relevance
+      enabled: true
+      weight: 0.25
+      description: "Evaluates if the answer addresses the query"
+      requires_context: false
+      prompt: |
+        You are an evaluation judge. Score how relevant the answer is to the query on a scale from 0.0 to 1.0.
+
+        Query: {{.Query}}
+        Answer: {{.Answer}}
+
+        Output ONLY valid JSON (no markdown, no explanation):
+        {"score": <float>, "reason": "<string>"}
+      model:
+        max_tokens: 200
+        temperature: 0.0
+        retry: true
+
+    # Faithfulness Judge: Evaluates if answer is grounded in context (no hallucinations)
+    - name: faithfulness
+      enabled: true
+      weight: 0.20
+      description: "Evaluates whether the answer is grounded in the provided context"
+      requires_context: true
+      prompt: |
+        You are an evaluation judge.
+        Score how faithful the answer is to the provided context, on a scale from 0.0 to 1.0.
+        Penalize if the answer introduces facts not present in the context.
+
+        Context: {{.Context}}
+        Answer: {{.Answer}}
+
+        Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
+        {"score": <float>, "reason": "<string>"}
+      model:
+        max_tokens: 256
+        temperature: 0.0
+        retry: true
+
+    # Coherence Judge: Evaluates internal logical consistency
+    - name: coherence
+      enabled: true
+      weight: 0.15
+      description: "Evaluates if the answer is internally logically consistent"
+      requires_context: false
+      prompt: |
+        You are an evaluation judge.
+        Score how logically coherent and internally consistent the answer is, on a scale from 0.0 to 1.0.
+        Do NOT consider whether the answer is correct or relevant — only evaluate its internal logic.
+
+        Answer: {{.Answer}}
+
+        Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
+        {"score": <float>, "reason": "<string>"}
+      model:
+        max_tokens: 256
+        temperature: 0.0
+        retry: true
+
+    # Completeness Judge: Evaluates if answer fully addresses all parts of query
+    - name: completeness
+      enabled: true
+      weight: 0.20
+      description: "Evaluates whether the answer fully addresses all parts of the query"
+      requires_context: false
+      prompt: |
+        You are a completeness judge.
+        You are evaluating answer completeness.
+
+        Query: {{.Query}}
+        Answer: {{.Answer}}
+
+        Task: Identify all distinct questions/requests in the query.
+        Does the answer address EACH one?
+        Score:
+          - 1.0: All parts fully addressed
+          - 0.5: Some parts missing or incomplete
+          - 0.0: Major parts ignored
+
+        Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
+        {"score": <float>, "reason": "<which parts were addressed>"}
+      model:
+        max_tokens: 256
+        temperature: 0.0
+        retry: true
+
+    # Instruction Judge: Evaluates if answer follows explicit instructions
+    - name: instruction
+      enabled: true
+      weight: 0.15
+      description: "Evaluates whether the answer follows explicit instructions in the query"
+      requires_context: false
+      prompt: |
+        You are an evaluation judge for instruction-following.
+
+        Your task:
+        1. Carefully analyze the query for any EXPLICIT instructions or requirements
+        2. Check if the answer follows each instruction
+        3. Score based on compliance
+
+        Query: {{.Query}}
+        Answer: {{.Answer}}
+
+        Types of instructions to look for:
+        - Format requirements: "as JSON", "in bullet points", "as a list", "in code format", "as a table", "step by step"
+        - Count specifications: "3 examples", "list 5 items", "top 10", "at least 2"
+        - Style directives: "be concise", "in detail", "briefly", "explain simply", "comprehensively"
+        - Length constraints: "in one sentence", "in 50 words or less", "in a paragraph"
+        - Content constraints: "without technical jargon", "for beginners", "with examples", "include code"
+
+        Scoring guidelines:
+        - 1.0: All instructions followed perfectly, OR no explicit instructions in query
+        - 0.7-0.9: Most instructions followed, minor deviations
+        - 0.4-0.6: Some instructions followed, some ignored
+        - 0.0-0.3: Instructions largely ignored
+
+        IMPORTANT: Only evaluate EXPLICIT instructions. Do not penalize for general quality issues.
+
+        Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
+        {"score": <float>, "reason": "<which parts were addressed>"}
+      model:
+        max_tokens: 300
+        temperature: 0.0
+        retry: true
+
+    # Correctness Judge: Evaluates semantic match with expected output (ground truth)
+    - name: correctness
+      enabled: true
+      weight: 0.05
+      description: "Evaluates semantic similarity between answer and expected output"
+      requires_context: false
+      requires_expected_output: true
+      prompt: |
+        You are a correctness evaluation judge.
+
+        Compare the provided answer with the expected output (ground truth).
+        Score based on semantic equivalence, not exact string match.
+
+        Answer: {{.Answer}}
+        Expected Output: {{.ExpectedOutput}}
+
+        Scoring guidelines:
+        - 1.0: Semantically identical
+        - 0.8-0.9: Mostly correct, minor differences
+        - 0.5-0.7: Partially correct
+        - 0.2-0.4: Somewhat related but different
+        - 0.0-0.1: Completely different
+
+        Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
+        {"score": <float>, "reason": "<string>"}
+      model:
+        max_tokens: 200
+        temperature: 0.0
+        retry: true

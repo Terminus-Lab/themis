@@ -1,0 +1,4 @@
+{"event_id":"test-val-1","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is 2+2?","context":"Basic math","answer":"4"},"human_annotation":"pass"}
+{"event_id":"test-val-2","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of Spain?","context":"Spain is in Europe","answer":"Madrid"},"human_annotation":"pass"}
+{"event_id":"test-val-3","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"Explain quantum physics","context":"Quantum physics studies...","answer":"It's complicated"},"human_annotation":"review"}
+{"event_id":"test-val-4","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"AI is artificial intelligence","answer":"I don't know"},"human_annotation":"fail"}

@@ -1,0 +1,99 @@
+package models
+
+import (
+	"time"
+)
+
+type Verdict string
+type AggregationMethod string
+
+const (
+	MethodWeightedAverage AggregationMethod = "weighted_average"
+	MethodHarmonicMean    AggregationMethod = "harmonic_mean"
+	MethodMedian          AggregationMethod = "median"
+	MethodWeightedProduct AggregationMethod = "weighted_product"
+)
+
+const (
+	VerdictPass   Verdict = "pass"
+	VerdictFail   Verdict = "fail"
+	VerdictReview Verdict = "review"
+)
+
+type EventType string
+
+const (
+	EventTypeAgentResponse EventType = "agent_response"
+	EventTypeAgentError    EventType = "agent_error"
+)
+
+type Agent struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Version string `json:"version"`
+}
+
+type Interaction struct {
+	UserQuery      string `json:"user_query"`
+	Context        string `json:"context"`
+	Answer         string `json:"answer"`
+	ExpectedOutput string `json:"expected_output,omitempty"` // Optional: ground truth for correctness evaluation
+}
+
+// Input message
+
+type EvaluationRequest struct {
+	EventID         string      `json:"event_id"`
+	EventType       EventType   `json:"event_type"`
+	Agent           Agent       `json:"agent"`
+	Interaction     Interaction `json:"interaction"`
+	HumanAnnotation *string     `json:"human_annotation,omitempty"` // Optional: for validation mode
+}
+
+// Normalized internal object
+type EvaluationContext struct {
+	RequestID      string    `json:"request_id" jsonschema:"required,description=Unique event identifier"`
+	AgentName      string    `json:"agent_name,omitempty" jsonschema:"description=Name of the agent being evaluated"`
+	AgentVersion   string    `json:"agent_version,omitempty" jsonschema:"description=Version of the agent being evaluated"`
+	Query          string    `json:"user_query" jsonschema:"required,description=User's original query"`
+	Context        string    `json:"context,omitempty" jsonschema:"description=Optional context or retrieved documents"`
+	Answer         string    `json:"answer" jsonschema:"required,description=Agent response to evaluate"`
+	ExpectedOutput string    `json:"expected_output,omitempty" jsonschema:"description=Optional ground truth for correctness evaluation"`
+	CreatedAt      time.Time `json:"created_at" jsonschema:"description=Time when the evaluation context was created"`
+}
+
+// One evaluator's output
+type StageResult struct {
+	Name     string        `json:"name"`
+	Score    float64       `json:"score"`
+	Reason   string        `json:"reason"`
+	Duration time.Duration `json:"duration_ns"`
+	Weight   float64       `json:"weight,omitempty"` // Weight for this judge (0.0-1.0)
+}
+
+// Final output emitted to Kafka
+type EvaluationResult struct {
+	ID         string             `json:"id"`
+	Stages     []StageResult      `json:"stages"`
+	Confidence float64            `json:"confidence"`
+	Verdict    Verdict            `json:"verdict"`
+	Metrics    AggregationMetrics `json:"metrics"`
+}
+
+type AggregationMetrics struct {
+	Stage1Avg             float64           `json:"stage1_avg"`
+	Stage2WeightedAvg     float64           `json:"stage2_weighted_avg"`
+	Stage2HarmonicMean    float64           `json:"stage2_harmonic_mean"`
+	Stage2Median          float64           `json:"stage2_median"`
+	Stage2WeightedProduct float64           `json:"stage2_weighted_product"`
+	FinalConfidence       float64           `json:"final_confidence"`
+	MethodUsed            AggregationMethod `json:"aggregation_method"`
+}
+
+type QueryFilters struct {
+	AgentName string
+	Verdict   string
+	Limit     int
+	Offset    int
+	Count     int
+}
