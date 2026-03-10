@@ -208,6 +208,9 @@ export IN_MEMORY_DB=false
 ```bash
 # Start API server (uses SQLite by default)
 go run cmd/api/main.go
+
+# Access the dashboard at http://localhost:18082
+# Access the API at http://localhost:18082/api/v1/
 ```
 
 ### API Endpoints
@@ -324,6 +327,32 @@ JUDGE_AGGREGATION_METHOD=harmonic_mean
 
 **All methods are computed and returned in `metrics`** - you can experiment without re-running evaluations by examining different scores in the response.
 
+## Dashboard UI
+
+Themis includes a built-in web dashboard for visualizing evaluation results.
+
+**Access**: Open `http://localhost:18082` in your browser after starting the API server.
+
+**Features**:
+- **Dark terminal theme** - Claude Code-inspired aesthetic with monospace fonts
+- **Real-time updates** - Auto-refreshes every 10 seconds
+- **Filtering** - Filter by agent name, verdict (pass/review/fail), or limit results
+- **Expandable rows** - Click any result to see full details, stage scores, and reasoning
+- **Pagination** - Navigate through results with Previous/Next buttons
+- **No authentication** - Simple, read-only visualization for local development
+
+**UI Components**:
+- Stats cards showing total results, current page, and result count
+- Results table with event ID, agent, query preview, verdict, and confidence
+- Detailed view with full query, answer, context, and individual stage scores
+- Filter controls for agent name, verdict, and pagination
+
+The dashboard is perfect for:
+- Monitoring evaluation results during development
+- Debugging judge behavior and score distributions
+- Quick visual inspection of pass/review/fail verdicts
+- Understanding why specific responses received certain scores
+
 ## How It Works
 
 ### Two-Stage Pipeline
@@ -385,6 +414,7 @@ Comprehensive testing guides for each deployment mode:
 - **Flexible Deployment**: API, streaming, batch, and MCP modes
 - **SQLite by Default**: Zero-config database for development, optional Postgres for production
 - **Query API**: Filter and retrieve evaluation results with pagination
+- **Built-in Dashboard**: Dark terminal-themed web UI for visual monitoring (no auth, no build step)
 - **Extensible Results**: Log, store in DB, or publish to Kafka
 
 ## Development

@@ -116,6 +116,7 @@ Four entry points sharing core evaluation logic:
    - `POST /api/v1/evaluate/judge/{name}` - single judge evaluation
    - `GET /api/v1/results` - query evaluation results with filters (agent_name, verdict, limit, offset)
    - `GET /api/v1/results/{event_id}` - get single evaluation result by ID
+   - `GET /` - dashboard UI (static HTML at `static/dashboard.html`)
    - CORS enabled, structured logging
    - **Can run in two modes:**
      - **API only** (default): HTTP endpoints only
@@ -126,6 +127,13 @@ Four entry points sharing core evaluation logic:
      - Manual testing via API while streaming runs
      - Graceful shutdown handles both HTTP and streaming
      - Horizontal scaling with multiple consumer instances
+   - **Dashboard UI:**
+     - Dark terminal theme (Claude Code-inspired)
+     - Real-time visualization of evaluation results
+     - Filtering by agent, verdict, pagination
+     - Expandable rows for detailed inspection
+     - Auto-refresh every 10 seconds
+     - No authentication required (local dev only)
 
 2. **Batch** (`cmd/batch/main.go`): CLI with concurrent worker pool
    - JSONL input/output formats
@@ -278,6 +286,32 @@ Query parameters:
 - `verdict` - Filter by verdict: "pass", "review", or "fail"
 - `limit` - Number of results per page (default: 50)
 - `offset` - Pagination offset (default: 0)
+
+### Dashboard UI
+
+Access the web dashboard at `http://localhost:18082` after starting the API server.
+
+**Location**: `static/dashboard.html` - single-page HTML application
+
+**Features**:
+- Dark terminal theme with Claude Code aesthetic
+- Real-time updates (auto-refresh every 10s)
+- Filter by agent name, verdict, or limit results
+- Click rows to expand and view full details
+- Pagination with Previous/Next controls
+- No build step required - pure HTML/CSS/JS
+
+**Customization**:
+- Edit `static/dashboard.html` directly to modify UI
+- Colors and styling defined in `<style>` block
+- API calls use relative URLs (works with any port)
+- Auto-detects API base URL from `window.location.origin`
+
+**Use cases**:
+- Visual monitoring during development
+- Debugging judge scores and reasoning
+- Quick inspection of evaluation results
+- Demo and stakeholder presentations
 
 ### Adding a New Judge
 

@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Themis - Evaluation Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #00d4aa;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 13px;
+        }
+
+        .filters {
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        label {
+            display: block;
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input, select {
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #00d4aa;
+        }
+
+        button {
+            background: #00d4aa;
+            color: #1a1a1a;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #00e6bb;
+        }
+
+        button:active {
+            background: #00c299;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: #3d3d3d;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px 20px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #00d4aa;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .results-table {
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #2a2a2a;
+            border-bottom: 1px solid #333;
+        }
+
+        th {
+            text-align: left;
+            padding: 15px;
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #2a2a2a;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        tbody tr:hover {
+            background: #2a2a2a;
+        }
+
+        tbody tr.expanded {
+            background: #2a2a2a;
+        }
+
+        td {
+            padding: 15px;
+            color: #e0e0e0;
+        }
+
+        .verdict {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .verdict-pass {
+            background: #00d4aa33;
+            color: #00d4aa;
+        }
+
+        .verdict-review {
+            background: #ffa50033;
+            color: #ffa500;
+        }
+
+        .verdict-fail {
+            background: #ff4d4d33;
+            color: #ff4d4d;
+        }
+
+        .confidence {
+            color: #00d4aa;
+            font-weight: 600;
+        }
+
+        .query-preview {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #aaa;
+        }
+
+        .detail-row {
+            display: none;
+            background: #1a1a1a;
+        }
+
+        .detail-row.visible {
+            display: table-row;
+        }
+
+        .detail-content {
+            padding: 20px;
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-title {
+            color: #00d4aa;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .detail-text {
+            color: #e0e0e0;
+            line-height: 1.8;
+            padding: 12px;
+            background: #242424;
+            border-radius: 6px;
+            border-left: 3px solid #00d4aa;
+        }
+
+        .stages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .stage-card {
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .stage-name {
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        .stage-score {
+            color: #00d4aa;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stage-reason {
+            color: #aaa;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-top: 1px solid #333;
+        }
+
+        .pagination-info {
+            color: #888;
+            font-size: 13px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        .error {
+            background: #ff4d4d33;
+            border: 1px solid #ff4d4d;
+            border-radius: 8px;
+            padding: 15px;
+            color: #ff4d4d;
+            margin-bottom: 20px;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚖️ Themis Evaluation Dashboard</h1>
+            <div class="subtitle">Real-time AI agent response evaluation results</div>
+        </header>
+
+        <div class="filters">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Agent Name</label>
+                    <input type="text" id="agentFilter" placeholder="Filter by agent name...">
+                </div>
+                <div class="filter-group">
+                    <label>Verdict</label>
+                    <select id="verdictFilter">
+                        <option value="">All verdicts</option>
+                        <option value="pass">Pass</option>
+                        <option value="review">Review</option>
+                        <option value="fail">Fail</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Results per page</label>
+                    <select id="limitFilter">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <button onclick="applyFilters()">Apply Filters</button>
+                </div>
+                <div class="filter-group">
+                    <button class="btn-secondary" onclick="resetFilters()">Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Results</div>
+                <div class="stat-value" id="totalCount">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Current Page</div>
+                <div class="stat-value" id="currentPage">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Showing</div>
+                <div class="stat-value" id="showingCount">-</div>
+            </div>
+        </div>
+
+        <div id="errorContainer"></div>
+
+        <div class="results-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Event ID</th>
+                        <th>Agent</th>
+                        <th>Query</th>
+                        <th>Verdict</th>
+                        <th>Confidence</th>
+                        <th>Stages</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                    <tr>
+                        <td colspan="6" class="loading">Loading results...</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <div class="pagination-info" id="paginationInfo">-</div>
+                <div class="pagination-controls">
+                    <button id="prevBtn" onclick="previousPage()" disabled>← Previous</button>
+                    <button id="nextBtn" onclick="nextPage()" disabled>Next →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentOffset = 0;
+        let currentLimit = 25;
+        let totalResults = 0;
+        let hasMore = false;
+        let expandedRows = new Set();
+
+        async function fetchResults() {
+            const agentName = document.getElementById('agentFilter').value;
+            const verdict = document.getElementById('verdictFilter').value;
+            const limit = parseInt(document.getElementById('limitFilter').value);
+
+            let url = `${API_BASE}/api/v1/results?limit=${limit}&offset=${currentOffset}`;
+            if (agentName) url += `&agent_name=${encodeURIComponent(agentName)}`;
+            if (verdict) url += `&verdict=${encodeURIComponent(verdict)}`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                renderResults(data);
+                updateStats(data);
+                updatePagination(data);
+                clearError();
+            } catch (error) {
+                showError(`Failed to fetch results: ${error.message}`);
+                renderEmpty();
+            }
+        }
+
+        function renderResults(data) {
+            const tbody = document.getElementById('resultsBody');
+
+            if (!data.results || data.results.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <div>No evaluation results found</div>
+                            <div style="margin-top: 10px; font-size: 12px;">Try adjusting your filters or run some evaluations</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.results.forEach((result, index) => {
+                const rowId = `row-${currentOffset + index}`;
+                const detailId = `detail-${currentOffset + index}`;
+
+                // Main row
+                const row = document.createElement('tr');
+                row.id = rowId;
+                row.onclick = () => toggleDetails(rowId, detailId, result);
+                row.innerHTML = `
+                    <td><code>${result.event_id}</code></td>
+                    <td>${result.agent_name} <span class="timestamp">v${result.agent_version}</span></td>
+                    <td class="query-preview">${result.user_query}</td>
+                    <td><span class="verdict verdict-${result.verdict}">${result.verdict}</span></td>
+                    <td class="confidence">${(result.confidence * 100).toFixed(1)}%</td>
+                    <td>${result.stage_scores.length} stages</td>
+                `;
+                tbody.appendChild(row);
+
+                // Detail row (initially hidden)
+                const detailRow = document.createElement('tr');
+                detailRow.id = detailId;
+                detailRow.className = 'detail-row';
+                detailRow.innerHTML = `
+                    <td colspan="6">
+                        <div class="detail-content">
+                            <div class="detail-section">
+                                <div class="detail-title">User Query</div>
+                                <div class="detail-text">${result.user_query}</div>
+                            </div>
+                            <div class="detail-section">
+                                <div class="detail-title">Agent Answer</div>
+                                <div class="detail-text">${result.answer}</div>
+                            </div>
+                            ${result.context ? `
+                            <div class="detail-section">
+                                <div class="detail-title">Context</div>
+                                <div class="detail-text">${result.context}</div>
+                            </div>
+                            ` : ''}
+                            <div class="detail-section">
+                                <div class="detail-title">Stage Scores</div>
+                                <div class="stages-grid">
+                                    ${result.stage_scores.map(stage => `
+                                        <div class="stage-card">
+                                            <div class="stage-name">${stage.name}</div>
+                                            <div class="stage-score">${(stage.score * 100).toFixed(0)}%</div>
+                                            ${stage.reason ? `<div class="stage-reason">${stage.reason}</div>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(detailRow);
+            });
+        }
+
+        function toggleDetails(rowId, detailId, result) {
+            const row = document.getElementById(rowId);
+            const detailRow = document.getElementById(detailId);
+
+            if (expandedRows.has(rowId)) {
+                expandedRows.delete(rowId);
+                row.classList.remove('expanded');
+                detailRow.classList.remove('visible');
+            } else {
+                expandedRows.add(rowId);
+                row.classList.add('expanded');
+                detailRow.classList.add('visible');
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('totalCount').textContent = data.total || 0;
+            document.getElementById('currentPage').textContent = Math.floor(currentOffset / currentLimit) + 1;
+            document.getElementById('showingCount').textContent = data.count || 0;
+
+            totalResults = data.total;
+            hasMore = data.has_more;
+        }
+
+        function updatePagination(data) {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const info = document.getElementById('paginationInfo');
+
+            prevBtn.disabled = currentOffset === 0;
+            nextBtn.disabled = !data.has_more;
+
+            const start = currentOffset + 1;
+            const end = currentOffset + (data.count || 0);
+            info.textContent = `Showing ${start}-${end} of ${data.total || 0} results`;
+        }
+
+        function applyFilters() {
+            currentOffset = 0;
+            currentLimit = parseInt(document.getElementById('limitFilter').value);
+            expandedRows.clear();
+            fetchResults();
+        }
+
+        function resetFilters() {
+            document.getElementById('agentFilter').value = '';
+            document.getElementById('verdictFilter').value = '';
+            document.getElementById('limitFilter').value = '25';
+            applyFilters();
+        }
+
+        function nextPage() {
+            if (hasMore) {
+                currentOffset += currentLimit;
+                expandedRows.clear();
+                fetchResults();
+            }
+        }
+
+        function previousPage() {
+            if (currentOffset > 0) {
+                currentOffset = Math.max(0, currentOffset - currentLimit);
+                expandedRows.clear();
+                fetchResults();
+            }
+        }
+
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div class="error">⚠️ ${message}</div>`;
+        }
+
+        function clearError() {
+            document.getElementById('errorContainer').innerHTML = '';
+        }
+
+        function renderEmpty() {
+            document.getElementById('totalCount').textContent = '0';
+            document.getElementById('currentPage').textContent = '0';
+            document.getElementById('showingCount').textContent = '0';
+        }
+
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
+            fetchResults();
+        }, 10000);
+
+        // Initial load
+        fetchResults();
+    </script>
+</body>
+</html>

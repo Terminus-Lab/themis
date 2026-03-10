@@ -62,13 +62,18 @@ func main() {
 		AllowedHeaders: []string{"*"},
 	})
 
+	// Serve static files (dashboard)
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServer(http.Dir("./static")))
+	mux.Handle("/api/", corsHandler.Handler(container))
+
 	// Server config
 	port := env.GetString("EVAL_AGENT_API_PORT", "18082")
 	addr := fmt.Sprintf(":%s", port)
 
 	server := &http.Server{
 		Addr:    addr,
-		Handler: corsHandler.Handler(container),
+		Handler: mux,
 	}
 
 	// ===== Streaming Consumer =====
