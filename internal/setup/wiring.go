@@ -42,6 +42,7 @@ type Config struct {
 type Dependencies struct {
 	Executor      *executor.Executor
 	JudgeExecutor *executor.JudgeExecutor
+	Repository    storage.Repository
 	Logger        *zerolog.Logger
 }
 
@@ -141,6 +142,7 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 	return &Dependencies{
 		Executor:      agentExec,
 		JudgeExecutor: judgeExec,
+		Repository:    repository,
 		Logger:        logger,
 	}, nil
 

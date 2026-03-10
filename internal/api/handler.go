@@ -1,28 +1,37 @@
 package api
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/emicklei/go-restful/v3"
 	"github.com/Terminus-Lab/themis/internal/api/middleware"
 	"github.com/Terminus-Lab/themis/internal/executor"
 	"github.com/Terminus-Lab/themis/internal/models"
+	"github.com/Terminus-Lab/themis/internal/storage"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/rs/zerolog"
 )
 
 type Handler struct {
 	executor      *executor.Executor
 	judgeExecutor *executor.JudgeExecutor
+	repository    storage.Repository
 	logger        *zerolog.Logger
 }
 
-func NewHandler(executor *executor.Executor, judgeExecutor *executor.JudgeExecutor, logger *zerolog.Logger) *Handler {
+func NewHandler(
+	executor *executor.Executor,
+	judgeExecutor *executor.JudgeExecutor,
+	repository storage.Repository,
+	logger *zerolog.Logger,
+) *Handler {
 	return &Handler{
 		executor:      executor,
 		judgeExecutor: judgeExecutor,
+		repository:    repository,
 		logger:        logger,
 	}
 }
@@ -174,4 +183,95 @@ func validateEvaluationRequest(evalRequest models.EvaluationRequest) error {
 		return errors.New("answer is required")
 	}
 	return nil
+}
+
+// GET /api/v1/results
+func (h *Handler) QueryResults(req *restful.Request, resp *restful.Response) {
+	agentName := req.QueryParameter("agent_name")
+	verdict := req.QueryParameter("verdict")
+	limitStr := req.QueryParameter("limit")
+	offsetStr := req.QueryParameter("offset")
+
+	limit := 50
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	filters := models.QueryFilters{
+		AgentName: agentName,
+		Verdict:   verdict,
+		Limit:     limit,
+		Offset:    offset,
+	}
+
+	h.logger.Info().
+		Str("agent_name", agentName).
+		Str("verdict", verdict).
+		Int("limit", limit).
+		Int("offset", offset).
+		Msg("Query results")
+
+	ctx := req.Request.Context()
+	evaluations, total, err := h.repository.Query(ctx, filters)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to query results")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to DTOs
+	dtos := toEvaluationDTOs(evaluations)
+
+	response := QueryResultsResponse{
+		Results: dtos,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+		Count:   len(dtos),
+		HasMore: offset+len(dtos) < total,
+	}
+
+	resp.WriteHeaderAndEntity(http.StatusOK, response)
+}
+
+// GET /api/v1/results/{event_id}
+func (h *Handler) GetResultByID(req *restful.Request, resp *restful.Response) {
+	eventID := req.PathParameter("event_id")
+
+	h.logger.Info().
+		Str("event_id", eventID).
+		Msg("Get result by ID")
+
+	ctx := req.Request.Context()
+	evaluation, err := h.repository.QueryById(ctx, eventID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.logger.Warn().Str("event_id", eventID).Msg("Result not found")
+			resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
+				"error": "result not found",
+			})
+			return
+		}
+		h.logger.Error().Err(err).Msg("Failed to get result")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to DTO
+	dto := toEvaluationDTO(*evaluation)
+
+	response := EvaluationResponse{
+		Evaluation: dto,
+	}
+
+	resp.WriteHeaderAndEntity(http.StatusOK, response)
 }

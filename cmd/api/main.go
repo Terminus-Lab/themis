@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// ===== API =====
-	handler := api.NewHandler(deps.Executor, deps.JudgeExecutor, &logger)
+	handler := api.NewHandler(deps.Executor, deps.JudgeExecutor, deps.Repository, &logger)
 	container := restful.NewContainer()
 	container.Filter(middleware.Logger)
 	container.Filter(middleware.RecoverPanic)
