@@ -57,8 +57,8 @@ func (e *JudgeExecutor) Execute(ctx context.Context, judgeName string, threshold
 
 	evaluationResult := storage.Evaluation{
 		EventID:      id,
-		AgentName:    "",
-		AgentVersion: "",
+		AgentName:    evalCtx.AgentName,
+		AgentVersion: evalCtx.AgentVersion,
 		UserQuery:    evalCtx.Query,
 		Answer:       evalCtx.Answer,
 		Context:      evalCtx.Context,

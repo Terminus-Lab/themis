@@ -14,7 +14,7 @@ import (
 // Configuration file search paths
 const (
 	ConfigFileNameJudges          = "judges.yaml"
-	ConfigDirConfigFileNameJudges = "config/judges.yaml"
+	ConfigDirConfigFileNameJudges = "configs/judges.yaml"
 )
 
 // JudgesConfig is the root configuration structure
@@ -52,8 +52,8 @@ type ModelConfig struct {
 // LoadJudgesConfig loads and validates the judges configuration from YAML
 // Search priority:
 //  1. JUDGES_CONFIG_PATH env var (explicit override)
-//  2. ./judges.yaml (next to binary)
-//  3. ./configs/judges.yaml (configs folder next to binary)
+//  2. ./judges.yaml (current working directory)
+//  3. ./configs/judges.yaml (configs folder in current working directory)
 //
 // Returns error if no configuration file is found.
 func LoadJudgesConfig() (*JudgesConfig, error) {
@@ -69,16 +69,15 @@ func LoadJudgesConfig() (*JudgesConfig, error) {
 		}
 		source = customPath
 	} else {
-		// Search next to binary
-		exePath, err := os.Executable()
+		// Search relative to current working directory
+		workDir, err := os.Getwd()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get executable path: %w", err)
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
 		}
-		exeDir := filepath.Dir(exePath)
 
 		searchPaths := []string{
-			filepath.Join(exeDir, ConfigFileNameJudges),
-			filepath.Join(exeDir, ConfigDirConfigFileNameJudges),
+			filepath.Join(workDir, ConfigFileNameJudges),
+			filepath.Join(workDir, ConfigDirConfigFileNameJudges),
 		}
 
 		found := false

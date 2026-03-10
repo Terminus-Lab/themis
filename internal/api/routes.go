@@ -49,5 +49,30 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 			Returns(404, "Judge Not Found", middleware.ErrorResponse{}).
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
+	ws.
+		Route(ws.GET("/results").
+			To(handler.QueryResults).
+			Doc("Query evaluation results with filters").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"results"}).
+			Param(ws.QueryParameter("agent_name", "Filter by agent name").DataType("string").Required(false)).
+			Param(ws.QueryParameter("verdict", "Filter by verdict (pass, review, fail)").DataType("string").Required(false)).
+			Param(ws.QueryParameter("limit", "Number of results to return (default: 50)").DataType("number").Required(false)).
+			Param(ws.QueryParameter("offset", "Number of results to skip (default: 0)").DataType("number").Required(false)).
+			Writes(QueryResultsResponse{}).
+			Returns(200, "OK", QueryResultsResponse{}).
+			Returns(400, "Bad Request", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
+	ws.
+		Route(ws.GET("/results/{event_id}").
+			To(handler.GetResultByID).
+			Doc("Get evaluation result by event ID").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"results"}).
+			Param(ws.PathParameter("event_id", "Event ID").DataType("string")).
+			Writes(EvaluationResponse{}).
+			Returns(200, "OK", EvaluationResponse{}).
+			Returns(404, "Not Found", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
 	container.Add(ws)
 }

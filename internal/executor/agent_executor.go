@@ -89,16 +89,16 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 
 	evaluationResult := storage.Evaluation{
 		EventID:      finalResult.ID,
-		AgentName:    "",
-		AgentVersion: "",
+		AgentName:    evalCtx.AgentName,
+		AgentVersion: evalCtx.AgentVersion,
 		UserQuery:    evalCtx.Query,
 		Answer:       evalCtx.Answer,
 		Context:      evalCtx.Context,
-		Confidence:   0,
+		Confidence:   finalResult.Confidence,
 		Verdict:      string(finalResult.Verdict),
 		StageScores:  judgeEvaResults,
 	}
-	
+
 	e.repository.Store(ctx, &evaluationResult)
 	e.logger.
 		Info().

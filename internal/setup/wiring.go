@@ -42,6 +42,7 @@ type Config struct {
 type Dependencies struct {
 	Executor      *executor.Executor
 	JudgeExecutor *executor.JudgeExecutor
+	Repository    storage.Repository
 	Logger        *zerolog.Logger
 }
 
@@ -141,6 +142,7 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 	return &Dependencies{
 		Executor:      agentExec,
 		JudgeExecutor: judgeExec,
+		Repository:    repository,
 		Logger:        logger,
 	}, nil
 
@@ -226,7 +228,12 @@ func getDatabaseClient(ctx context.Context, cfg *Config) (storage.DB, error) {
 			return nil, err
 		}
 
-		return client, err
+		// Initialize schema for SQLite
+		if err := client.InitSchema(ctx); err != nil {
+			return nil, fmt.Errorf("failed to initialize SQLite schema: %w", err)
+		}
+
+		return client, nil
 	} else {
 		client, err := postgres.New(ctx, cfg.DBConnectionString)
 		if err != nil {

@@ -105,6 +105,10 @@ EARLY_EXIT_THRESHOLD=0.2
 PRECHECK_WEIGHT=0.3
 LLM_JUDGE_WEIGHT=0.7
 
+# Database configuration
+IN_MEMORY_DB=true                 # SQLite in-memory (default: true), set false for Postgres
+THEMIS_DB_URL=                    # PostgreSQL connection string (required if IN_MEMORY_DB=false)
+
 # Streaming configuration (for API + Streaming mode)
 STREAMING_ENABLED=false           # Set to true to enable Redis stream consumer
 REDIS_ADDR=localhost:6379
@@ -168,9 +172,20 @@ judges:
   - **AWS Bedrock** access (for Claude models)
   - **Azure OpenAI** access (for Azure-hosted GPT models)
 
-### Run API Server
-Start database 
+### Database Configuration
+
+**SQLite (Default)** - Zero setup required:
 ```bash
+# SQLite is enabled by default - evaluation results stored in memory
+IN_MEMORY_DB=true  # Default setting
+
+# For persistent SQLite database:
+IN_MEMORY_DB=true  # Will store in :memory:, or modify code to use file path
+```
+
+**PostgreSQL (Optional - Production)** - For production deployments needing persistence:
+```bash
+# 1. Start Postgres
 export THEMIS_DB_DATABASE=themis
 export THEMIS_DB_USER=themis
 export THEMIS_DB_PASSWORD=themis
@@ -179,24 +194,28 @@ export THEMIS_DB_PORT=5432
 export THEMIS_DB_SSL_MODE=disable
 export THEMIS_DB_URL=postgresql://${THEMIS_DB_USER}:${THEMIS_DB_PASSWORD}@${THEMIS_DB_HOST}:${THEMIS_DB_PORT}/${THEMIS_DB_DATABASE}?sslmode=${THEMIS_DB_SSL_MODE}
 
-# Start Postgres using docker compose
 docker compose up --build themis-db -d
 
-# Run DB migration (if this is the first time). 
-# Install migrate tool
+# 2. Run migrations
 brew install golang-migrate
-
-# Run migrations
 migrate -path ./migrations -database "$THEMIS_DB_URL" up
+
+# 3. Disable in-memory DB
+export IN_MEMORY_DB=false
 ```
 
-
+### Run API Server
 ```bash
-# Start API server
+# Start API server (uses SQLite by default)
 go run cmd/api/main.go
+
+# Access the dashboard at http://localhost:18082
+# Access the API at http://localhost:18082/api/v1/
 ```
 
-### Evaluate a Response
+### API Endpoints
+
+#### Evaluate a Response
 ```bash
 curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
@@ -232,6 +251,38 @@ Response:
     "final_confidence": 0.92,
     "aggregation_method": "weighted_average"
   }
+}
+```
+
+#### Query Evaluation Results
+```bash
+# Get all results with filters
+curl "http://localhost:18082/api/v1/results?agent_name=my-agent&verdict=pass&limit=10&offset=0"
+
+# Get specific result by event ID
+curl "http://localhost:18082/api/v1/results/test-1"
+```
+
+Query response:
+```json
+{
+  "results": [
+    {
+      "event_id": "test-1",
+      "agent_name": "my-agent",
+      "agent_version": "1.0",
+      "user_query": "What is the capital of France?",
+      "answer": "Paris",
+      "confidence": 0.92,
+      "verdict": "pass",
+      "stage_scores": [...]
+    }
+  ],
+  "total": 100,
+  "count": 10,
+  "limit": 10,
+  "offset": 0,
+  "has_more": true
 }
 ```
 
@@ -275,6 +326,32 @@ JUDGE_AGGREGATION_METHOD=harmonic_mean
 ```
 
 **All methods are computed and returned in `metrics`** - you can experiment without re-running evaluations by examining different scores in the response.
+
+## Dashboard UI
+
+Themis includes a built-in web dashboard for visualizing evaluation results.
+
+**Access**: Open `http://localhost:18082` in your browser after starting the API server.
+
+**Features**:
+- **Dark terminal theme** - Claude Code-inspired aesthetic with monospace fonts
+- **Real-time updates** - Auto-refreshes every 10 seconds
+- **Filtering** - Filter by agent name, verdict (pass/review/fail), or limit results
+- **Expandable rows** - Click any result to see full details, stage scores, and reasoning
+- **Pagination** - Navigate through results with Previous/Next buttons
+- **No authentication** - Simple, read-only visualization for local development
+
+**UI Components**:
+- Stats cards showing total results, current page, and result count
+- Results table with event ID, agent, query preview, verdict, and confidence
+- Detailed view with full query, answer, context, and individual stage scores
+- Filter controls for agent name, verdict, and pagination
+
+The dashboard is perfect for:
+- Monitoring evaluation results during development
+- Debugging judge behavior and score distributions
+- Quick visual inspection of pass/review/fail verdicts
+- Understanding why specific responses received certain scores
 
 ## How It Works
 
@@ -335,6 +412,9 @@ Comprehensive testing guides for each deployment mode:
 - **Statistical Validation**: Kendall's tau correlation against human annotations (CLI mode only)
 - **Early Exit Optimization**: Skip LLM calls for obviously poor responses
 - **Flexible Deployment**: API, streaming, batch, and MCP modes
+- **SQLite by Default**: Zero-config database for development, optional Postgres for production
+- **Query API**: Filter and retrieve evaluation results with pagination
+- **Built-in Dashboard**: Dark terminal-themed web UI for visual monitoring (no auth, no build step)
 - **Extensible Results**: Log, store in DB, or publish to Kafka
 
 ## Development

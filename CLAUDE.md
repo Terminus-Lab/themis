@@ -112,8 +112,11 @@ Order of initialization:
 Four entry points sharing core evaluation logic:
 
 1. **API** (`cmd/api/main.go`): REST endpoints with go-restful framework
-   - `POST /api/v1/evaluate` - full pipeline
-   - `POST /api/v1/evaluate/judge/{name}` - single judge
+   - `POST /api/v1/evaluate` - full pipeline evaluation
+   - `POST /api/v1/evaluate/judge/{name}` - single judge evaluation
+   - `GET /api/v1/results` - query evaluation results with filters (agent_name, verdict, limit, offset)
+   - `GET /api/v1/results/{event_id}` - get single evaluation result by ID
+   - `GET /` - dashboard UI (static HTML at `static/dashboard.html`)
    - CORS enabled, structured logging
    - **Can run in two modes:**
      - **API only** (default): HTTP endpoints only
@@ -124,6 +127,13 @@ Four entry points sharing core evaluation logic:
      - Manual testing via API while streaming runs
      - Graceful shutdown handles both HTTP and streaming
      - Horizontal scaling with multiple consumer instances
+   - **Dashboard UI:**
+     - Dark terminal theme (Claude Code-inspired)
+     - Real-time visualization of evaluation results
+     - Filtering by agent, verdict, pagination
+     - Expandable rows for detailed inspection
+     - Auto-refresh every 10 seconds
+     - No authentication required (local dev only)
 
 2. **Batch** (`cmd/batch/main.go`): CLI with concurrent worker pool
    - JSONL input/output formats
@@ -168,6 +178,10 @@ VERDICT_PASS_THRESHOLD=0.8         # Confidence > this → "pass"
 VERDICT_REVIEW_THRESHOLD=0.5       # Confidence > this → "review", else "fail"
 ENABLE_PRECHECK=true               # Enable Stage 1 prechecks
 JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2: weighted_average, harmonic_mean, median, weighted_product
+
+# Database configuration
+IN_MEMORY_DB=true                  # Use SQLite in-memory (default: true) - zero setup required
+THEMIS_DB_URL=                     # PostgreSQL connection string (only if IN_MEMORY_DB=false)
 
 # Streaming configuration (unified API + Streaming mode)
 STREAMING_ENABLED=false            # Enable Redis stream consumer alongside API
@@ -234,9 +248,70 @@ Four methods available for combining LLM judge scores (`JUDGE_AGGREGATION_METHOD
 - **`internal/batch/`**: Batch processing, validation, JSONL reader/writer
 - **`internal/api/`**: HTTP handlers, routes, middleware
 - **`internal/stream/`**: Redis Streams consumer implementation
+- **`internal/storage/`**: Database abstraction layer with SQLite (default) and PostgreSQL implementations
 - **`internal/models/`**: Shared types (EvaluationContext, EvaluationResult, StageResult)
 
 ## Development Notes
+
+### Database Storage
+
+**SQLite (Default)** - Automatically used for development and testing:
+- Set `IN_MEMORY_DB=true` (default) to use SQLite in-memory storage
+- Zero configuration required
+- Perfect for local development and testing
+- Evaluation results stored temporarily during service runtime
+
+**PostgreSQL (Production)** - For persistent storage:
+- Set `IN_MEMORY_DB=false`
+- Provide `THEMIS_DB_URL` connection string
+- Run migrations: `migrate -path ./migrations -database "$THEMIS_DB_URL" up`
+- Use for production deployments requiring data persistence
+
+### Query API Usage
+
+Query evaluation results programmatically:
+```bash
+# Filter by agent name
+curl "http://localhost:18082/api/v1/results?agent_name=my-agent&limit=10"
+
+# Filter by verdict
+curl "http://localhost:18082/api/v1/results?verdict=pass&limit=20&offset=0"
+
+# Get specific result
+curl "http://localhost:18082/api/v1/results/event-123"
+```
+
+Query parameters:
+- `agent_name` - Filter by agent name (exact match)
+- `verdict` - Filter by verdict: "pass", "review", or "fail"
+- `limit` - Number of results per page (default: 50)
+- `offset` - Pagination offset (default: 0)
+
+### Dashboard UI
+
+Access the web dashboard at `http://localhost:18082` after starting the API server.
+
+**Location**: `static/dashboard.html` - single-page HTML application
+
+**Features**:
+- Dark terminal theme with Claude Code aesthetic
+- Real-time updates (auto-refresh every 10s)
+- Filter by agent name, verdict, or limit results
+- Click rows to expand and view full details
+- Pagination with Previous/Next controls
+- No build step required - pure HTML/CSS/JS
+
+**Customization**:
+- Edit `static/dashboard.html` directly to modify UI
+- Colors and styling defined in `<style>` block
+- API calls use relative URLs (works with any port)
+- Auto-detects API base URL from `window.location.origin`
+
+**Use cases**:
+- Visual monitoring during development
+- Debugging judge scores and reasoning
+- Quick inspection of evaluation results
+- Demo and stakeholder presentations
 
 ### Adding a New Judge
 
