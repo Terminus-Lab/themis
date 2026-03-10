@@ -15,6 +15,9 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm/openaiplatform"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/prechecks"
+	"github.com/Terminus-Lab/themis/internal/storage"
+	"github.com/Terminus-Lab/themis/internal/storage/postgres"
+	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/rs/zerolog"
 )
 
@@ -26,6 +29,8 @@ type Config struct {
 	AzureOpenAIEndpoint    string
 	DefaultProvider        string
 	EnablePrecheck         bool
+	InMemoryDB             bool
+	DBConnectionString     string
 	PrecheckWeight         float64
 	LLMJudgeWeight         float64
 	EarlyExitThreshold     float64
@@ -49,6 +54,8 @@ func LoadConfig() *Config {
 		AzureOpenAIEndpoint:    env.GetString("AZURE_OPENAI_ENDPOINT", ""),
 		DefaultProvider:        env.GetString("DEFAULT_LLM_PROVIDER", "bedrock"),
 		EnablePrecheck:         env.GetBool("ENABLE_PRECHECK", true),
+		InMemoryDB:             env.GetBool("IN_MEMORY_DB", true),
+		DBConnectionString:     env.GetString("THEMIS_DB_URL", ""),
 		PrecheckWeight:         env.GetFloat("PRECHECK_WEIGHT", 0.3),
 		LLMJudgeWeight:         env.GetFloat("LLM_JUDGE_WEIGHT", 0.7),
 		EarlyExitThreshold:     env.GetFloat("EARLY_EXIT_THRESHOLD", 0.2),
@@ -200,4 +207,23 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 	}
 
 	return llm.NewLLMClientRegistry(clients), nil
+}
+
+func getDatabaseClient(ctx context.Context, cfg Config) (storage.DB, error) {
+	if cfg.InMemoryDB {
+		localDB := "themis-db.sql"
+		client, err := sqlite.New(ctx, localDB)
+		if err != nil {
+			return nil, err
+		}
+
+		return client, err
+	} else {
+		client, err := postgres.New(ctx, cfg.DBConnectionString)
+		if err != nil {
+			return nil, err
+		}
+
+		return client, nil
+	}
 }

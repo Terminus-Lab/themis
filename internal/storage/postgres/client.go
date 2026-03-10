@@ -9,21 +9,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type Config struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	Database string
-	SSLMode  string
-}
-
 type DB struct {
 	Pool *pgxpool.Pool
 }
 
-func New(ctx context.Context, config Config) (*DB, error) {
-	connString := config.ConnectionString()
+func New(ctx context.Context, connString string) (*DB, error) {
 	pgPool, err := pgxpool.New(ctx, connString)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect to database. Error: %w", err)
@@ -34,10 +24,7 @@ func New(ctx context.Context, config Config) (*DB, error) {
 	}, nil
 }
 
-func NewWithBackoff(ctx context.Context, config Config, maxRetries int, log *zerolog.Logger) (*DB, error) {
-
-	connString := config.ConnectionString()
-
+func NewWithBackoff(ctx context.Context, connString string, maxRetries int, log *zerolog.Logger) (*DB, error) {
 	var pgPool *pgxpool.Pool
 	var err error
 
@@ -64,11 +51,6 @@ func NewWithBackoff(ctx context.Context, config Config, maxRetries int, log *zer
 	}
 
 	return nil, fmt.Errorf("failed to connect after %d attempts. Error: %w", maxRetries, err)
-}
-
-func (c *Config) ConnectionString() string {
-	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s", c.User, c.Password, c.Host, c.Port, c.Database, c.SSLMode)
-
 }
 
 func (d *DB) Close() error {

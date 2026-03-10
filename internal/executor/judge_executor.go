@@ -15,13 +15,13 @@ type JudgeFactory interface {
 
 type JudgeExecutor struct {
 	judgeFactory JudgeFactory
-	logger *zerolog.Logger
+	logger       *zerolog.Logger
 }
 
 func NewJudgeExecutor(judgeFactory JudgeFactory, logger *zerolog.Logger) *JudgeExecutor {
 	return &JudgeExecutor{
 		judgeFactory: judgeFactory,
-		logger: logger,
+		logger:       logger,
 	}
 }
 
