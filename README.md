@@ -6,7 +6,7 @@ AI response evaluation service with MCP and API interfaces. Uses configurable LL
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![Documentation](https://img.shields.io/badge/docs-complete-green)](docs/INDEX.md)
 
-**Deploy as**: HTTP API • MCP Server • CLI • Redis Consumer
+**Deploy as**: HTTP API • MCP Server • CLI
 
 ## Quick Start
 
