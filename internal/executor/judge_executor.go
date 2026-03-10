@@ -6,6 +6,7 @@ import (
 
 	"github.com/Terminus-Lab/themis/internal/judge"
 	"github.com/Terminus-Lab/themis/internal/models"
+	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/rs/zerolog"
 )
 
@@ -15,13 +16,15 @@ type JudgeFactory interface {
 
 type JudgeExecutor struct {
 	judgeFactory JudgeFactory
-	logger *zerolog.Logger
+	repository   storage.Repository
+	logger       *zerolog.Logger
 }
 
-func NewJudgeExecutor(judgeFactory JudgeFactory, logger *zerolog.Logger) *JudgeExecutor {
+func NewJudgeExecutor(judgeFactory JudgeFactory, repository storage.Repository, logger *zerolog.Logger) *JudgeExecutor {
 	return &JudgeExecutor{
 		judgeFactory: judgeFactory,
-		logger: logger,
+		repository:   repository,
+		logger:       logger,
 	}
 }
 
@@ -51,6 +54,20 @@ func (e *JudgeExecutor) Execute(ctx context.Context, judgeName string, threshold
 		result.Verdict = models.VerdictFail
 	}
 	result.Confidence = judgeResponse.Score
+
+	evaluationResult := storage.Evaluation{
+		EventID:      id,
+		AgentName:    "",
+		AgentVersion: "",
+		UserQuery:    evalCtx.Query,
+		Answer:       evalCtx.Answer,
+		Context:      evalCtx.Context,
+		Confidence:   result.Confidence,
+		Verdict:      string(result.Verdict),
+		StageScores:  result.Stages,
+	}
+
+	e.repository.Store(ctx, &evaluationResult)
 
 	return result, nil
 }

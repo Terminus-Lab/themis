@@ -20,6 +20,7 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/prechecks"
+	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
@@ -509,10 +510,10 @@ func setupTestAPI(t *testing.T) *restful.Container {
 		&prechecks.OverlapChecker{MinOverlapThreshold: 0.3},
 		&prechecks.FormatChecker{},
 	})
-
+	repository := setupTestRepository(t, &logger)
 	// Executors
-	exec := executor.NewExecutor(stageRunner, judgeRunner, agg, 0.2, &logger)
-	judgeExec := executor.NewJudgeExecutor(judgeFactory, &logger)
+	exec := executor.NewExecutor(stageRunner, repository, judgeRunner, agg, 0.2, &logger)
+	judgeExec := executor.NewJudgeExecutor(judgeFactory, repository, &logger)
 
 	// API Handler
 	handler := api.NewHandler(exec, judgeExec, &logger)
@@ -522,4 +523,19 @@ func setupTestAPI(t *testing.T) *restful.Container {
 	api.RegisterRoutes(container, handler)
 
 	return container
+}
+
+func setupTestRepository(t *testing.T, logger *zerolog.Logger) *sqlite.EvalRepository {
+	t.Helper()
+
+	db, err := sqlite.New(context.Background(), ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create in-memory database: %v", err)
+	}
+
+	if err := db.InitSchema(context.Background()); err != nil {
+		t.Fatalf("Failed to initialize schema: %v", err)
+	}
+
+	return sqlite.NewEvalRepository(db, logger)
 }

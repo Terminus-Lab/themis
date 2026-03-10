@@ -1,0 +1,28 @@
+package postgres
+
+import "context"
+
+const schema = `
+  CREATE TABLE IF NOT EXISTS eval_results (
+      event_id TEXT NOT NULL,
+      agent_name TEXT NOT NULL,
+      agent_version TEXT NOT NULL,
+      user_query TEXT NOT NULL,
+      answer TEXT NOT NULL,
+      context TEXT,
+      confidence REAL NOT NULL,
+      verdict TEXT NOT NULL,
+      stage_scores JSONB NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (event_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_agent_name ON eval_results(agent_name, created_at);
+  CREATE INDEX IF NOT EXISTS idx_verdict ON eval_results(verdict, created_at);
+  CREATE INDEX IF NOT EXISTS idx_created_at ON eval_results(created_at);
+`
+
+func (d *DB) InitSchema(ctx context.Context) error {
+	_, err := d.Pool.Exec(ctx, schema)
+	return err
+}

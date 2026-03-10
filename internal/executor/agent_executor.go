@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Terminus-Lab/themis/internal/models"
+	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/rs/zerolog"
 )
 
@@ -24,6 +25,7 @@ type Aggregator interface {
 
 type Executor struct {
 	precheckStageRunner PrecheckRunner
+	repository          storage.Repository
 	judgeRunner         JudgeRunner
 	aggregator          Aggregator
 	earlyExitThreshold  float64
@@ -32,6 +34,7 @@ type Executor struct {
 
 func NewExecutor(
 	prechecks PrecheckRunner,
+	repository storage.Repository,
 	judgeRunner JudgeRunner,
 	aggregator Aggregator,
 	earlyExitThreshold float64,
@@ -39,6 +42,7 @@ func NewExecutor(
 ) *Executor {
 	return &Executor{
 		precheckStageRunner: prechecks,
+		repository:          repository,
 		judgeRunner:         judgeRunner,
 		aggregator:          aggregator,
 		earlyExitThreshold:  earlyExitThreshold,
@@ -82,6 +86,20 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 	judgeEvaResults := e.judgeRunner.Run(ctx, evalCtx)
 
 	finalResult := e.aggregator.Aggregate(id, stageEvalResults, judgeEvaResults)
+
+	evaluationResult := storage.Evaluation{
+		EventID:      finalResult.ID,
+		AgentName:    "",
+		AgentVersion: "",
+		UserQuery:    evalCtx.Query,
+		Answer:       evalCtx.Answer,
+		Context:      evalCtx.Context,
+		Confidence:   0,
+		Verdict:      string(finalResult.Verdict),
+		StageScores:  judgeEvaResults,
+	}
+	
+	e.repository.Store(ctx, &evaluationResult)
 	e.logger.
 		Info().
 		Str("verdict", string(finalResult.Verdict)).

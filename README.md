@@ -169,10 +169,29 @@ judges:
   - **Azure OpenAI** access (for Azure-hosted GPT models)
 
 ### Run API Server
+Start database 
 ```bash
-# Create .env file with credentials
-cp .env.example .env  # Edit with your credentials
+export THEMIS_DB_DATABASE=themis
+export THEMIS_DB_USER=themis
+export THEMIS_DB_PASSWORD=themis
+export THEMIS_DB_HOST=localhost
+export THEMIS_DB_PORT=5432
+export THEMIS_DB_SSL_MODE=disable
+export THEMIS_DB_URL=postgresql://${THEMIS_DB_USER}:${THEMIS_DB_PASSWORD}@${THEMIS_DB_HOST}:${THEMIS_DB_PORT}/${THEMIS_DB_DATABASE}?sslmode=${THEMIS_DB_SSL_MODE}
 
+# Start Postgres using docker compose
+docker compose up --build themis-db -d
+
+# Run DB migration (if this is the first time). 
+# Install migrate tool
+brew install golang-migrate
+
+# Run migrations
+migrate -path ./migrations -database "$THEMIS_DB_URL" up
+```
+
+
+```bash
 # Start API server
 go run cmd/api/main.go
 ```
