@@ -164,6 +164,8 @@ func (h *Handler) Health(req *restful.Request, resp *restful.Response) {
 func normalize(req models.EvaluationRequest) models.EvaluationContext {
 	return models.EvaluationContext{
 		RequestID:      req.EventID,
+		AgentName:      req.Agent.Name,
+		AgentVersion:   req.Agent.Version,
 		Query:          req.Interaction.UserQuery,
 		Context:        req.Interaction.Context,
 		Answer:         req.Interaction.Answer,

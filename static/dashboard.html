@@ -349,6 +349,82 @@
             color: #666;
             font-size: 12px;
         }
+
+        .refresh-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+
+        .refresh-status {
+            flex: 1;
+            color: #888;
+            font-size: 13px;
+        }
+
+        .refresh-status.active {
+            color: #00d4aa;
+        }
+
+        .refresh-controls button {
+            padding: 8px 16px;
+        }
+
+        .refresh-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+            margin: 0 10px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #00d4aa;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
     </style>
 </head>
 <body>
@@ -408,6 +484,14 @@
 
         <div id="errorContainer"></div>
 
+        <div class="refresh-controls">
+            <div class="refresh-status" id="refreshStatus">Auto-refresh: OFF</div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
         <div class="results-table">
             <table>
                 <thead>
@@ -442,7 +526,9 @@
         let currentLimit = 25;
         let totalResults = 0;
         let hasMore = false;
-        let expandedRows = new Set();
+        let expandedRows = new Set(); // Now stores event_ids instead of row_ids
+        let autoRefreshEnabled = false;
+        let refreshInterval = null;
 
         async function fetchResults() {
             const agentName = document.getElementById('agentFilter').value;
@@ -488,13 +574,13 @@
 
             tbody.innerHTML = '';
             data.results.forEach((result, index) => {
-                const rowId = `row-${currentOffset + index}`;
-                const detailId = `detail-${currentOffset + index}`;
+                const rowId = `row-${result.event_id}`;
+                const detailId = `detail-${result.event_id}`;
 
                 // Main row
                 const row = document.createElement('tr');
                 row.id = rowId;
-                row.onclick = () => toggleDetails(rowId, detailId, result);
+                row.onclick = () => toggleDetails(result.event_id);
                 row.innerHTML = `
                     <td><code>${result.event_id}</code></td>
                     <td>${result.agent_name} <span class="timestamp">v${result.agent_version}</span></td>
@@ -542,19 +628,27 @@
                     </td>
                 `;
                 tbody.appendChild(detailRow);
+
+                // Re-expand if this row was previously expanded
+                if (expandedRows.has(result.event_id)) {
+                    row.classList.add('expanded');
+                    detailRow.classList.add('visible');
+                }
             });
         }
 
-        function toggleDetails(rowId, detailId, result) {
-            const row = document.getElementById(rowId);
-            const detailRow = document.getElementById(detailId);
+        function toggleDetails(eventId) {
+            const row = document.getElementById(`row-${eventId}`);
+            const detailRow = document.getElementById(`detail-${eventId}`);
 
-            if (expandedRows.has(rowId)) {
-                expandedRows.delete(rowId);
+            if (!row || !detailRow) return;
+
+            if (expandedRows.has(eventId)) {
+                expandedRows.delete(eventId);
                 row.classList.remove('expanded');
                 detailRow.classList.remove('visible');
             } else {
-                expandedRows.add(rowId);
+                expandedRows.add(eventId);
                 row.classList.add('expanded');
                 detailRow.classList.add('visible');
             }
@@ -627,13 +721,71 @@
             document.getElementById('showingCount').textContent = '0';
         }
 
-        // Auto-refresh every 10 seconds
-        setInterval(() => {
-            fetchResults();
-        }, 10000);
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
 
-        // Initial load
-        fetchResults();
+            // Save preference to localStorage
+            localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
+
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            autoRefreshEnabled = true;
+            updateRefreshStatus();
+
+            // Start refresh interval (every 10 seconds)
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => {
+                fetchResults();
+            }, 10000);
+        }
+
+        function stopAutoRefresh() {
+            autoRefreshEnabled = false;
+
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+
+            updateRefreshStatus();
+        }
+
+        function updateRefreshStatus() {
+            const statusEl = document.getElementById('refreshStatus');
+
+            if (autoRefreshEnabled) {
+                statusEl.textContent = '🔄 Auto-refresh: ON';
+                statusEl.classList.add('active');
+            } else {
+                statusEl.textContent = '⏸️ Auto-refresh: OFF';
+                statusEl.classList.remove('active');
+            }
+        }
+
+        // Initial setup
+        function initializeDashboard() {
+            // Restore auto-refresh preference from localStorage
+            const savedPreference = localStorage.getItem('autoRefreshEnabled');
+            if (savedPreference !== null) {
+                autoRefreshEnabled = savedPreference === 'true';
+                document.getElementById('autoRefreshToggle').checked = autoRefreshEnabled;
+
+                if (autoRefreshEnabled) {
+                    startAutoRefresh();
+                }
+            }
+
+            updateRefreshStatus();
+            fetchResults();
+        }
+
+        initializeDashboard();
     </script>
 </body>
 </html>

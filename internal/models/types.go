@@ -53,6 +53,8 @@ type EvaluationRequest struct {
 // Normalized internal object
 type EvaluationContext struct {
 	RequestID      string    `json:"request_id" jsonschema:"required,description=Unique event identifier"`
+	AgentName      string    `json:"agent_name,omitempty" jsonschema:"description=Name of the agent being evaluated"`
+	AgentVersion   string    `json:"agent_version,omitempty" jsonschema:"description=Version of the agent being evaluated"`
 	Query          string    `json:"user_query" jsonschema:"required,description=User's original query"`
 	Context        string    `json:"context,omitempty" jsonschema:"description=Optional context or retrieved documents"`
 	Answer         string    `json:"answer" jsonschema:"required,description=Agent response to evaluate"`
