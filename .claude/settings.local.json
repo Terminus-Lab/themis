@@ -5,7 +5,9 @@
       "Bash(go test:*)",
       "Bash(go build:*)",
       "Bash(ls:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(go get:*)",
+      "Bash(goreleaser build:*)"
     ]
   }
 }
