@@ -5,11 +5,7 @@
       "Bash(go test:*)",
       "Bash(go build:*)",
       "Bash(ls:*)",
-      "Bash(curl:*)",
-      "Bash(grep:*)",
-      "Bash(docs/contributing.md:*)",
-      "Bash(golangci-lint version:*)",
-      "Bash(golangci-lint help:*)"
+      "Bash(curl:*)"
     ]
   }
 }

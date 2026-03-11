@@ -46,20 +46,43 @@ For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployme
 
 ## Getting Started
 
-Download pre-built binaries from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases):
+### Download Pre-Built Binaries
 
-**API Server Release** (themis-api):
-- HTTP REST API server
-- Web dashboard at `http://localhost:18082`
-- Optional Redis streaming consumer
-- Prometheus metrics endpoint
+Download the latest release from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases/latest).
 
-**MCP Server Release** (themis-mcp):
-- Model Context Protocol server
-- Integrates with Claude Code, Claude Desktop, Cursor
-- Stdio transport for AI assistant tools
+**Choose your platform:**
+- **macOS (Apple Silicon)**: `themis_1.0.0_darwin_arm64.tar.gz` - M1/M2/M3 Macs
+- **macOS (Intel)**: `themis_1.0.0_darwin_amd64.tar.gz` - Intel-based Macs
+- **Linux (x64)**: `themis_1.0.0_linux_amd64.tar.gz`
+- **Linux (ARM)**: `themis_1.0.0_linux_arm64.tar.gz`
+- **Windows (x64)**: `themis_1.0.0_windows_amd64.zip`
 
-**Prerequisites**: Configure LLM provider credentials in `.env` file and edit `configs/judges.yaml` for judge definitions. See [Configuration](#configuration) section below.
+**Extract and setup:**
+```bash
+# macOS/Linux
+tar -xzf themis_1.0.0_darwin_arm64.tar.gz
+cd themis_1.0.0_darwin_arm64
+
+# Windows (PowerShell)
+Expand-Archive themis_1.0.0_windows_amd64.zip
+cd themis_1.0.0_windows_amd64
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your LLM provider credentials
+```
+
+**⚠️ Important:** Always run binaries from the extracted directory where `configs/judges.yaml` is located.
+
+**What's included:**
+- **themis-api**: HTTP REST API server with web dashboard at `http://localhost:18082`
+- **themis-mcp**: Model Context Protocol server for Claude Code/Desktop/Cursor integration
+- **themis-batch**: CLI for batch processing and validation
+- **configs/**: Judge configuration files (judges.yaml)
+- **docs/**: Complete documentation
+- **.env.example**: Environment template
+
+**Prerequisites**: You'll need LLM provider credentials (AWS Bedrock, Azure OpenAI, or OpenAI Platform). Configure in `.env` file. See [Configuration](#configuration) section below.
 
 For detailed setup instructions, see [Installation Guide](docs/getting-started/installation.md) and [Quick Start Tutorial](docs/getting-started/quick-start.md).
 
@@ -69,8 +92,8 @@ The API server provides both a web dashboard and REST endpoints for evaluation a
 
 **Start the server:**
 ```bash
-./bin/themis-api
-# or with streaming: STREAMING_ENABLED=true ./bin/themis-api
+./themis-api
+# or with streaming: STREAMING_ENABLED=true ./themis-api
 ```
 
 **Web Dashboard**: Navigate to `http://localhost:18082` for real-time visualization of evaluation results with filtering, pagination, and detailed inspection.

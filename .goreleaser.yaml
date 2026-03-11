@@ -11,7 +11,7 @@ builds:
     binary: themis-api
     main: ./cmd/api
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
@@ -30,7 +30,7 @@ builds:
     binary: themis-batch
     main: ./cmd/batch
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
@@ -49,26 +49,7 @@ builds:
     binary: themis-mcp
     main: ./cmd/mcp
     env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
-
-  # Redis Producer (optional)
-  - id: themis-producer
-    binary: themis-producer
-    main: ./cmd/producer
-    env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
@@ -137,20 +118,49 @@ release:
   footer: |
     ## Installation
 
-    ### Binary
-    Download the appropriate binary for your platform from the assets above and extract it.
+    ### Download Binary Release
 
-    ### Go Install
+    **Choose your platform:**
+    - **macOS (Apple Silicon)**: `themis_{{.Version}}_darwin_arm64.tar.gz` - M1/M2/M3 Macs
+    - **macOS (Intel)**: `themis_{{.Version}}_darwin_amd64.tar.gz`
+    - **Linux (x64)**: `themis_{{.Version}}_linux_amd64.tar.gz`
+    - **Linux (ARM)**: `themis_{{.Version}}_linux_arm64.tar.gz`
+    - **Windows (x64)**: `themis_{{.Version}}_windows_amd64.zip`
+    - **Windows (ARM)**: `themis_{{.Version}}_windows_arm64.zip`
+
+    **Extract and run:**
+    ```bash
+    # macOS/Linux
+    tar -xzf themis_{{.Version}}_darwin_arm64.tar.gz
+    cd themis_{{.Version}}_darwin_arm64
+
+    # Configure LLM credentials
+    cp .env.example .env
+    # Edit .env with your OPEN_AI_KEY or AWS credentials
+
+    # Run from extracted directory
+    ./themis-api
+    ```
+
+    **⚠️ Important:** Always run binaries from the extracted directory where `configs/judges.yaml` is located.
+
+    ### What's Included
+    - **themis-api** - HTTP API server with web dashboard
+    - **themis-mcp** - MCP server for Claude Code/Desktop integration
+    - **themis-batch** - CLI batch processor with Kendall's τ validation
+    - **configs/** - Judge configurations (judges.yaml)
+    - **docs/** - Complete documentation
+    - **static/** - Web dashboard assets
+    - **.env.example** - Environment template
+
+    ### Go Install (Alternative)
     ```bash
     go install github.com/Terminus-Lab/themis/cmd/api@{{.Tag}}
     go install github.com/Terminus-Lab/themis/cmd/batch@{{.Tag}}
     go install github.com/Terminus-Lab/themis/cmd/mcp@{{.Tag}}
     ```
 
-    ### Docker
-    ```bash
-    docker pull ghcr.io/terminus-lab/themis:{{.Tag}}
-    ```
+    Note: You'll need to provide `configs/judges.yaml` separately or set `JUDGES_CONFIG_PATH` env var.
 
     ## Documentation
-    See [README.md](https://github.com/Terminus-Lab/themis/blob/main/README.md) for usage instructions.
+    See [README.md](https://github.com/Terminus-Lab/themis/blob/main/README.md) for complete usage instructions.
