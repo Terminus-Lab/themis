@@ -28,6 +28,11 @@ Themis evaluates AI agent responses through a two-stage pipeline: fast prechecks
 
 Both modes share the same core evaluation engine and judge configuration, allowing teams to use API mode for production monitoring and MCP mode for development workflows.
 
+## Security Notice
+
+**Themis v1.0 is designed for internal/trusted network deployment.**
+For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployment Guide](docs/deployment/api-mode.md).
+
 ## Features
 
 - **Two-Stage Evaluation Pipeline**: Fast prechecks + parallel LLM judges with early exit optimization
@@ -141,6 +146,18 @@ JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2 aggregation
 VERDICT_PASS_THRESHOLD=0.8                 # Pass if confidence > 0.8
 VERDICT_REVIEW_THRESHOLD=0.5               # Review if > 0.5, else fail
 ```
+
+### ⚠️ Judge Weights Configuration
+
+**Important**: Default judge weights are starting values that **must be tuned** for your specific use case.
+
+**Recommended workflow**:
+1. **Collect human annotations** - Have domain experts label 25-50 sample evaluations
+2. **Run validation** - Use batch mode with `-validate` to compute Kendall's τ correlation
+3. **Adjust weights** - Modify judge weights in `configs/judges.yaml` based on correlation results
+4. **Iterate** - Repeat until Kendall's τ ≥ 0.3 (acceptable agreement with human judgment)
+
+See [Batch Test Cases](docs/testing/batch-tests.md) for validation workflow examples.
 
 **Judge Configuration** (`configs/judges.yaml`):
 ```yaml
