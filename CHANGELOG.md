@@ -77,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Early exit evaluations now stored in database (were previously skipped in storage)
 - License inconsistency resolved (Apache 2.0 everywhere)
+- **CRITICAL**: Enabled CGO in release builds to support SQLite (fixes "go-sqlite3 requires cgo" fatal error)
+- Removed internal themis-producer from release binaries (not needed by end users)
+- Added warning that binaries must run from extracted directory for configs/judges.yaml discovery
 
 [Unreleased]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Terminus-Lab/themis/releases/tag/v1.0.0
