@@ -7,18 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- CI/CD workflows (test, lint, release)
-- GoReleaser configuration for binary releases
-- CHANGELOG.md for tracking releases
-
-### Changed
-- Fixed license inconsistency (Apache 2.0 everywhere)
-
-## [1.0.0] - TBD
+## [1.0.0] - 2026-03-11
 
 ### Added
 - Two-stage evaluation pipeline (prechecks + LLM judges)
+- CI/CD workflows (test, lint, release)
+- GoReleaser configuration for binary releases
+- CHANGELOG.md for tracking releases
 - Six quality dimensions: relevance, faithfulness, coherence, completeness, instruction, correctness
 - Multi-provider LLM support (AWS Bedrock, Azure OpenAI, OpenAI Platform)
 - HTTP API with REST endpoints
@@ -78,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-refresh dashboard
 - Error handling and retry logic
 - Test coverage: 84-100% on core packages
+
+### Fixed
+- Early exit evaluations now stored in database (were previously skipped in storage)
+- License inconsistency resolved (Apache 2.0 everywhere)
 
 [Unreleased]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Terminus-Lab/themis/releases/tag/v1.0.0
