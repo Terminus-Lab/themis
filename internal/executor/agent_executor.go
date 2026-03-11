@@ -78,7 +78,26 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 	if stageEvalAvgScore < e.earlyExitThreshold {
 		result.Stages = append(result.Stages, stageEvalResults...)
 		result.Verdict = models.VerdictFail
+		result.Confidence = stageEvalAvgScore // Set confidence for early exit
 		e.logger.Info().Float64("avgScore", stageEvalAvgScore).Msg("early exit triggered")
+
+		// Store early exit result
+		evaluationResult := storage.Evaluation{
+			EventID:      result.ID,
+			AgentName:    evalCtx.AgentName,
+			AgentVersion: evalCtx.AgentVersion,
+			UserQuery:    evalCtx.Query,
+			Answer:       evalCtx.Answer,
+			Context:      evalCtx.Context,
+			Confidence:   result.Confidence,
+			Verdict:      string(result.Verdict),
+			StageScores:  stageEvalResults,
+		}
+
+		err := e.repository.Store(ctx, &evaluationResult)
+		if err != nil {
+			e.logger.Error().Err(err).Msg("unable to store early exit evaluation result")
+		}
 
 		return result
 	}
