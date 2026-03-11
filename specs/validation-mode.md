@@ -335,7 +335,7 @@ Total pairs: 10
 - [ ] Validation summary written to file (if `-output` specified)
 - [ ] Clear error messages for common issues
 - [ ] Unit tests for Kendall computation
-- [ ] Documentation in batch_evaluation_test_cases.md
+- [ ] Documentation in docs/testing/batch-tests.md
 
 ---
 
