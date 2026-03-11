@@ -18,13 +18,13 @@ type Client struct {
 
 func NewClient(apiKey string, model string, azureEndpoint string) (*Client, error) {
 	if apiKey == "" {
-		return nil, fmt.Errorf("Azure OpenAI API key is required")
+		return nil, fmt.Errorf("azure OpenAI API key is required")
 	}
 	if model == "" {
-		return nil, fmt.Errorf("Azure OpenAI deployment name is required")
+		return nil, fmt.Errorf("azure OpenAI deployment name is required")
 	}
 	if azureEndpoint == "" {
-		return nil, fmt.Errorf("Azure OpenAI endpoint is required")
+		return nil, fmt.Errorf("azure OpenAI endpoint is required")
 	}
 
 	openaiClient := openai.NewClient(

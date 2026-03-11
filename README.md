@@ -1,191 +1,164 @@
 # Themis
 
-AI response evaluation service with MCP and API interfaces. Uses configurable LLM judges to assess response quality across multiple dimensions.
+AI agent evaluation service using configurable LLM judges and statistical validation.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
 
-**Deploy as**: HTTP API • MCP Server • CLI
-
-## Quick Start
-
-### HTTP API
+**Build Commands**
 
 ```bash
-# Start server
-go run cmd/api/main.go
+# API Server (HTTP endpoints + web dashboard)
+go build -o bin/themis-api cmd/api/main.go
 
-# Evaluate response
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -d '{"event_id":"test","agent":{"name":"my-agent"},"interaction":{"user_query":"What is AI?","answer":"Artificial intelligence"}}'
-
-# View dashboard
-open http://localhost:18082
-```
-
-### MCP Server
-
-```bash
-# Build
+# MCP Server (Claude Code/Desktop integration)
 go build -o bin/themis-mcp cmd/mcp/main.go
 
+# CLI (batch processing)
+go build -o bin/themis-batch cmd/batch/main.go
+```
+
+## Purpose
+
+Themis evaluates AI agent responses through a two-stage pipeline: fast prechecks (heuristics) followed by parallel LLM judge evaluation across six quality dimensions. The framework validates judge accuracy against human annotations using Kendall's τ correlation before production deployment.
+
+**Primary deployment modes:**
+- **API Mode**: HTTP server with REST endpoints, web dashboard, and optional Redis streaming for real-time evaluation of agent responses
+- **MCP Mode**: Model Context Protocol server that integrates with Claude Code, Claude Desktop, and Cursor for interactive evaluation during development
+
+Both modes share the same core evaluation engine and judge configuration, allowing teams to use API mode for production monitoring and MCP mode for development workflows.
+
+## Features
+
+- **Two-Stage Evaluation Pipeline**: Fast prechecks + parallel LLM judges with early exit optimization
+- **Statistical Validation**: Kendall's τ correlation against human annotations to ensure judge accuracy
+- **Multi-Provider LLM Support**: Mix AWS Bedrock, Azure OpenAI, and OpenAI Platform models in same pipeline
+- **YAML-Driven Configuration**: Edit judge prompts and models without code changes
+- **Multiple Deployment Options**: HTTP API, MCP server, CLI batch processor, Redis streaming consumer
+- **Query & Storage**: SQLite (default) or PostgreSQL with filtering by agent, verdict, timestamp
+- **Web Dashboard**: Real-time visualization with dark terminal theme
+- **Production-Ready**: Prometheus metrics, structured logging, graceful shutdown, horizontal scaling
+
+## Getting Started
+
+Download pre-built binaries from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases):
+
+**API Server Release** (themis-api):
+- HTTP REST API server
+- Web dashboard at `http://localhost:18082`
+- Optional Redis streaming consumer
+- Prometheus metrics endpoint
+
+**MCP Server Release** (themis-mcp):
+- Model Context Protocol server
+- Integrates with Claude Code, Claude Desktop, Cursor
+- Stdio transport for AI assistant tools
+
+**Prerequisites**: Configure LLM provider credentials in `.env` file and edit `configs/judges.yaml` for judge definitions. See [Configuration](#configuration) section below.
+
+For detailed setup instructions, see [Installation Guide](docs/getting-started/installation.md) and [Quick Start Tutorial](docs/getting-started/quick-start.md).
+
+## Web Interface & API
+
+The API server provides both a web dashboard and REST endpoints for evaluation and querying results.
+
+**Start the server:**
+```bash
+./bin/themis-api
+# or with streaming: STREAMING_ENABLED=true ./bin/themis-api
+```
+
+**Web Dashboard**: Navigate to `http://localhost:18082` for real-time visualization of evaluation results with filtering, pagination, and detailed inspection.
+
+**API Endpoints:**
+- `POST /api/v1/evaluate` - Full pipeline evaluation
+- `POST /api/v1/evaluate/judge/{name}` - Single judge evaluation
+- `GET /api/v1/results` - Query results with filters (agent_name, verdict, limit, offset)
+- `GET /api/v1/results/{event_id}` - Get specific result by ID
+- `GET /metrics` - Prometheus metrics
+
+For detailed API examples and test cases, see [API Mode Documentation](docs/deployment/api-mode.md) and [API Test Cases](docs/testing/api-tests.md).
+
+## MCP Integration
+
+The MCP server exposes Themis evaluation as tools for Claude Code, Claude Desktop, and Cursor. Use natural language to evaluate agent responses during development.
+
+**Installation:**
+```bash
+# Build MCP server
+./bin/themis-mcp
+
 # Add to Claude Code
-claude mcp add --transport stdio themis -- ./bin/themis-mcp
+claude mcp add --transport stdio themis -- /absolute/path/to/bin/themis-mcp
 
-# Use in conversation
-"Evaluate this answer: ..."
-```
-
-### CLI Batch
-
-```bash
-go run cmd/batch/main.go -input dataset.jsonl -output results.jsonl -workers 10
-```
-
-## How It Works
-
-Themis evaluates AI responses using a two-stage pipeline:
-
-**Stage 1 (Prechecks)**: Fast heuristics check length, overlap, and format. Responses scoring below 0.2 exit early, skipping expensive LLM calls.
-
-**Stage 2 (LLM Judges)**: Parallel evaluation across quality dimensions (relevance, faithfulness, coherence, completeness, instruction-following, correctness). Each judge runs concurrently using configurable LLM providers.
-
-### Representative Commands
-
-**Full evaluation**:
-```bash
-curl -X POST http://localhost:18082/api/v1/evaluate -d '{
-  "event_id": "eval-001",
-  "agent": {"name": "chatbot", "version": "1.0"},
-  "interaction": {
-    "user_query": "What is the capital of France?",
-    "context": "France is a country in Western Europe. Paris is its capital.",
-    "answer": "The capital of France is Paris."
-  }
-}'
-```
-
-**Response**:
-```json
+# Add to Claude Desktop (edit config.json)
 {
-  "id": "eval-001",
-  "confidence": 0.92,
-  "verdict": "pass",
-  "stages": [
-    {"name": "length-checker", "score": 1.0},
-    {"name": "relevance-judge", "score": 0.95}
-  ]
+  "mcpServers": {
+    "themis": {
+      "command": "/absolute/path/to/bin/themis-mcp"
+    }
+  }
 }
 ```
 
-**Single judge** (faster):
-```bash
-curl -X POST http://localhost:18082/api/v1/evaluate/judge/relevance -d '{...}'
+**Usage in conversation:**
+```
+"Evaluate this response: User asked 'What is AI?' and agent answered 'Artificial Intelligence is...'"
 ```
 
-**Query results**:
+For setup details and advanced usage, see [MCP Test Cases](docs/testing/mcp-tests.md).
+
+## CLI Batch Processing
+
+Process datasets offline with concurrent workers and validate judge accuracy against human annotations.
+
+**Basic evaluation:**
 ```bash
-curl "http://localhost:18082/api/v1/results?agent_name=chatbot&verdict=fail"
+./bin/themis-batch -input dataset.jsonl -output results.jsonl -workers 10
 ```
 
-**Batch processing with validation**:
+**Validation mode** (Kendall's τ):
 ```bash
-# Process dataset
-go run cmd/batch/main.go -input data.jsonl -output results.jsonl
-
-# Validate judges against human annotations (Kendall's tau)
-go run cmd/batch/main.go -input annotated.jsonl -validate -correlation-threshold 0.3
+./bin/themis-batch -input annotated.jsonl -validate -correlation-threshold 0.3
 ```
+
+Input format: JSONL with `event_id`, `agent`, `interaction`, and optional `human_score` fields. For detailed examples and validation workflows, see [Batch Test Cases](docs/testing/batch-tests.md).
 
 ## Configuration
 
-Create `.env` with LLM provider credentials:
-
+**Environment Variables** (`.env`):
 ```env
-# OpenAI Platform (simplest)
-OPEN_AI_KEY=sk-proj-...
-
-# OR AWS Bedrock
-AWS_REGION=us-east-1
+# LLM Provider (choose one or mix)
+OPEN_AI_KEY=sk-proj-...                    # OpenAI Platform
+AWS_REGION=us-east-1                       # AWS Bedrock
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
+AZURE_OPENAI_ENDPOINT=https://...          # Azure OpenAI
 
-# OR Azure OpenAI
-AZURE_OPENAI_ENDPOINT=https://...
-OPEN_AI_KEY=...
+# Pipeline Settings
+ENABLE_PRECHECK=true                       # Stage 1 prechecks
+JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2 aggregation
+VERDICT_PASS_THRESHOLD=0.8                 # Pass if confidence > 0.8
+VERDICT_REVIEW_THRESHOLD=0.5               # Review if > 0.5, else fail
 ```
 
-Define judges in `configs/judges.yaml`:
-
+**Judge Configuration** (`configs/judges.yaml`):
 ```yaml
 judges:
   default_model:
     modelFamily: "openai_platform"
     modelID: gpt-4o-mini
-
   evaluators:
     - name: relevance
       enabled: true
       weight: 0.25
       model:
         modelFamily: "anthropic"
-        modelID: us.anthropic.claude-3-5-sonnet-20241022-v2:0
-      prompt: |
-        Evaluate if the answer addresses the user query...
+        modelID: claude-3-5-sonnet-20241022
+      prompt: "Evaluate if the answer addresses the query..."
 ```
 
-Mix different LLM providers in the same pipeline. Each judge can use a different model.
-
-## Key Features
-
-**Integration**
-- HTTP API with REST endpoints
-- MCP protocol for AI assistants (Claude Code, Claude Desktop, Cursor)
-- Redis Streams for async evaluation
-- CLI for batch processing
-- Web dashboard for visual monitoring
-
-**Evaluation**
-- Two-stage pipeline (fast prechecks, then parallel LLM judges)
-- Early exit optimization (saves 80% cost on poor responses)
-- Six quality dimensions (relevance, faithfulness, coherence, completeness, instruction, correctness)
-- Four aggregation methods (weighted_average, harmonic_mean, median, weighted_product)
-- Judge validation with Kendall's tau correlation
-
-**Flexibility**
-- Multi-provider LLM support (AWS Bedrock, Azure OpenAI, OpenAI Platform)
-- YAML-driven judge configuration (edit prompts without code changes)
-- Configurable thresholds and weights
-- SQLite default, PostgreSQL optional
-- Horizontal scaling (multiple Redis consumers)
-
-**Production-Ready**
-- Prometheus metrics endpoint
-- Structured logging (zerolog)
-- Query API for retrieving past results
-- Graceful shutdown
-- Docker support
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Quick Start](docs/getting-started/quick-start.md) | 5-minute tutorial |
-| [Installation](docs/getting-started/installation.md) | Prerequisites and setup |
-| [Configuration](docs/getting-started/configuration.md) | Environment variables and judges.yaml |
-| [API Mode](docs/deployment/api-mode.md) | HTTP API deployment |
-| [API Tests](docs/testing/api-tests.md) | HTTP endpoint test cases |
-| [Batch Tests](docs/testing/batch-tests.md) | CLI batch processing test cases |
-| [MCP Tests](docs/testing/mcp-tests.md) | MCP server integration test cases |
-| [Streaming Tests](docs/testing/streaming-tests.md) | Redis consumer test cases |
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-- Report bugs or request features via [GitHub Issues](https://github.com/Terminus-Lab/themis/issues)
-- Review [Code of Conduct](CODE_OF_CONDUCT.md) before contributing
-- Check [Security Policy](SECURITY.md) for vulnerability reporting
+Each judge can use a different LLM provider and model. For complete configuration reference, see [Configuration Guide](docs/getting-started/configuration.md).
 
 ## License
 

@@ -67,7 +67,11 @@ func (e *JudgeExecutor) Execute(ctx context.Context, judgeName string, threshold
 		StageScores:  result.Stages,
 	}
 
-	e.repository.Store(ctx, &evaluationResult)
+	err = e.repository.Store(ctx, &evaluationResult)
+	if err != nil {
+		e.logger.Error().Err(err).Msg("unable to store evaluation result in the repository")
+		return result, nil
+	}
 
 	return result, nil
 }

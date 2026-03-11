@@ -31,7 +31,7 @@ func HandleError(resp *restful.Response, err error, statusCode int) {
 		Details: "",
 	}
 
-	resp.WriteHeaderAndEntity(statusCode, errResp)
+	_ = resp.WriteHeaderAndEntity(statusCode, errResp)
 }
 
 func RecoverPanic(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {

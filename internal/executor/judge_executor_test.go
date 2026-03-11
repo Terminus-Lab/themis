@@ -19,7 +19,7 @@ func testLogger() *zerolog.Logger {
 }
 
 // Setup SQLite in-memory database for testing
-func setupTestDB(t *testing.T) *sqlite.DB {
+func setupTestDB(t *testing.T) (*sqlite.DB, func()) {
 	t.Helper()
 
 	db, err := sqlite.New(context.Background(), ":memory:")
@@ -30,8 +30,9 @@ func setupTestDB(t *testing.T) *sqlite.DB {
 	if err := db.InitSchema(context.Background()); err != nil {
 		t.Fatalf("Failed to initialize schema: %v", err)
 	}
+	cleanup := func() { _ = db.Close() }
 
-	return db
+	return db, cleanup
 }
 
 func TestJudgeExecutor_Execute(t *testing.T) {
@@ -131,8 +132,8 @@ func TestJudgeExecutor_Execute(t *testing.T) {
 			defer ctrl.Finish()
 
 			// Setup SQLite in-memory database
-			db := setupTestDB(t)
-			defer db.Close()
+			db, cleanup := setupTestDB(t)
+			defer cleanup()
 			repo := sqlite.NewEvalRepository(db, testLogger())
 
 			mockJudgeFactory := mocks.NewMockJudgeFactory(ctrl)
@@ -233,8 +234,8 @@ func TestJudgeExecutor_Execute_ContextCancellation(t *testing.T) {
 	defer ctrl.Finish()
 
 	// Setup SQLite in-memory database
-	db := setupTestDB(t)
-	defer db.Close()
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
 	repo := sqlite.NewEvalRepository(db, testLogger())
 
 	mockJudgeFactory := mocks.NewMockJudgeFactory(ctrl)
@@ -283,8 +284,9 @@ func TestJudgeExecutor_Execute_VerifyStorageIntegration(t *testing.T) {
 	defer ctrl.Finish()
 
 	// Setup SQLite in-memory database
-	db := setupTestDB(t)
-	defer db.Close()
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
 	repo := sqlite.NewEvalRepository(db, testLogger())
 
 	mockJudgeFactory := mocks.NewMockJudgeFactory(ctrl)

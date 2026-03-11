@@ -48,10 +48,9 @@ func (h *Handler) Evaluate(req *restful.Request, resp *restful.Response) {
 	}
 
 	// EvaluationRequest validation
-	validateEvaluationRequest(evalRequest)
 	if err := validateEvaluationRequest(evalRequest); err != nil {
 		h.logger.Warn().Err(err).Msg("Request validation failed")
-		resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
 			"error": err.Error(),
 		})
 		return
@@ -74,7 +73,7 @@ func (h *Handler) Evaluate(req *restful.Request, resp *restful.Response) {
 		Float64("confidence", evalResult.Confidence).
 		Msg("Evaluation complete")
 
-	resp.WriteHeaderAndEntity(http.StatusOK, evalResult)
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, evalResult)
 }
 
 // POST /api/v1/evaluate/judge/{judge_name}
@@ -101,10 +100,9 @@ func (h *Handler) EvaluateSingleJudge(req *restful.Request, resp *restful.Respon
 	}
 
 	// EvaluationRequest validation
-	validateEvaluationRequest(evalRequest)
 	if err := validateEvaluationRequest(evalRequest); err != nil {
 		h.logger.Warn().Err(err).Msg("Request validation failed")
-		resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
 			"error": err.Error(),
 		})
 		return
@@ -126,14 +124,14 @@ func (h *Handler) EvaluateSingleJudge(req *restful.Request, resp *restful.Respon
 	if err != nil {
 		if errors.Is(err, executor.ErrJudgeNotFound) {
 			h.logger.Warn().Str("judge_name", judgeName).Msg("Judge not found")
-			resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
+			_ = resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
 				"error": "judge not found: " + judgeName,
 			})
 			return
 		}
 
 		h.logger.Error().Err(err).Msg("Evaluation failed")
-		resp.WriteHeaderAndEntity(http.StatusInternalServerError, map[string]string{
+		_ = resp.WriteHeaderAndEntity(http.StatusInternalServerError, map[string]string{
 			"error": "internal server error",
 		})
 		return
@@ -147,7 +145,7 @@ func (h *Handler) EvaluateSingleJudge(req *restful.Request, resp *restful.Respon
 		Float64("confidence", evalResult.Confidence).
 		Msg("Evaluation complete")
 
-	resp.WriteHeaderAndEntity(http.StatusOK, evalResult)
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, evalResult)
 
 }
 
@@ -158,7 +156,7 @@ func (h *Handler) Health(req *restful.Request, resp *restful.Response) {
 		Version: "1.0.0",
 	}
 
-	resp.WriteHeaderAndEntity(http.StatusOK, healthResponse)
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, healthResponse)
 }
 
 func normalize(req models.EvaluationRequest) models.EvaluationContext {
@@ -242,7 +240,7 @@ func (h *Handler) QueryResults(req *restful.Request, resp *restful.Response) {
 		HasMore: offset+len(dtos) < total,
 	}
 
-	resp.WriteHeaderAndEntity(http.StatusOK, response)
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, response)
 }
 
 // GET /api/v1/results/{event_id}
@@ -258,7 +256,7 @@ func (h *Handler) GetResultByID(req *restful.Request, resp *restful.Response) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.logger.Warn().Str("event_id", eventID).Msg("Result not found")
-			resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
+			_ = resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
 				"error": "result not found",
 			})
 			return
@@ -275,5 +273,5 @@ func (h *Handler) GetResultByID(req *restful.Request, resp *restful.Response) {
 		Evaluation: dto,
 	}
 
-	resp.WriteHeaderAndEntity(http.StatusOK, response)
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, response)
 }

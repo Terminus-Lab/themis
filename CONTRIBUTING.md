@@ -156,7 +156,7 @@ func TestFunction(t *testing.T) {
   ---
   ```
 
-- Update `docs/INDEX.md` if adding new sections
+- Update `README.md` if adding new sections
 - Include code examples that work
 
 ## Reporting Issues
@@ -177,7 +177,7 @@ Use labels: `bug`, `enhancement`, `documentation`, `good first issue`
 ## Questions?
 
 - Open a [GitHub Discussion](https://github.com/Terminus-Lab/themis/discussions)
-- Check [documentation](docs/INDEX.md)
+- Check [documentation](README.md)
 - Review existing [issues](https://github.com/Terminus-Lab/themis/issues)
 
 ## License

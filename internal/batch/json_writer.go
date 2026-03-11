@@ -24,7 +24,7 @@ func NewJSONLWriter(output io.Writer, logger *zerolog.Logger) *JSONLWriter {
 func (w *JSONLWriter) Write(result models.EvaluationResult) error {
 	data, err := json.Marshal(result)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal the result. Error: %w", err)
+		return fmt.Errorf("failed to marshal the result. Error: %w", err)
 	}
 
 	_, err = w.output.Write(append(data, '\n'))

@@ -20,7 +20,7 @@ type Client struct {
 func NewClient(ctx context.Context, region string, modelID string) (*Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
-		return nil, fmt.Errorf("Unable to load AWS config: %w", err)
+		return nil, fmt.Errorf("unable to load AWS config: %w", err)
 	}
 
 	bedrockClient := bedrockruntime.NewFromConfig(cfg)

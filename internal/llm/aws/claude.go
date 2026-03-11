@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Terminus-Lab/themis/internal/llm"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
-	"github.com/Terminus-Lab/themis/internal/llm"
 )
 
 type claudeMessageRequest struct {
@@ -51,7 +51,7 @@ func (c *Client) InvokeModel(ctx context.Context, request llm.LLMRequest) (*llm.
 
 	byes, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to serialize claude request. Error: %w", err)
+		return nil, fmt.Errorf("unable to serialize claude request. Error: %w", err)
 	}
 
 	output, err := c.Client.InvokeModel(ctx, &bedrockruntime.InvokeModelInput{
@@ -62,12 +62,12 @@ func (c *Client) InvokeModel(ctx context.Context, request llm.LLMRequest) (*llm.
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to invoke claude model. Error: %w", err)
+		return nil, fmt.Errorf("unable to invoke claude model. Error: %w", err)
 	}
 
 	var response claudeMessageResponse
 	if err := json.Unmarshal(output.Body, &response); err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal bedrock response. Error: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal bedrock response. Error: %w", err)
 	}
 
 	// Extract the response

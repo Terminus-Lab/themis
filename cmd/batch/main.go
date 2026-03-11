@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/Terminus-Lab/themis/internal/batch"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/setup"
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -66,7 +66,9 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("file", *input).Msg("Failed to open input file")
 		}
-		defer f.Close()
+
+		defer closeFile(f)
+
 		inputFile = f
 		log.Info().Str("file", *input).Msg("Reading input file")
 	}
@@ -103,7 +105,8 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("file", *output).Msg("Failed to create output file")
 		}
-		defer f.Close()
+		defer closeFile(f)
+
 		outputFile = f
 		log.Info().Str("file", *output).Msg("Writing to output file")
 	}
@@ -113,7 +116,8 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create writer")
 	}
-	defer writer.Close()
+
+	defer closeFile(writer)
 
 	// Process with worker pool
 	processor := batch.NewProcessor(deps.Executor, *workers, deps.Logger)
@@ -181,7 +185,8 @@ func writeSummary(summary *string, results []models.EvaluationResult) {
 	if err != nil {
 		log.Fatal().Err(err).Str("file", *summary).Msg("Failed to create summary file")
 	}
-	defer summaryFile.Close()
+
+	defer closeFile(summaryFile)
 
 	// Create a summary writer and populate it
 	summaryWriter := batch.NewSummaryWriter(summaryFile, &log.Logger)
@@ -320,4 +325,10 @@ func printValidationSummary(result *batch.ValidationResult) {
 		Str("status", status).
 		Str("interpretation", result.Interpretation).
 		Msg("Validation complete")
+}
+
+func closeFile(f io.Closer) {
+	if err := f.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close file")
+	}
 }

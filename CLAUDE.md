@@ -397,8 +397,12 @@ LLM judges run concurrently via `judge.Runner.Run()` which spawns goroutines for
 
 ## Documentation
 
-Comprehensive test cases and usage guides in `docs/`:
-- `docs/api_test_cases.md` - HTTP endpoint testing
-- `docs/batch_evaluation_test_cases.md` - Offline evaluation and validation
-- `docs/mcp_test_cases.md` - Claude Code/Desktop integration
-- `docs/redis_test_cases.md` - Redis Streams setup and consumer patterns
+Comprehensive guides and test cases in `docs/`:
+- `docs/getting-started/installation.md` - Prerequisites and setup
+- `docs/getting-started/quick-start.md` - 5-minute tutorial
+- `docs/getting-started/configuration.md` - Environment variables and judges.yaml
+- `docs/deployment/api-mode.md` - HTTP API deployment
+- `docs/testing/api-tests.md` - HTTP endpoint test cases
+- `docs/testing/batch-tests.md` - CLI batch processing test cases
+- `docs/testing/mcp-tests.md` - Claude Code/Desktop integration test cases
+- `docs/testing/streaming-tests.md` - Redis consumer test cases
