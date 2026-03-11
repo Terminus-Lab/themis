@@ -99,7 +99,13 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 		StageScores:  judgeEvaResults,
 	}
 
-	e.repository.Store(ctx, &evaluationResult)
+	err := e.repository.Store(ctx, &evaluationResult)
+
+	if err != nil {
+		e.logger.Error().Err(err).Msg("unable to store evaluation result in the repository")
+		return finalResult
+	}
+
 	e.logger.
 		Info().
 		Str("verdict", string(finalResult.Verdict)).

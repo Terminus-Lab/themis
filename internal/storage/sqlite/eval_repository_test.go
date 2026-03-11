@@ -26,7 +26,7 @@ func setupTestDB(t *testing.T) (*sqlite.DB, func()) {
 	}
 
 	cleanup := func() {
-		db.Close()
+		_ = db.Close()
 	}
 
 	return db, cleanup

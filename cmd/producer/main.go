@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/Terminus-Lab/themis/internal/models"
 	red "github.com/Terminus-Lab/themis/internal/stream/redis"
+	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -49,7 +49,7 @@ func run(data, stream string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer closeRedisClient(client)
 
 	var req models.EvaluationRequest
 	if err := json.Unmarshal([]byte(data), &req); err != nil {
@@ -66,4 +66,10 @@ func run(data, stream string) error {
 
 	log.Info().Str("stream", stream).Str("id", id).Str("event_id", req.EventID).Msg("Published successfully!")
 	return nil
+}
+
+func closeRedisClient(client *redis.Client) {
+	if err := client.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close Redis client")
+	}
 }

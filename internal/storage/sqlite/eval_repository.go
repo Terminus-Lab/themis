@@ -109,7 +109,11 @@ func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFil
 	if err != nil {
 		return nil, 0, fmt.Errorf("unable to query storage. Error: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			e.logger.Error().Err(err).Msg("Failed to close database rows")
+		}
+	}()
 
 	evaluations := []storage.Evaluation{}
 	var stageScoreJSON string
