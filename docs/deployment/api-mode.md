@@ -42,7 +42,7 @@ EVAL_AGENT_API_PORT=18082
 ### 2. Start Server
 
 ```bash
-go run cmd/api/main.go
+./themis-api
 ```
 
 **Expected output**:
@@ -297,7 +297,7 @@ OPEN_AI_KEY=...
 Simple standalone deployment:
 
 ```bash
-go run cmd/api/main.go
+./themis-api
 ```
 
 **Use case**: Local development, testing, demos
@@ -330,13 +330,13 @@ Multiple API instances behind load balancer:
 
 ```bash
 # Instance 1
-EVAL_AGENT_API_PORT=18082 go run cmd/api/main.go
+EVAL_AGENT_API_PORT=18082 ./themis-api
 
 # Instance 2
-EVAL_AGENT_API_PORT=18083 go run cmd/api/main.go
+EVAL_AGENT_API_PORT=18083 ./themis-api
 
 # Instance 3
-EVAL_AGENT_API_PORT=18084 go run cmd/api/main.go
+EVAL_AGENT_API_PORT=18084 ./themis-api
 
 # Nginx/HAProxy load balancer
 # Round-robin to 18082, 18083, 18084
@@ -349,7 +349,7 @@ EVAL_AGENT_API_PORT=18084 go run cmd/api/main.go
 Single service running both API and streaming consumer:
 
 ```bash
-STREAMING_ENABLED=true go run cmd/api/main.go
+STREAMING_ENABLED=true ./themis-api
 ```
 
 **Benefits**:
@@ -460,7 +460,7 @@ rate(themis_early_exits_total[5m]) / rate(themis_evaluations_total[5m])
 
 ```bash
 # Change port
-EVAL_AGENT_API_PORT=18083 go run cmd/api/main.go
+EVAL_AGENT_API_PORT=18083 ./themis-api
 ```
 
 ### Issue: Slow Response Times

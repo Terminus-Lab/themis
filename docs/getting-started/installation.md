@@ -13,7 +13,6 @@ related:
 ## Prerequisites
 
 ### Required
-- **Go 1.21+** - For building and running Themis
 - **LLM Provider Access** - At least one of:
   - OpenAI Platform API key (recommended - simplest setup)
   - AWS Bedrock access (for Claude models)
@@ -23,23 +22,52 @@ related:
 - **Redis** - For streaming mode (`STREAMING_ENABLED=true`)
 - **PostgreSQL** - For production persistent storage (SQLite used by default)
 - **Docker** - For containerized MCP deployment
+- **Go 1.21+** - Only needed if building from source (see bottom of page)
 
-## Installation Steps
+## Installation Methods
 
-### 1. Clone Repository
+### Method 1: Pre-Built Binaries (Recommended)
 
+Download the latest release from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases/latest).
+
+#### 1. Download for Your Platform
+
+**macOS (Apple Silicon - M1/M2/M3)**:
 ```bash
-git clone https://github.com/Terminus-Lab/themis.git
-cd themis
+curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_arm64.tar.gz
+tar -xzf themis_1.0.0_darwin_arm64.tar.gz
+cd themis_1.0.0_darwin_arm64
 ```
 
-### 2. Install Dependencies
-
+**macOS (Intel)**:
 ```bash
-go mod download
+curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_amd64.tar.gz
+tar -xzf themis_1.0.0_darwin_amd64.tar.gz
+cd themis_1.0.0_darwin_amd64
 ```
 
-### 3. Configure Environment
+**Linux (x64)**:
+```bash
+curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_linux_amd64.tar.gz
+tar -xzf themis_1.0.0_linux_amd64.tar.gz
+cd themis_1.0.0_linux_amd64
+```
+
+**Linux (ARM)**:
+```bash
+curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_linux_arm64.tar.gz
+tar -xzf themis_1.0.0_linux_arm64.tar.gz
+cd themis_1.0.0_linux_arm64
+```
+
+**Windows (PowerShell)**:
+```powershell
+Invoke-WebRequest -Uri "https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_windows_amd64.zip" -OutFile "themis_1.0.0_windows_amd64.zip"
+Expand-Archive themis_1.0.0_windows_amd64.zip
+cd themis_1.0.0_windows_amd64
+```
+
+#### 2. Configure Environment
 
 Copy the example environment file:
 
@@ -67,19 +95,68 @@ OPEN_AI_KEY=your_azure_key
 AZURE_OPENAI_ENDPOINT=https://...openai.azure.com/...
 ```
 
-### 4. Verify Installation
+#### 3. Verify Installation
 
 Run a quick test:
 
 ```bash
 # Start API server
-go run cmd/api/main.go
+./themis-api
+
+# Windows:
+# .\themis-api.exe
 
 # In another terminal, test the endpoint
 curl http://localhost:18082/
 ```
 
 You should see the dashboard UI load successfully.
+
+---
+
+### Method 2: Build from Source (Development)
+
+For contributors or those who want to modify Themis:
+
+#### 1. Clone Repository
+
+```bash
+git clone https://github.com/Terminus-Lab/themis.git
+cd themis
+```
+
+#### 2. Install Dependencies
+
+```bash
+go mod download
+```
+
+#### 3. Build Binaries
+
+```bash
+go build -o bin/themis-api cmd/api/main.go
+go build -o bin/themis-mcp cmd/mcp/main.go
+go build -o bin/themis-batch cmd/batch/main.go
+```
+
+#### 4. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your LLM credentials
+```
+
+#### 5. Run from Source (Development Mode)
+
+```bash
+# Run without building
+go run cmd/api/main.go
+
+# Or use built binary
+./bin/themis-api
+```
+
+---
 
 ## Database Setup
 

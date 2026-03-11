@@ -108,7 +108,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-go run cmd/batch/main.go -input test-valid.jsonl -output results.jsonl
+./themis-batch -input test-valid.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -128,7 +128,7 @@ go run cmd/batch/main.go -input test-valid.jsonl -output results.jsonl
 
 **Command:**
 ```bash
-go run cmd/batch/main.go -input test-invalid.jsonl -output results.jsonl
+./themis-batch -input test-invalid.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -142,7 +142,7 @@ go run cmd/batch/main.go -input test-invalid.jsonl -output results.jsonl
 
 **Command:**
 ```bash
-go run cmd/batch/main.go -input test-mixed.jsonl -dry-run
+./themis-batch -input test-mixed.jsonl -dry-run
 ```
 
 **Expected Output:**
@@ -155,7 +155,7 @@ go run cmd/batch/main.go -input test-mixed.jsonl -dry-run
 
 **Command:**
 ```bash
-go run cmd/batch/main.go -input test-valid.jsonl -format summary
+./themis-batch -input test-valid.jsonl -format summary
 ```
 
 **Expected Output:**
@@ -174,7 +174,7 @@ go run cmd/batch/main.go -input test-valid.jsonl -format summary
 **Command:**
 ```bash
 # Start processing large file
-go run cmd/batch/main.go -input large-dataset.jsonl -output results.jsonl
+./themis-batch -input large-dataset.jsonl -output results.jsonl
 
 # Press Ctrl+C after 2 seconds
 ```
@@ -190,7 +190,7 @@ go run cmd/batch/main.go -input large-dataset.jsonl -output results.jsonl
 
 **Command:**
 ```bash
-go run cmd/batch/main.go -input dataset-100.jsonl -workers 20 -output results.jsonl
+./themis-batch -input dataset-100.jsonl -workers 20 -output results.jsonl
 ```
 
 **Expected Output:**
@@ -203,7 +203,7 @@ go run cmd/batch/main.go -input dataset-100.jsonl -workers 20 -output results.js
 
 **Command:**
 ```bash
-go run cmd/batch/main.go -input test.jsonl -format csv
+./themis-batch -input test.jsonl -format csv
 ```
 
 **Expected Output:**
@@ -221,7 +221,7 @@ go run cmd/batch/main.go -input test.jsonl -format csv
 
 **Command:**
 ```bash
-go run cmd/batch/main.go \
+./themis-batch \
   -input resources/annotated_sample.jsonl \
   -validate \
   -correlation-threshold 0.3
@@ -272,7 +272,7 @@ INFO Computing Kendall's correlation...
 # Create test file with missing human_annotation
 echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
 
-go run cmd/batch/main.go -input test-no-annotation.jsonl -validate
+./themis-batch -input test-no-annotation.jsonl -validate
 ```
 
 **Expected:**
@@ -284,7 +284,7 @@ go run cmd/batch/main.go -input test-no-annotation.jsonl -validate
 
 **Command:**
 ```bash
-go run cmd/batch/main.go \
+./themis-batch \
   -input resources/dataset.jsonl \
   -output resources/results.jsonl \
   -summary resources/summary.json
@@ -299,7 +299,7 @@ go run cmd/batch/main.go \
 
 **Command:**
 ```bash
-cat dataset.jsonl | go run cmd/batch/main.go -input - | jq 'select(.verdict=="fail")'
+cat dataset.jsonl | ./themis-batch -input - | jq 'select(.verdict=="fail")'
 ```
 
 **Expected:**
@@ -316,7 +316,7 @@ cat dataset.jsonl | go run cmd/batch/main.go -input - | jq 'select(.verdict=="fa
 
 **Command:**
 ```bash
-time go run cmd/batch/main.go \
+time ./themis-batch \
   -input dataset-1000.jsonl \
   -output results-1000.jsonl \
   -workers 10
@@ -334,13 +334,13 @@ Test with different worker counts:
 
 ```bash
 # 1 worker (sequential)
-time go run cmd/batch/main.go -input dataset-100.jsonl -workers 1 -output /dev/null
+time ./themis-batch -input dataset-100.jsonl -workers 1 -output /dev/null
 
 # 5 workers (default)
-time go run cmd/batch/main.go -input dataset-100.jsonl -workers 5 -output /dev/null
+time ./themis-batch -input dataset-100.jsonl -workers 5 -output /dev/null
 
 # 20 workers (high concurrency)
-time go run cmd/batch/main.go -input dataset-100.jsonl -workers 20 -output /dev/null
+time ./themis-batch -input dataset-100.jsonl -workers 20 -output /dev/null
 ```
 
 **Expected:**
@@ -353,13 +353,13 @@ time go run cmd/batch/main.go -input dataset-100.jsonl -workers 20 -output /dev/
 ### Filter Failed Evaluations with jq
 
 ```bash
-go run cmd/batch/main.go -input dataset.jsonl | jq 'select(.verdict=="fail")'
+./themis-batch -input dataset.jsonl | jq 'select(.verdict=="fail")'
 ```
 
 ### Calculate Average Confidence with jq
 
 ```bash
-go run cmd/batch/main.go -input dataset.jsonl | jq -s 'map(.confidence) | add/length'
+./themis-batch -input dataset.jsonl | jq -s 'map(.confidence) | add/length'
 ```
 
 ### Import to pandas (Python)
@@ -383,7 +383,7 @@ print(fails[['id', 'confidence', 'verdict']])
 **Solution:** Ensure you specify `-input` flag with a valid file path.
 
 ```bash
-go run cmd/batch/main.go -input dataset.jsonl
+./themis-batch -input dataset.jsonl
 ```
 
 ### Issue: "Failed to open input file"
@@ -400,7 +400,7 @@ chmod 644 dataset.jsonl
 **Solution:** Check for parse errors in input JSONL. Use `-dry-run` to validate.
 
 ```bash
-go run cmd/batch/main.go -input dataset.jsonl -dry-run
+./themis-batch -input dataset.jsonl -dry-run
 ```
 
 ### Issue: High Memory Usage
@@ -417,7 +417,7 @@ split -l 10000 large-dataset.jsonl batch-
 **Solution:** Reduce worker count to stay within rate limits.
 
 ```bash
-go run cmd/batch/main.go -input dataset.jsonl -workers 3
+./themis-batch -input dataset.jsonl -workers 3
 ```
 
 ## Validation Mode Details
