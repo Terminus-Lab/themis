@@ -50,11 +50,9 @@ func (h *Handler) Evaluate(req *restful.Request, resp *restful.Response) {
 	// EvaluationRequest validation
 	if err := validateEvaluationRequest(evalRequest); err != nil {
 		h.logger.Warn().Err(err).Msg("Request validation failed")
-		if err := resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
 			"error": err.Error(),
-		}); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to write response")
-		}
+		})
 		return
 	}
 
