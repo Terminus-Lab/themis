@@ -80,9 +80,9 @@ archives:
       - README.md
       - CHANGELOG.md
       - .env.example
-      - configs/**/*
-      - static/**/*
-      - docs/**/*
+      - src: "configs/**"
+      - src: "static/**"
+      - src: "docs/**"
 
 checksum:
   name_template: 'checksums.txt'
