@@ -4,8 +4,9 @@ description: Test scenarios for Themis MCP server with Claude Code, Claude Deskt
 version: 1.0.0
 tags: [testing, mcp, claude-code, claude-desktop, cursor, integration]
 related:
-  - deployment/mcp-mode.md
   - testing/api-tests.md
+  - testing/batch-tests.md
+  - testing/streaming-tests.md
   - getting-started/installation.md
 ---
 
@@ -527,7 +528,8 @@ Which response had the lowest quality?
 
 ## Next Steps
 
-- [MCP Deployment Guide](../deployment/mcp-mode.md) - Detailed deployment instructions
 - [API Test Cases](api-tests.md) - HTTP endpoint testing
-- [Integration Examples](../guides/integration-examples.md) - Code integration patterns
-- [Troubleshooting Guide](../guides/troubleshooting.md) - Common issues and solutions
+- [Batch Test Cases](batch-tests.md) - CLI batch processing tests
+- [Streaming Test Cases](streaming-tests.md) - Redis consumer tests
+- [Configuration](../getting-started/configuration.md) - Environment setup
+- [CLAUDE.md](../../CLAUDE.md) - Complete MCP deployment and troubleshooting guide

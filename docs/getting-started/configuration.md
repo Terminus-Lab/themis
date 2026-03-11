@@ -5,8 +5,8 @@ version: 1.0.0
 tags: [configuration, environment-variables, settings, judges-yaml]
 related:
   - getting-started/installation.md
-  - architecture/judges.md
-  - architecture/aggregation.md
+  - getting-started/quick-start.md
+  - deployment/api-mode.md
 ---
 
 # Configuration
@@ -442,7 +442,7 @@ go run cmd/batch/main.go \
 # Deploy only if Kendall's τ ≥ 0.3
 ```
 
-See [Validation Guide](../guides/validation.md) for details.
+See [CLAUDE.md](../../CLAUDE.md) for validation details.
 
 ### 3. Experiment with Aggregation Methods
 
@@ -504,6 +504,6 @@ Track verdict distribution in production:
 ## Next Steps
 
 - [Quick Start](quick-start.md) - Run your first evaluation
-- [Pipeline Architecture](../architecture/pipeline.md) - Understand evaluation flow
-- [Aggregation Methods](../architecture/aggregation.md) - Deep dive into scoring
-- [Adding Judges](../guides/adding-judges.md) - Create custom judges
+- [API Mode](../deployment/api-mode.md) - Deploy HTTP API server
+- [API Tests](../testing/api-tests.md) - Test your configuration
+- [CLAUDE.md](../../CLAUDE.md) - Complete architecture and customization guide

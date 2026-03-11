@@ -4,9 +4,10 @@ description: Test scenarios for Themis batch evaluation CLI
 version: 1.0.0
 tags: [testing, batch, cli, offline, validation, kendall]
 related:
-  - deployment/batch-mode.md
-  - guides/validation.md
   - testing/api-tests.md
+  - testing/mcp-tests.md
+  - testing/streaming-tests.md
+  - getting-started/configuration.md
 ---
 
 # Batch Evaluation CLI Test Cases
@@ -448,7 +449,7 @@ Shows agreement between human and LLM verdicts:
 4. **Iterate prompts** - If τ < 0.3, improve judge prompts in `judges.yaml`
 5. **Deploy** - Once τ ≥ 0.3, safe to evaluate full dataset
 
-See [Validation Guide](../guides/validation.md) for complete details.
+See [CLAUDE.md](../../CLAUDE.md) for complete validation details.
 
 ## Performance Benchmarks
 
@@ -467,7 +468,8 @@ See [Validation Guide](../guides/validation.md) for complete details.
 
 ## Next Steps
 
-- [Validation Guide](../guides/validation.md) - Deep dive on Kendall's tau validation
 - [API Test Cases](api-tests.md) - HTTP endpoint testing
-- [Batch Mode Deployment](../deployment/batch-mode.md) - Deployment guide
+- [MCP Test Cases](mcp-tests.md) - Claude Code integration testing
+- [Streaming Test Cases](streaming-tests.md) - Redis consumer testing
 - [Configuration](../getting-started/configuration.md) - Tune pipeline settings
+- [CLAUDE.md](../../CLAUDE.md) - Complete documentation including validation

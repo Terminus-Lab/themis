@@ -234,3 +234,4 @@ Ensure `judges.yaml` exists in one of:
 - [Quick Start Guide](quick-start.md) - Run your first evaluation
 - [Configuration Reference](configuration.md) - Detailed configuration options
 - [API Mode](../deployment/api-mode.md) - Deploy HTTP API server
+- [CLAUDE.md](../../CLAUDE.md) - Complete project documentation

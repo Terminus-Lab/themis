@@ -4,9 +4,10 @@ description: Deploy Themis as an HTTP API server for synchronous evaluation
 version: 1.0.0
 tags: [deployment, api, http, rest, synchronous]
 related:
-  - deployment/streaming-mode.md
-  - deployment/batch-mode.md
-  - api-reference/endpoints.md
+  - getting-started/quick-start.md
+  - getting-started/configuration.md
+  - testing/api-tests.md
+  - testing/streaming-tests.md
 ---
 
 # API Mode
@@ -357,7 +358,7 @@ STREAMING_ENABLED=true go run cmd/api/main.go
 - Single deployment
 - Unified metrics endpoint
 
-See [Streaming Mode](streaming-mode.md) for details.
+See [CLAUDE.md](../../CLAUDE.md) and [Streaming Tests](../testing/streaming-tests.md) for details.
 
 ## Performance Optimization
 
@@ -533,7 +534,8 @@ API validates required fields. For additional validation:
 
 ## Next Steps
 
-- [Streaming Mode](streaming-mode.md) - Add async evaluation
-- [API Reference](../api-reference/endpoints.md) - Complete API docs
-- [Testing](../testing/api-tests.md) - Comprehensive test cases
-- [Batch Mode](batch-mode.md) - Offline evaluation
+- [API Tests](../testing/api-tests.md) - Comprehensive test cases
+- [Streaming Tests](../testing/streaming-tests.md) - Async evaluation with Redis
+- [Batch Tests](../testing/batch-tests.md) - Offline evaluation
+- [Configuration](../getting-started/configuration.md) - Tune your setup
+- [CLAUDE.md](../../CLAUDE.md) - Complete documentation

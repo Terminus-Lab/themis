@@ -7,6 +7,7 @@ related:
   - getting-started/installation.md
   - getting-started/configuration.md
   - deployment/api-mode.md
+  - testing/api-tests.md
 ---
 
 # Quick Start
@@ -208,21 +209,19 @@ curl "http://localhost:18082/api/v1/results/test-001"
 ### Deploy Different Modes
 
 - **[API Mode](../deployment/api-mode.md)** - HTTP API for synchronous evaluation
-- **[Streaming Mode](../deployment/streaming-mode.md)** - Redis consumer for async evaluation
-- **[Batch Mode](../deployment/batch-mode.md)** - CLI for offline dataset evaluation
-- **[MCP Mode](../deployment/mcp-mode.md)** - Integration with Claude Code/Desktop
+- **See CLAUDE.md** for batch, MCP, and streaming mode documentation
 
 ### Customize Configuration
 
 - **[Configuration Guide](configuration.md)** - Environment variables and thresholds
-- **[Adding Judges](../guides/adding-judges.md)** - Create custom evaluation judges
-- **[Aggregation Methods](../architecture/aggregation.md)** - Choose how scores combine
+- **See CLAUDE.md** for adding judges and aggregation methods
 
-### Production Setup
+### Run Tests
 
-- **[Pipeline Architecture](../architecture/pipeline.md)** - Understand two-stage evaluation
-- **[Judge Validation](../guides/validation.md)** - Validate judges against human annotations
-- **[API Reference](../api-reference/endpoints.md)** - Complete API documentation
+- **[API Tests](../testing/api-tests.md)** - HTTP endpoint test cases
+- **[Batch Tests](../testing/batch-tests.md)** - CLI batch processing tests
+- **[MCP Tests](../testing/mcp-tests.md)** - MCP integration tests
+- **[Streaming Tests](../testing/streaming-tests.md)** - Redis consumer tests
 
 ## Common Issues
 
@@ -294,6 +293,6 @@ Check browser console for errors and ensure no CORS issues.
 
 ## Getting Help
 
-- **Documentation**: See [API Reference](../api-reference/endpoints.md) for complete API docs
-- **Test Cases**: See [Testing](../testing/api-tests.md) for comprehensive test scenarios
+- **Documentation**: See [CLAUDE.md](../../CLAUDE.md) for complete documentation
+- **Test Cases**: See [API Tests](../testing/api-tests.md) for comprehensive test scenarios
 - **Issues**: Report bugs at https://github.com/Terminus-Lab/themis/issues

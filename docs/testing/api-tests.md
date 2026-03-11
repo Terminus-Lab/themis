@@ -5,8 +5,9 @@ version: 1.0.0
 tags: [testing, api, http, test-cases, endpoints]
 related:
   - deployment/api-mode.md
-  - api-reference/endpoints.md
   - testing/batch-tests.md
+  - testing/mcp-tests.md
+  - testing/streaming-tests.md
 ---
 
 # API Test Cases
@@ -498,13 +499,10 @@ curl http://localhost:18082/
 
 ---
 
-## Complete Test Reference
-
-For comprehensive test scenarios including correctness judge tests, see the original [`api_test_cases.md`](../api_test_cases.md) file.
-
 ## Next Steps
 
 - [Batch Test Cases](batch-tests.md) - CLI evaluation testing
 - [MCP Test Cases](mcp-tests.md) - Claude Code integration
 - [Streaming Test Cases](streaming-tests.md) - Redis consumer testing
-- [API Reference](../api-reference/endpoints.md) - Complete API documentation
+- [API Mode Deployment](../deployment/api-mode.md) - Deployment guide
+- [Configuration](../getting-started/configuration.md) - Tune your setup

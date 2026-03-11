@@ -4,9 +4,10 @@ description: Test scenarios for Themis Redis Stream consumer
 version: 1.0.0
 tags: [testing, streaming, redis, async, consumer, horizontal-scaling]
 related:
-  - deployment/streaming-mode.md
+  - deployment/api-mode.md
   - testing/api-tests.md
-  - guides/scaling.md
+  - testing/batch-tests.md
+  - testing/mcp-tests.md
 ---
 
 # Streaming Mode Test Cases
@@ -648,7 +649,9 @@ REDIS_CONSUMER_NAME=consumer-${HOSTNAME}-${RANDOM}
 
 ## Next Steps
 
-- [Streaming Mode Deployment](../deployment/streaming-mode.md) - Deployment guide
-- [Horizontal Scaling Guide](../guides/scaling.md) - Scale with multiple consumers
-- [Monitoring Guide](../guides/monitoring.md) - Prometheus metrics and dashboards
 - [API Test Cases](api-tests.md) - HTTP endpoint testing
+- [Batch Test Cases](batch-tests.md) - CLI batch processing tests
+- [MCP Test Cases](mcp-tests.md) - MCP integration tests
+- [API Mode Deployment](../deployment/api-mode.md) - Unified API + Streaming setup
+- [Configuration](../getting-started/configuration.md) - Environment setup
+- [CLAUDE.md](../../CLAUDE.md) - Complete streaming, scaling, and monitoring guide

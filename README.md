@@ -4,7 +4,6 @@ AI response evaluation service with MCP and API interfaces. Uses configurable LL
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
-[![Documentation](https://img.shields.io/badge/docs-complete-green)](docs/INDEX.md)
 
 **Deploy as**: HTTP API • MCP Server • CLI
 
@@ -175,12 +174,10 @@ Mix different LLM providers in the same pipeline. Each judge can use a different
 | [Installation](docs/getting-started/installation.md) | Prerequisites and setup |
 | [Configuration](docs/getting-started/configuration.md) | Environment variables and judges.yaml |
 | [API Mode](docs/deployment/api-mode.md) | HTTP API deployment |
-| [MCP Mode](docs/deployment/mcp-mode.md) | AI assistant integration |
-| [Batch Mode](docs/deployment/batch-mode.md) | CLI batch processing |
-| [Streaming Mode](docs/deployment/streaming-mode.md) | Redis consumer deployment |
 | [API Tests](docs/testing/api-tests.md) | HTTP endpoint test cases |
-| [Architecture](docs/architecture/) | Pipeline design and judges |
-| [Full Index](docs/INDEX.md) | Complete documentation index |
+| [Batch Tests](docs/testing/batch-tests.md) | CLI batch processing test cases |
+| [MCP Tests](docs/testing/mcp-tests.md) | MCP server integration test cases |
+| [Streaming Tests](docs/testing/streaming-tests.md) | Redis consumer test cases |
 
 ## Contributing
 
