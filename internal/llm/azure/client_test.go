@@ -27,7 +27,7 @@ func TestNewClient(t *testing.T) {
 			model:          "gpt-4o-mini",
 			azureEndpoint:  "https://test.openai.azure.com",
 			wantErr:        true,
-			expectedErrMsg: "Azure OpenAI API key is required",
+			expectedErrMsg: "azure OpenAI API key is required",
 		},
 		{
 			name:           "missing model",
@@ -35,7 +35,7 @@ func TestNewClient(t *testing.T) {
 			model:          "",
 			azureEndpoint:  "https://test.openai.azure.com",
 			wantErr:        true,
-			expectedErrMsg: "Azure OpenAI deployment name is required",
+			expectedErrMsg: "azure OpenAI deployment name is required",
 		},
 		{
 			name:           "missing endpoint",
@@ -43,7 +43,7 @@ func TestNewClient(t *testing.T) {
 			model:          "gpt-4o-mini",
 			azureEndpoint:  "",
 			wantErr:        true,
-			expectedErrMsg: "Azure OpenAI endpoint is required",
+			expectedErrMsg: "azure OpenAI endpoint is required",
 		},
 	}
 
@@ -99,7 +99,7 @@ func TestNewClient_ValidationOrder(t *testing.T) {
 		t.Error("Expected error for all empty params")
 	}
 	// Should fail on API key first
-	if err.Error() != "Azure OpenAI API key is required" {
+	if err.Error() != "azure OpenAI API key is required" {
 		t.Errorf("Expected API key error first, got: %v", err.Error())
 	}
 
@@ -108,7 +108,7 @@ func TestNewClient_ValidationOrder(t *testing.T) {
 		t.Error("Expected error for empty model and endpoint")
 	}
 	// Should fail on model second
-	if err.Error() != "Azure OpenAI deployment name is required" {
+	if err.Error() != "azure OpenAI deployment name is required" {
 		t.Errorf("Expected model error second, got: %v", err.Error())
 	}
 
@@ -117,7 +117,7 @@ func TestNewClient_ValidationOrder(t *testing.T) {
 		t.Error("Expected error for empty endpoint")
 	}
 	// Should fail on endpoint third
-	if err.Error() != "Azure OpenAI endpoint is required" {
+	if err.Error() != "azure OpenAI endpoint is required" {
 		t.Errorf("Expected endpoint error third, got: %v", err.Error())
 	}
 }
