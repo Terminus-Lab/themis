@@ -66,7 +66,7 @@ EVAL_AGENT_API_PORT=18082
 ### Start the Consumer
 
 ```bash
-STREAMING_ENABLED=true go run cmd/api/main.go
+STREAMING_ENABLED=true ./themis-api
 ```
 
 **Expected output:**
@@ -83,7 +83,7 @@ INFO Starting Themis Server address=:18082 streaming_enabled=true
 **Send message using CLI producer:**
 
 ```bash
-go run cmd/producer/main.go -d '{
+./themis-producer -d '{
   "event_id": "test-001",
   "event_type": "agent_response",
   "agent": {
@@ -119,7 +119,7 @@ redis-cli XPENDING eval-events eval-group - + 10
 **Send message:**
 
 ```bash
-go run cmd/producer/main.go -d '{
+./themis-producer -d '{
   "event_id": "test-002",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
@@ -143,7 +143,7 @@ INFO Evaluation complete verdict=pass confidence=0.95
 **Send message:**
 
 ```bash
-go run cmd/producer/main.go -d '{
+./themis-producer -d '{
   "event_id": "test-003",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
@@ -170,7 +170,7 @@ INFO Evaluation complete verdict=fail confidence=0.15 duration=<fast>
 **Send message:**
 
 ```bash
-go run cmd/producer/main.go -d '{
+./themis-producer -d '{
   "event_id": "test-004",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
@@ -197,7 +197,7 @@ INFO Stages: faithfulness=0.1 coherence=0.2
 
 ```bash
 for i in {1..10}; do
-  go run cmd/producer/main.go -d "{
+  ./themis-producer -d "{
     \"event_id\": \"concurrent-$i\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -247,7 +247,7 @@ INFO Message acknowledged (parse error)
 **Send incomplete message:**
 
 ```bash
-go run cmd/producer/main.go -d '{
+./themis-producer -d '{
   "event_id": "test-incomplete",
   "interaction": {
     "user_query": "Test"
@@ -317,20 +317,20 @@ Start 3 consumer instances:
 
 ```bash
 # Consumer 1
-STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 EVAL_AGENT_API_PORT=18082 go run cmd/api/main.go &
+STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 EVAL_AGENT_API_PORT=18082 ./themis-api &
 
 # Consumer 2
-STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 go run cmd/api/main.go &
+STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 ./themis-api &
 
 # Consumer 3
-STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-3 EVAL_AGENT_API_PORT=18084 go run cmd/api/main.go &
+STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-3 EVAL_AGENT_API_PORT=18084 ./themis-api &
 ```
 
 **Send 30 messages:**
 
 ```bash
 for i in {1..30}; do
-  go run cmd/producer/main.go -d "{
+  ./themis-producer -d "{
     \"event_id\": \"scale-$i\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -449,7 +449,7 @@ INFO Resuming stream processing
 ```bash
 LARGE_CONTEXT=$(python3 -c "print('Context word. ' * 2000)")
 
-go run cmd/producer/main.go -d "{
+./themis-producer -d "{
   \"event_id\": \"large-payload\",
   \"event_type\": \"agent_response\",
   \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -495,7 +495,7 @@ redis-cli XPENDING eval-events eval-group - + 10
 
 ```bash
 time for i in {1..1000}; do
-  go run cmd/producer/main.go -d "{
+  ./themis-producer -d "{
     \"event_id\": \"perf-$i\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -532,7 +532,7 @@ redis-cli XPENDING eval-events eval-group
 
 ```bash
 START=$(date +%s%N)
-go run cmd/producer/main.go -d '{
+./themis-producer -d '{
   "event_id": "latency-test",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},

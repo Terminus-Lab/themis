@@ -6,8 +6,6 @@
       "Bash(go build:*)",
       "Bash(ls:*)",
       "Bash(curl:*)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep:*)",
       "Bash(docs/contributing.md:*)",
       "Bash(golangci-lint version:*)",

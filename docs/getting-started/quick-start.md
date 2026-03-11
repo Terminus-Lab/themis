@@ -14,24 +14,37 @@ related:
 
 Get Themis running and evaluate your first AI response in 5 minutes.
 
-## Step 1: Install and Configure
+## Step 1: Download and Extract
 
 ```bash
-# Clone repository
-git clone https://github.com/Terminus-Lab/themis.git
-cd themis
+# Download latest release (choose your platform)
+# macOS Apple Silicon (M1/M2/M3):
+curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_arm64.tar.gz
+tar -xzf themis_1.0.0_darwin_arm64.tar.gz
+cd themis_1.0.0_darwin_arm64
 
-# Install dependencies
-go mod download
+# macOS Intel:
+# curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_amd64.tar.gz
+
+# Linux:
+# curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_linux_amd64.tar.gz
+
+# Windows PowerShell:
+# Invoke-WebRequest -Uri "https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_windows_amd64.zip" -OutFile "themis_1.0.0_windows_amd64.zip"
+# Expand-Archive themis_1.0.0_windows_amd64.zip
 
 # Set up environment (OpenAI - simplest option)
-echo "OPEN_AI_KEY=sk-proj-..." > .env
+cp .env.example .env
+echo "OPEN_AI_KEY=sk-proj-YOUR_KEY_HERE" >> .env
 ```
 
 ## Step 2: Start the Server
 
 ```bash
-go run cmd/api/main.go
+./themis-api
+
+# Windows:
+# .\themis-api.exe
 ```
 
 Expected output:
@@ -285,11 +298,32 @@ Check browser console for errors and ensure no CORS issues.
 4. **Horizontal Scaling (Streaming)** - Multiple consumers:
    ```bash
    # Consumer 1
-   STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 go run cmd/api/main.go
+   STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 ./themis-api
 
    # Consumer 2
-   STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 go run cmd/api/main.go
+   STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 ./themis-api
    ```
+
+## Building from Source (Development)
+
+If you want to contribute or modify Themis:
+
+```bash
+# Clone repository
+git clone https://github.com/Terminus-Lab/themis.git
+cd themis
+
+# Install dependencies
+go mod download
+
+# Build binaries
+go build -o bin/themis-api cmd/api/main.go
+go build -o bin/themis-mcp cmd/mcp/main.go
+go build -o bin/themis-batch cmd/batch/main.go
+
+# Run from source
+go run cmd/api/main.go
+```
 
 ## Getting Help
 
