@@ -10,7 +10,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep:*)",
       "Bash(docs/contributing.md:*)",
-      "Bash(cloc .:*)"
+      "Bash(golangci-lint version:*)",
+      "Bash(golangci-lint help:*)"
     ]
   }
 }

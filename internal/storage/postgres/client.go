@@ -16,7 +16,7 @@ type DB struct {
 func New(ctx context.Context, connString string) (*DB, error) {
 	pgPool, err := pgxpool.New(ctx, connString)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to database. Error: %w", err)
+		return nil, fmt.Errorf("failed to connect to database. Error: %w", err)
 	}
 
 	return &DB{
