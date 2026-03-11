@@ -5,6 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Themis - Evaluation Dashboard</title>
     <style>
+        :root {
+            /* Dark theme (default) */
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --bg-tertiary: #2a2a2a;
+            --border-color: #333;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --text-tertiary: #666;
+            --text-muted: #aaa;
+            --accent-color: #00d4aa;
+            --accent-hover: #00e6bb;
+            --accent-active: #00c299;
+            --input-bg: #1a1a1a;
+            --input-border: #444;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e8e8e8;
+            --border-color: #ddd;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666;
+            --text-tertiary: #999;
+            --text-muted: #555;
+            --accent-color: #00a886;
+            --accent-hover: #00b894;
+            --accent-active: #009977;
+            --input-bg: #ffffff;
+            --input-border: #ccc;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,10 +46,11 @@
 
         body {
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-            background: #1a1a1a;
-            color: #e0e0e0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             line-height: 1.6;
             font-size: 14px;
+            transition: background 0.3s, color 0.3s;
         }
 
         .container {
@@ -26,26 +60,56 @@
         }
 
         header {
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border-color);
             padding-bottom: 20px;
             margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content {
+            flex: 1;
         }
 
         h1 {
-            color: #00d4aa;
+            color: var(--accent-color);
             font-size: 24px;
             font-weight: 600;
             margin-bottom: 8px;
         }
 
         .subtitle {
-            color: #888;
+            color: var(--text-secondary);
             font-size: 13px;
         }
 
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .theme-toggle-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .filters {
-            background: #242424;
-            border: 1px solid #333;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
@@ -65,7 +129,7 @@
 
         label {
             display: block;
-            color: #888;
+            color: var(--text-secondary);
             font-size: 12px;
             margin-bottom: 6px;
             text-transform: uppercase;
@@ -74,23 +138,24 @@
 
         input, select {
             width: 100%;
-            background: #1a1a1a;
-            border: 1px solid #444;
-            color: #e0e0e0;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-primary);
             padding: 10px 12px;
             border-radius: 6px;
             font-family: inherit;
             font-size: 13px;
+            transition: border-color 0.2s;
         }
 
         input:focus, select:focus {
             outline: none;
-            border-color: #00d4aa;
+            border-color: var(--accent-color);
         }
 
         button {
-            background: #00d4aa;
-            color: #1a1a1a;
+            background: var(--accent-color);
+            color: var(--bg-primary);
             border: none;
             padding: 10px 20px;
             border-radius: 6px;
@@ -102,20 +167,21 @@
         }
 
         button:hover {
-            background: #00e6bb;
+            background: var(--accent-hover);
         }
 
         button:active {
-            background: #00c299;
+            background: var(--accent-active);
         }
 
         .btn-secondary {
-            background: #333;
-            color: #e0e0e0;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
 
         .btn-secondary:hover {
-            background: #3d3d3d;
+            background: var(--border-color);
         }
 
         .stats {
@@ -126,16 +192,17 @@
         }
 
         .stat-card {
-            background: #242424;
-            border: 1px solid #333;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 15px 20px;
             flex: 1;
             min-width: 150px;
+            transition: background 0.3s, border-color 0.3s;
         }
 
         .stat-label {
-            color: #888;
+            color: var(--text-secondary);
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -143,14 +210,14 @@
         }
 
         .stat-value {
-            color: #00d4aa;
+            color: var(--accent-color);
             font-size: 24px;
             font-weight: 600;
         }
 
         .results-table {
-            background: #242424;
-            border: 1px solid #333;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
         }
@@ -161,14 +228,14 @@
         }
 
         thead {
-            background: #2a2a2a;
-            border-bottom: 1px solid #333;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
         }
 
         th {
             text-align: left;
             padding: 15px;
-            color: #888;
+            color: var(--text-secondary);
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -176,22 +243,22 @@
         }
 
         tbody tr {
-            border-bottom: 1px solid #2a2a2a;
+            border-bottom: 1px solid var(--bg-tertiary);
             cursor: pointer;
             transition: background 0.2s;
         }
 
         tbody tr:hover {
-            background: #2a2a2a;
+            background: var(--bg-tertiary);
         }
 
         tbody tr.expanded {
-            background: #2a2a2a;
+            background: var(--bg-tertiary);
         }
 
         td {
             padding: 15px;
-            color: #e0e0e0;
+            color: var(--text-primary);
         }
 
         .verdict {
@@ -219,7 +286,7 @@
         }
 
         .confidence {
-            color: #00d4aa;
+            color: var(--accent-color);
             font-weight: 600;
         }
 
@@ -228,12 +295,12 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            color: #aaa;
+            color: var(--text-muted);
         }
 
         .detail-row {
             display: none;
-            background: #1a1a1a;
+            background: var(--bg-primary);
         }
 
         .detail-row.visible {
@@ -253,7 +320,7 @@
         }
 
         .detail-title {
-            color: #00d4aa;
+            color: var(--accent-color);
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -261,12 +328,12 @@
         }
 
         .detail-text {
-            color: #e0e0e0;
+            color: var(--text-primary);
             line-height: 1.8;
             padding: 12px;
-            background: #242424;
+            background: var(--bg-secondary);
             border-radius: 6px;
-            border-left: 3px solid #00d4aa;
+            border-left: 3px solid var(--accent-color);
         }
 
         .stages-grid {
@@ -276,26 +343,26 @@
         }
 
         .stage-card {
-            background: #242424;
-            border: 1px solid #333;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             padding: 12px;
         }
 
         .stage-name {
-            color: #888;
+            color: var(--text-secondary);
             font-size: 11px;
             margin-bottom: 5px;
         }
 
         .stage-score {
-            color: #00d4aa;
+            color: var(--accent-color);
             font-size: 18px;
             font-weight: 600;
         }
 
         .stage-reason {
-            color: #aaa;
+            color: var(--text-muted);
             font-size: 11px;
             margin-top: 5px;
         }
@@ -305,11 +372,11 @@
             justify-content: space-between;
             align-items: center;
             padding: 20px;
-            border-top: 1px solid #333;
+            border-top: 1px solid var(--border-color);
         }
 
         .pagination-info {
-            color: #888;
+            color: var(--text-secondary);
             font-size: 13px;
         }
 
@@ -321,13 +388,13 @@
         .loading {
             text-align: center;
             padding: 40px;
-            color: #888;
+            color: var(--text-secondary);
         }
 
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #888;
+            color: var(--text-secondary);
         }
 
         .empty-state-icon {
@@ -346,7 +413,7 @@
         }
 
         .timestamp {
-            color: #666;
+            color: var(--text-tertiary);
             font-size: 12px;
         }
 
@@ -356,19 +423,19 @@
             align-items: center;
             margin-bottom: 20px;
             padding: 15px 20px;
-            background: #242424;
-            border: 1px solid #333;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
         }
 
         .refresh-status {
             flex: 1;
-            color: #888;
+            color: var(--text-secondary);
             font-size: 13px;
         }
 
         .refresh-status.active {
-            color: #00d4aa;
+            color: var(--accent-color);
         }
 
         .refresh-controls button {
@@ -401,7 +468,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #555;
+            background-color: var(--border-color);
             transition: 0.3s;
             border-radius: 24px;
         }
@@ -413,13 +480,13 @@
             width: 18px;
             left: 3px;
             bottom: 3px;
-            background-color: white;
+            background-color: var(--bg-primary);
             transition: 0.3s;
             border-radius: 50%;
         }
 
         input:checked + .toggle-slider {
-            background-color: #00d4aa;
+            background-color: var(--accent-color);
         }
 
         input:checked + .toggle-slider:before {
@@ -430,8 +497,14 @@
 <body>
     <div class="container">
         <header>
-            <h1>⚖️ Themis Evaluation Dashboard</h1>
-            <div class="subtitle">Real-time AI agent response evaluation results</div>
+            <div class="header-content">
+                <h1>⚖️ Themis Evaluation Dashboard</h1>
+                <div class="subtitle">Real-time AI agent response evaluation results</div>
+            </div>
+            <div class="theme-toggle" onclick="toggleTheme()">
+                <span class="theme-toggle-label" id="themeLabel">Dark Mode</span>
+                <span id="themeIcon">🌙</span>
+            </div>
         </header>
 
         <div class="filters">
@@ -768,8 +841,41 @@
             }
         }
 
+        // Theme Management
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
+        }
+
+        function updateThemeUI(theme) {
+            const themeLabel = document.getElementById('themeLabel');
+            const themeIcon = document.getElementById('themeIcon');
+
+            if (theme === 'light') {
+                themeLabel.textContent = 'Light Mode';
+                themeIcon.textContent = '☀️';
+            } else {
+                themeLabel.textContent = 'Dark Mode';
+                themeIcon.textContent = '🌙';
+            }
+        }
+
+        function initializeTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeUI(savedTheme);
+        }
+
         // Initial setup
         function initializeDashboard() {
+            // Initialize theme first
+            initializeTheme();
+
             // Restore auto-refresh preference from localStorage
             const savedPreference = localStorage.getItem('autoRefreshEnabled');
             if (savedPreference !== null) {
