@@ -9,7 +9,8 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep:*)",
-      "Bash(docs/contributing.md:*)"
+      "Bash(docs/contributing.md:*)",
+      "Bash(cloc .:*)"
     ]
   }
 }

@@ -2,7 +2,7 @@
 
 AI response evaluation service with MCP and API interfaces. Uses configurable LLM judges to assess response quality across multiple dimensions.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 
 **Deploy as**: HTTP API • MCP Server • CLI
@@ -189,4 +189,4 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-[MIT License](LICENSE)
+[Apache License 2.0](LICENSE)

@@ -1,0 +1,156 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  # API Server
+  - id: themis-api
+    binary: themis-api
+    main: ./cmd/api
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  # Batch CLI
+  - id: themis-batch
+    binary: themis-batch
+    main: ./cmd/batch
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  # MCP Server
+  - id: themis-mcp
+    binary: themis-mcp
+    main: ./cmd/mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  # Redis Producer (optional)
+  - id: themis-producer
+    binary: themis-producer
+    main: ./cmd/producer
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - .env.example
+      - configs/**/*
+      - static/**/*
+      - docs/**/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+  groups:
+    - title: Features
+      regexp: '^feat:'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix:'
+      order: 1
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: Terminus-Lab
+    name: themis
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} v{{.Version}}"
+  footer: |
+    ## Installation
+
+    ### Binary
+    Download the appropriate binary for your platform from the assets above and extract it.
+
+    ### Go Install
+    ```bash
+    go install github.com/Terminus-Lab/themis/cmd/api@{{.Tag}}
+    go install github.com/Terminus-Lab/themis/cmd/batch@{{.Tag}}
+    go install github.com/Terminus-Lab/themis/cmd/mcp@{{.Tag}}
+    ```
+
+    ### Docker
+    ```bash
+    docker pull ghcr.io/terminus-lab/themis:{{.Tag}}
+    ```
+
+    ## Documentation
+    See [README.md](https://github.com/Terminus-Lab/themis/blob/main/README.md) for usage instructions.
