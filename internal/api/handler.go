@@ -153,43 +153,6 @@ func (h *Handler) EvaluateSingleJudge(req *restful.Request, resp *restful.Respon
 
 }
 
-// Health handler GET API /api/v1/health
-func (h *Handler) Health(req *restful.Request, resp *restful.Response) {
-	healthResponse := HealthResponse{
-		Status:  "ok",
-		Version: "1.0.0",
-	}
-
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, healthResponse)
-}
-
-func normalize(req models.EvaluationRequest) models.EvaluationContext {
-	return models.EvaluationContext{
-		RequestID:      req.EventID,
-		ConversationID: req.ConversationID,
-		AgentName:      req.Agent.Name,
-		AgentVersion:   req.Agent.Version,
-		Query:          req.Interaction.UserQuery,
-		Context:        req.Interaction.Context,
-		Answer:         req.Interaction.Answer,
-		ExpectedOutput: req.Interaction.ExpectedOutput,
-		CreatedAt:      time.Now(),
-	}
-}
-
-func validateEvaluationRequest(evalRequest models.EvaluationRequest) error {
-	if evalRequest.EventID == "" {
-		return errors.New("event_id is required")
-	}
-	if evalRequest.Interaction.UserQuery == "" {
-		return errors.New("user_query is required")
-	}
-	if evalRequest.Interaction.Answer == "" {
-		return errors.New("answer is required")
-	}
-	return nil
-}
-
 // GET /api/v1/results
 func (h *Handler) QueryResults(req *restful.Request, resp *restful.Response) {
 	agentName := req.QueryParameter("agent_name")
@@ -279,4 +242,96 @@ func (h *Handler) GetResultByID(req *restful.Request, resp *restful.Response) {
 	}
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, response)
+}
+
+// GET /api/v1/conversations/{conversation_id}
+func (h *Handler) GetConversationID(req *restful.Request, resp *restful.Response) {
+	conversationID := req.PathParameter("conversation_id")
+
+	h.logger.Info().
+		Str("conversation_id", conversationID).
+		Msg("Get conversations by ID")
+
+	ctx := req.Request.Context()
+	evaluations, err := h.repository.GetConversation(ctx, conversationID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.logger.Warn().Str("conversation_id", conversationID).Msg("Result not found")
+			_ = resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
+				"error": "result not found",
+			})
+			return
+		}
+		h.logger.Error().Err(err).Msg("Failed to get result")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to DTO
+	conversationDetailResponse := toConversationDetailResponse(evaluations, conversationID)
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, conversationDetailResponse)
+}
+
+// GET /api/v1/conversations/{conversation_id}
+func (h *Handler) ListConversations(req *restful.Request, resp *restful.Response) {
+
+	h.logger.Info().
+		Msg("Getting all conversations")
+
+	ctx := req.Request.Context()
+	conversationSummaries, err := h.repository.ListConversations(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			_ = resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
+				"error": "couldn't find any conversation",
+			})
+			return
+		}
+		h.logger.Error().Err(err).Msg("Failed to get result")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to DTO
+	conversationSummaryDTOs := toConversationSummaryDTOs(conversationSummaries)
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, conversationSummaryDTOs)
+}
+
+// Health handler GET API /api/v1/health
+func (h *Handler) Health(req *restful.Request, resp *restful.Response) {
+	healthResponse := HealthResponse{
+		Status:  "ok",
+		Version: "1.0.0",
+	}
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, healthResponse)
+}
+
+func normalize(req models.EvaluationRequest) models.EvaluationContext {
+	return models.EvaluationContext{
+		RequestID:      req.EventID,
+		ConversationID: req.ConversationID,
+		AgentName:      req.Agent.Name,
+		AgentVersion:   req.Agent.Version,
+		Query:          req.Interaction.UserQuery,
+		Context:        req.Interaction.Context,
+		Answer:         req.Interaction.Answer,
+		ExpectedOutput: req.Interaction.ExpectedOutput,
+		CreatedAt:      time.Now(),
+	}
+}
+
+func validateEvaluationRequest(evalRequest models.EvaluationRequest) error {
+	if evalRequest.EventID == "" {
+		return errors.New("event_id is required")
+	}
+	if evalRequest.Interaction.UserQuery == "" {
+		return errors.New("user_query is required")
+	}
+	if evalRequest.Interaction.Answer == "" {
+		return errors.New("answer is required")
+	}
+	return nil
 }

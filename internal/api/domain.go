@@ -1,6 +1,10 @@
 package api
 
-import "github.com/Terminus-Lab/themis/internal/storage"
+import (
+	"time"
+
+	"github.com/Terminus-Lab/themis/internal/storage"
+)
 
 type HealthResponse struct {
 	Status  string `json:"status" description:"Service status"`
@@ -42,6 +46,32 @@ type EvaluationResponse struct {
 	Evaluation EvaluationDTO `json:"evaluation" description:"Evaluation result"`
 }
 
+type ConversationDetailResponse struct {
+	ConversationID string          `json:"conversation_id" description:"Conversation ID"`
+	TurnCount      int             `json:"turn_count" description:"The number of interactions/events from the conversation"`
+	Turns          []EvaluationDTO `json:"turns"` // Full Evaluation
+}
+
+type ConversationSummaryDTO struct {
+	ConversationID string  `json:"conversation_id"`
+	TurnCount      int     `json:"turn_count"`
+	AvgConfidence  float64 `json:"avg_confidence"`
+	VerdictCounts  struct {
+		Pass   int `json:"pass"`
+		Review int `json:"review"`
+		Fail   int `json:"fail"`
+	} `json:"verdict_counts"`
+	FirstTurnAt  time.Time `json:"first_turn_at"`
+	LastTurnAt   time.Time `json:"last_turn_at"`
+	AgentName    string    `json:"agent_name"`
+	AgentVersion string    `json:"agent_version"`
+}
+
+type ConversationListResponse struct {
+	Conversations []ConversationSummaryDTO `json:"conversations"`
+	Total         int                      `json:"total"`
+}
+
 // toEvaluationDTO converts storage.Evaluation to API DTO
 func toEvaluationDTO(e storage.Evaluation) EvaluationDTO {
 	stageScores := make([]StageScore, len(e.StageScores))
@@ -73,6 +103,55 @@ func toEvaluationDTOs(evaluations []storage.Evaluation) []EvaluationDTO {
 	dtos := make([]EvaluationDTO, len(evaluations))
 	for i, e := range evaluations {
 		dtos[i] = toEvaluationDTO(e)
+	}
+	return dtos
+}
+
+// toConversationDetailResponse convert Evaluations to ConversationDetailResponse
+func toConversationDetailResponse(evaluations []storage.Evaluation, conversationID string) ConversationDetailResponse {
+	response := ConversationDetailResponse{
+		ConversationID: conversationID,
+		TurnCount:      len(evaluations),
+		Turns:          []EvaluationDTO{},
+	}
+
+	if len(evaluations) == 0 {
+		return response
+	}
+
+	for _, evaluation := range evaluations {
+		evaluationDTO := toEvaluationDTO(evaluation)
+		response.Turns = append(response.Turns, evaluationDTO)
+	}
+
+	return response
+}
+
+func toConversationSummaryDTO(conversationSummaries storage.ConversationSummary) ConversationSummaryDTO {
+	return ConversationSummaryDTO{
+		ConversationID: conversationSummaries.ConversationID,
+		TurnCount:      conversationSummaries.TurnCount,
+		AvgConfidence:  conversationSummaries.AvgConfidence,
+		VerdictCounts: struct {
+			Pass   int `json:"pass"`
+			Review int `json:"review"`
+			Fail   int `json:"fail"`
+		}{
+			Pass:   conversationSummaries.PassCount,
+			Review: conversationSummaries.ReviewCount,
+			Fail:   conversationSummaries.FailCount,
+		},
+		FirstTurnAt:  conversationSummaries.FirstTurnAt,
+		LastTurnAt:   conversationSummaries.LastTurnAt,
+		AgentName:    conversationSummaries.AgentName,
+		AgentVersion: conversationSummaries.AgentVersion,
+	}
+}
+
+func toConversationSummaryDTOs(summaries []storage.ConversationSummary) []ConversationSummaryDTO {
+	dtos := make([]ConversationSummaryDTO, len(summaries))
+	for i, summary := range summaries {
+		dtos[i] = toConversationSummaryDTO(summary)
 	}
 	return dtos
 }

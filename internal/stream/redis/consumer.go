@@ -126,6 +126,9 @@ func (c *Consumer) ack(ctx context.Context, msgID string) {
 func normalize(req models.EvaluationRequest) models.EvaluationContext {
 	return models.EvaluationContext{
 		RequestID:      req.EventID,
+		ConversationID: req.ConversationID,
+		AgentName:      req.Agent.Name,
+		AgentVersion:   req.Agent.Version,
 		Query:          req.Interaction.UserQuery,
 		Context:        req.Interaction.Context,
 		Answer:         req.Interaction.Answer,

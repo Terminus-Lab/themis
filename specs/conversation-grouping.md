@@ -40,9 +40,9 @@
 - [X] Add unit tests for conversation queries
 
 ### Phase 3: API Layer
-- [ ] Update `/api/v1/evaluate` handler to accept `conversation_id`
-- [ ] Add `GET /api/v1/conversations/{id}` endpoint
-- [ ] Add `GET /api/v1/conversations` endpoint
+- [X] Update `/api/v1/evaluate` handler to accept `conversation_id`
+- [X] Add `GET /api/v1/conversations/{id}` endpoint
+- [X] Add `GET /api/v1/conversations` endpoint
 - [ ] Add API integration tests
 
 ### Phase 4: Entry Points
