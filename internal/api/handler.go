@@ -273,22 +273,16 @@ func (h *Handler) GetConversationID(req *restful.Request, resp *restful.Response
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, conversationDetailResponse)
 }
 
-// GET /api/v1/conversations/{conversation_id}
+// GET /api/v1/conversations
 func (h *Handler) ListConversations(req *restful.Request, resp *restful.Response) {
 
 	h.logger.Info().
-		Msg("Getting all conversations")
+		Msg("Listing all conversations")
 
 	ctx := req.Request.Context()
 	conversationSummaries, err := h.repository.ListConversations(ctx)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			_ = resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
-				"error": "couldn't find any conversation",
-			})
-			return
-		}
-		h.logger.Error().Err(err).Msg("Failed to get result")
+		h.logger.Error().Err(err).Msg("Failed to list conversations")
 		middleware.HandleError(resp, err, http.StatusInternalServerError)
 		return
 	}
@@ -296,7 +290,12 @@ func (h *Handler) ListConversations(req *restful.Request, resp *restful.Response
 	// Convert to DTO
 	conversationSummaryDTOs := toConversationSummaryDTOs(conversationSummaries)
 
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, conversationSummaryDTOs)
+	response := ConversationListResponse{
+		Conversations: conversationSummaryDTOs,
+		Total:         len(conversationSummaryDTOs),
+	}
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, response)
 }
 
 // Health handler GET API /api/v1/health

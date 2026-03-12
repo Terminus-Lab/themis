@@ -88,11 +88,10 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 	ws.
 		Route(ws.GET("/conversations").
 			To(handler.ListConversations).
-			Doc("Get conversations").
+			Doc("List all conversations with summary metrics").
 			Metadata(restfulspec.KeyOpenAPITags, []string{"conversations"}).
-			Writes(ConversationSummaryDTO{}).
-			Returns(200, "OK", ConversationSummaryDTO{}).
-			Returns(404, "Not Found", middleware.ErrorResponse{}).
+			Writes(ConversationListResponse{}).
+			Returns(200, "OK", ConversationListResponse{}).
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
 	container.Add(ws)
