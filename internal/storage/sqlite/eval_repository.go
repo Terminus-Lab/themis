@@ -206,7 +206,11 @@ func (e *EvalRepository) GetConversation(ctx context.Context, conversationID str
 	if err != nil {
 		return nil, fmt.Errorf("unable to query storage. Error: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			e.logger.Error().Err(err).Msg("Failed to close database rows")
+		}
+	}()
 
 	for rows.Next() {
 		var evaluation storage.Evaluation

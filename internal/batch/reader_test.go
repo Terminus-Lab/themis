@@ -49,6 +49,43 @@ func TestReader_ValidFile(t *testing.T) {
 	}
 }
 
+func TestReader_WithConversationID(t *testing.T) {
+	inputFile := `{"event_id":"turn-1","conversation_id":"conv-123","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"","answer":"AI is Artificial Intelligence"}}
+{"event_id":"turn-2","conversation_id":"conv-123","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"How does it work?","context":"","answer":"It uses machine learning algorithms"}}`
+
+	file := strings.NewReader(inputFile)
+	ctx := context.Background()
+	reader := NewReader(file, newTestLogger())
+
+	ch := reader.ReadAll(ctx)
+	records := []InputRecord{}
+	for record := range ch {
+		records = append(records, record)
+		if record.Error != nil {
+			t.Errorf("Error reading record: %s", record.Error)
+		}
+	}
+
+	if len(records) != 2 {
+		t.Errorf("Expected 2 records, got %d", len(records))
+	}
+
+	// Verify conversation_id is parsed correctly
+	for _, record := range records {
+		if record.Request.ConversationID != "conv-123" {
+			t.Errorf("Expected conversation_id='conv-123', got '%s'", record.Request.ConversationID)
+		}
+	}
+
+	// Verify event IDs are different but conversation ID is same
+	if records[0].Request.EventID != "turn-1" {
+		t.Errorf("Expected event_id='turn-1', got '%s'", records[0].Request.EventID)
+	}
+	if records[1].Request.EventID != "turn-2" {
+		t.Errorf("Expected event_id='turn-2', got '%s'", records[1].Request.EventID)
+	}
+}
+
 func TestReader_ContextCancellation(t *testing.T) {
 	// Large input with many lines
 	var lines []string

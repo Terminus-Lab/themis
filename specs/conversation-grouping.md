@@ -6,6 +6,27 @@
 
 ---
 
+## Status Summary
+
+**Completion**: 5.67/7 Phases Complete (81%)
+
+| Phase | Status | Progress |
+|-------|--------|----------|
+| Phase 1: Schema Migration | ✅ Complete | 100% |
+| Phase 2: Storage Layer | ✅ Complete | 100% |
+| Phase 3: API Layer | ✅ Complete | 100% |
+| Phase 4: Entry Points | ⚠️ Partial | 67% (2/3 complete) |
+| Phase 5: Dashboard | ❌ Not Started | 0% |
+| Phase 6: Documentation | ✅ Complete | 100% |
+| Phase 7: Performance Opt | ⏸️ On Hold | N/A (trigger-based) |
+
+**Next Steps**:
+1. ~~Fix streaming consumer normalize() function~~ ✅ **Done**
+2. Update MCP adapter for conversation_id
+3. (Optional) Add dashboard UI for conversations
+
+---
+
 ## Feature Overview
 
 ### Problem
@@ -46,9 +67,17 @@
 - [X] Add API integration tests
 
 ### Phase 4: Entry Points
-- [ ] Update batch CLI to support conversation_id in JSONL
+- [X] Update batch CLI to support conversation_id in JSONL
+  - Already supported via `models.EvaluationRequest`
+  - Added test: `TestReader_WithConversationID()`
+  - Added example file: `resources/conversation_example.jsonl`
+  - Updated documentation in `docs/testing/batch-tests.md`
 - [ ] Update MCP adapter to accept conversation_id
-- [ ] Update streaming consumer to parse conversation_id
+  - TODO: Update MCP request handling
+- [X] Update streaming consumer to parse conversation_id
+  - Fixed `normalize()` in `internal/stream/redis/consumer.go` to include ConversationID, AgentName, AgentVersion
+  - Added comprehensive tests: `TestNormalize()` with 3 test cases + `TestNormalize_CreatedAtTimestamp()`
+  - Now matches API handler normalize() function
 
 ### Phase 5: Dashboard (Optional)
 - [ ] Add "Conversations" tab to dashboard
@@ -56,8 +85,14 @@
 - [ ] Drill-down view for conversation turns
 
 ### Phase 6: Documentation
-- [] Update documentation. Update the existing examples
-- [] Create a new batch of data multiple events correlated to a single conversation.
+- [X] Update documentation. Update the existing examples
+  - Updated `docs/testing/batch-tests.md` with conversation_id examples
+  - Updated `resources/README.md` with conversation tracking guide
+  - Created `CONVERSATION_BATCH_SUPPORT.md` with complete usage guide
+  - Added 5 integration tests for conversation endpoints
+- [X] Create a new batch of data multiple events correlated to a single conversation.
+  - Created `resources/conversation_example.jsonl` with 10 records
+  - 3 conversations: 4 turns (Paris), 3 turns (ML), 3 turns (Quantum)
 
 ### Phase 7: Performance Optimization (If Needed)
 **Trigger**: Only implement if conversation query latency p95 >300ms in production.

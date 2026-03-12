@@ -65,12 +65,22 @@ Each line is a JSON object with the same structure as the API request:
 ```
 
 **Optional fields:**
+- `conversation_id` - For grouping related evaluations into multi-turn conversations. Enables conversation-level analysis and metrics.
 - `expected_output` - For correctness evaluation (ground truth comparison). Only used if correctness judge is enabled in `judges.yaml`.
 
 **Example with expected_output:**
 ```jsonl
 {"event_id":"eval-003","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"Four","expected_output":"4"}}
 ```
+
+**Example with conversation_id (multi-turn conversation):**
+```jsonl
+{"event_id":"turn-001","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country in Europe.","answer":"The capital of France is Paris."}}
+{"event_id":"turn-002","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the population?","context":"Paris is the capital of France.","answer":"Paris has approximately 2.2 million inhabitants."}}
+{"event_id":"turn-003","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"Tell me more about its history.","context":"Paris is an ancient city.","answer":"Paris was founded in the 3rd century BC by a Celtic people called the Parisii."}}
+```
+
+This groups 3 evaluations as turns in conversation `conv-abc123`, enabling conversation-level analysis.
 
 ## Output Formats
 
@@ -328,7 +338,38 @@ time ./themis-batch \
 - **Cost**: Each evaluation = 1 precheck + 5 LLM calls (unless early exit)
 - Processing time significantly faster than sequential
 
-### Test Case 12: Worker Pool Scaling
+### Test Case 12: Conversation Tracking
+
+**Input:** `conversation-dataset.jsonl`
+```jsonl
+{"event_id":"conv-a-turn-1","conversation_id":"conv-a","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"","answer":"AI stands for Artificial Intelligence."}}
+{"event_id":"conv-a-turn-2","conversation_id":"conv-a","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"How does it work?","context":"","answer":"It uses machine learning algorithms."}}
+{"event_id":"conv-b-turn-1","conversation_id":"conv-b","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is Python?","context":"","answer":"Python is a programming language."}}
+```
+
+**Command:**
+```bash
+./themis-batch -input conversation-dataset.jsonl -output results.jsonl
+```
+
+**Expected Output:**
+- All 3 evaluations include `conversation_id` in stored results
+- Evaluations can be queried by conversation via API: `GET /api/v1/conversations/conv-a`
+- Enables conversation-level metrics (average confidence per conversation, verdict distribution across turns)
+
+**Analyzing with jq:**
+```bash
+# Group results by conversation_id
+jq -s 'group_by(.conversation_id) | map({conversation: .[0].conversation_id, turns: length, avg_confidence: (map(.confidence) | add / length)})' results.jsonl
+
+# Expected output:
+# [
+#   {"conversation": "conv-a", "turns": 2, "avg_confidence": 0.85},
+#   {"conversation": "conv-b", "turns": 1, "avg_confidence": 0.92}
+# ]
+```
+
+### Test Case 13: Worker Pool Scaling
 
 Test with different worker counts:
 

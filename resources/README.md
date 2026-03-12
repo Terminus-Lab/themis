@@ -62,6 +62,32 @@ go run cmd/batch/main.go \
 - Review: 6 records
 - Fail: 6 records
 
+### conversation_example.jsonl
+
+Multi-turn conversation dataset with 10 evaluation requests grouped into 3 conversations.
+
+**Conversation structure:**
+- Conversation 001: 4 turns (Paris/French landmarks)
+- Conversation 002: 3 turns (Machine learning)
+- Conversation 003: 3 turns (Quantum computing)
+
+**Usage:**
+```bash
+go run cmd/batch/main.go \
+  -input resources/conversation_example.jsonl \
+  -output results.jsonl
+```
+
+**Important**: By default, batch CLI uses in-memory database. Data is stored during processing but NOT persisted after execution. The JSONL output file is what persists.
+
+**To persist in database for API queries:**
+```bash
+IN_MEMORY_DB=false THEMIS_DB_URL=postgresql://... \
+  go run cmd/batch/main.go -input resources/conversation_example.jsonl
+```
+
+**See also**: [Batch Test Cases - Conversation Tracking](../docs/testing/batch-tests.md#test-case-12-conversation-tracking) for detailed examples and conversation-level analysis.
+
 ### payloads/
 
 Directory containing individual JSON payload examples for testing the HTTP API:
