@@ -236,3 +236,56 @@ func (e *EvalRepository) GetConversation(ctx context.Context, conversationID str
 
 	return evaluations, nil
 }
+
+func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.ConversationSummary, error) {
+	query := `
+          SELECT
+              conversation_id,
+              COUNT(*) as turn_count,
+              AVG(confidence) as avg_confidence,
+              SUM(CASE WHEN verdict = 'pass' THEN 1 ELSE 0 END) as pass_count,
+              SUM(CASE WHEN verdict = 'review' THEN 1 ELSE 0 END) as review_count,
+              SUM(CASE WHEN verdict = 'fail' THEN 1 ELSE 0 END) as fail_count,
+              MIN(created_at) as first_turn_at,
+              MAX(created_at) as last_turn_at,
+              agent_name,
+              agent_version
+          FROM eval_results
+          WHERE conversation_id IS NOT NULL AND conversation_id != ''
+          GROUP BY conversation_id, agent_name, agent_version
+          ORDER BY last_turn_at DESC
+      `
+	rows, err := e.db.Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query storage. Error: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []storage.ConversationSummary
+
+	for rows.Next() {
+		var summary storage.ConversationSummary
+		if err := rows.Scan(
+			&summary.ConversationID,
+			&summary.TurnCount,
+			&summary.AvgConfidence,
+			&summary.PassCount,
+			&summary.ReviewCount,
+			&summary.FailCount,
+			&summary.FirstTurnAt,
+			&summary.LastTurnAt,
+			&summary.AgentName,
+			&summary.AgentVersion,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		summaries = append(summaries, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return summaries, nil
+}

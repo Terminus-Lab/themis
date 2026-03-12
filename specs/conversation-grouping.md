@@ -35,8 +35,8 @@
 
 ### Phase 2: Storage Layer
 - [X] Add `ConversationID` field to `Evaluation` struct
-- [ ] Implement `GetConversation()` method
-- [ ] Implement `ListConversations()` method
+- [X] Implement `GetConversation()` method
+- [X] Implement `ListConversations()` method
 - [ ] Add unit tests for conversation queries
 
 ### Phase 3: API Layer

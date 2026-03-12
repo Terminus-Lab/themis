@@ -16,4 +16,5 @@ type Repository interface {
 	QueryById(ctx context.Context, eventID string) (*Evaluation, error)
 
 	GetConversation(ctx context.Context, conversationID string) ([]Evaluation, error)
+	ListConversations(ctx context.Context) ([]ConversationSummary, error)
 }
