@@ -386,3 +386,143 @@ func TestEvalRepository_Store_DuplicateEventID(t *testing.T) {
 		t.Errorf("Expected 2 records with same event_id, got %d", count)
 	}
 }
+
+func TestGetConversation(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	testConId := "con1"
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	evals := []storage.Evaluation{
+		{
+			EventID:        "evt-01",
+			ConversationID: testConId,
+			AgentName:      "agent",
+			AgentVersion:   "v1",
+			UserQuery:      "query",
+			Answer:         "answer",
+			Confidence:     0.8,
+			Verdict:        "pass",
+			StageScores:    []models.StageResult{},
+		},
+		{
+			EventID:        "evt-02",
+			ConversationID: testConId,
+			AgentName:      "agent",
+			AgentVersion:   "v1",
+			UserQuery:      "query",
+			Answer:         "answer",
+			Confidence:     0.8,
+			Verdict:        "pass",
+			StageScores:    []models.StageResult{},
+		},
+	}
+
+	for _, eval := range evals {
+		if err := repo.Store(ctx, &eval); err != nil {
+			t.Fatalf("Unable to save eval id: %s in the storage", eval.EventID)
+		}
+	}
+
+	evalsResp, err := repo.GetConversation(ctx, testConId)
+	if err != nil {
+		t.Fatalf("Unable to fetch evals for conv id: %s", testConId)
+	}
+
+	if len(evalsResp) != 2 {
+		t.Fatalf("Expected 2 eval results in conv id: %s, received: %d", testConId, len(evalsResp))
+	}
+
+}
+
+func TestGetConversation_MultipleConversations(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	// Store evaluations for multiple conversations
+	evals := []storage.Evaluation{
+		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-03", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-04", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-05", ConversationID: "", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+	}
+
+	for _, eval := range evals {
+		if err := repo.Store(ctx, &eval); err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+	}
+
+	// Query conv-A, should only get 2 results
+	results, err := repo.GetConversation(ctx, "conv-A")
+	if err != nil {
+		t.Fatalf("GetConversation failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results for conv-A, got %d", len(results))
+	}
+
+	for _, result := range results {
+		if result.ConversationID != "conv-A" {
+			t.Errorf("Expected conversation_id conv-A, got %s", result.ConversationID)
+		}
+	}
+}
+
+func TestGetConversation_NotFound(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	// Query non-existent conversation
+	results, err := repo.GetConversation(ctx, "nonexistent-conv")
+	if err != nil {
+		t.Fatalf("GetConversation should not error on empty results: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results for non-existent conversation, got %d", len(results))
+	}
+}
+
+func TestGetConversation_EmptyConversationID(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	// Store evaluation with empty conversation_id
+	eval := &storage.Evaluation{
+		EventID: "evt-01", ConversationID: "", AgentName: "agent",
+		AgentVersion: "v1", UserQuery: "query", Answer: "answer",
+		Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{},
+	}
+	if err := repo.Store(ctx, eval); err != nil {
+		t.Fatalf("Store failed: %v", err)
+	}
+
+	// Query with empty string
+	results, err := repo.GetConversation(ctx, "")
+	if err != nil {
+		t.Fatalf("GetConversation failed: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Expected 0 result for empty conversation_id, got %d", len(results))
+	}
+}

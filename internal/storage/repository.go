@@ -14,4 +14,6 @@ type Repository interface {
 	Store(ctx context.Context, evaluation *Evaluation) error
 	Query(ctx context.Context, filters models.QueryFilters) ([]Evaluation, int, error)
 	QueryById(ctx context.Context, eventID string) (*Evaluation, error)
+
+	GetConversation(ctx context.Context, conversationID string) ([]Evaluation, error)
 }

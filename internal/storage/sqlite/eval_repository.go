@@ -183,3 +183,58 @@ func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storag
 
 	return &evaluation, nil
 }
+
+func (e *EvalRepository) GetConversation(ctx context.Context, conversationID string) ([]storage.Evaluation, error) {
+	var evaluations []storage.Evaluation
+	var stageScoreJSON []byte
+
+	if conversationID == "" {
+		return evaluations, nil
+	}
+
+	query := `
+		SELECT event_id, conversation_id, agent_name, agent_version,
+			user_query, answer, context, confidence, verdict,
+			stage_scores
+		FROM eval_results
+		WHERE conversation_id = ?
+		ORDER BY created_at ASC
+	`
+
+	rows, err := e.db.client.QueryContext(ctx, query, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query storage. Error: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var evaluation storage.Evaluation
+		if err := rows.Scan(
+			&evaluation.EventID,
+			&evaluation.ConversationID,
+			&evaluation.AgentName,
+			&evaluation.AgentVersion,
+			&evaluation.UserQuery,
+			&evaluation.Answer,
+			&evaluation.Context,
+			&evaluation.Confidence,
+			&evaluation.Verdict,
+			&stageScoreJSON,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan row. Error: %w", err)
+		}
+
+		if err := json.Unmarshal(stageScoreJSON, &evaluation.StageScores); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal stage_scores. Error: %w", err)
+		}
+
+		evaluations = append(evaluations, evaluation)
+	}
+
+	// Check for errors from iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return evaluations, nil
+}
