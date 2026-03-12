@@ -43,7 +43,7 @@
 - [X] Update `/api/v1/evaluate` handler to accept `conversation_id`
 - [X] Add `GET /api/v1/conversations/{id}` endpoint
 - [X] Add `GET /api/v1/conversations` endpoint
-- [ ] Add API integration tests
+- [X] Add API integration tests
 
 ### Phase 4: Entry Points
 - [ ] Update batch CLI to support conversation_id in JSONL

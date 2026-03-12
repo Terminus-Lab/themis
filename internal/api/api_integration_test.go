@@ -941,3 +941,361 @@ func TestAPI_GetResultByID_NotFound(t *testing.T) {
 
 	t.Log("Get by ID not found: returned 404 as expected")
 }
+
+/*
+TEST 14: List Conversations - Empty Database
+Purpose: Test listing conversations when no evaluations exist
+*/
+func TestAPI_ListConversations_Empty(t *testing.T) {
+	container := setupTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations", nil)
+	recorder := httptest.NewRecorder()
+
+	container.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response api.ConversationListResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	if response.Total != 0 {
+		t.Errorf("Expected total=0, got %d", response.Total)
+	}
+
+	if len(response.Conversations) != 0 {
+		t.Errorf("Expected 0 conversations, got %d", len(response.Conversations))
+	}
+
+	t.Logf("Empty conversations list: total=%d", response.Total)
+}
+
+/*
+TEST 15: List Conversations - With Data
+Purpose: Test listing conversations after running evaluations with conversation IDs
+*/
+func TestAPI_ListConversations_WithData(t *testing.T) {
+	container := setupTestAPI(t)
+
+	// Create evaluations with different conversation IDs
+	evaluations := []models.EvaluationRequest{
+		{
+			EventID:        "conv-list-test-001",
+			ConversationID: "conv-alpha",
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "What is the capital of France?",
+				Answer:    "The capital of France is Paris.",
+				Context:   "France is a country in Europe.",
+			},
+		},
+		{
+			EventID:        "conv-list-test-002",
+			ConversationID: "conv-alpha",
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "What is the population?",
+				Answer:    "Paris has approximately 2.2 million inhabitants.",
+				Context:   "Paris is the capital of France.",
+			},
+		},
+		{
+			EventID:        "conv-list-test-003",
+			ConversationID: "conv-beta",
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "What is AI?",
+				Answer:    "AI stands for Artificial Intelligence.",
+			},
+		},
+		{
+			EventID:        "conv-list-test-004",
+			ConversationID: "conv-beta",
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "How does it work?",
+				Answer:    "Yes.", // Short answer - should fail
+			},
+		},
+	}
+
+	// Run evaluations to populate database
+	for _, evalReq := range evaluations {
+		body, _ := json.Marshal(evalReq)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		recorder := httptest.NewRecorder()
+		container.ServeHTTP(recorder, req)
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("Failed to run evaluation %s: status=%d", evalReq.EventID, recorder.Code)
+		}
+	}
+
+	// Now test list conversations
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations", nil)
+	recorder := httptest.NewRecorder()
+	container.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response api.ConversationListResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// Should have 2 conversations (conv-alpha and conv-beta)
+	if response.Total != 2 {
+		t.Errorf("Expected total=2 conversations, got %d", response.Total)
+	}
+
+	if len(response.Conversations) != 2 {
+		t.Errorf("Expected 2 conversations, got %d", len(response.Conversations))
+	}
+
+	// Verify conversation summaries contain expected fields
+	for _, conv := range response.Conversations {
+		if conv.ConversationID == "" {
+			t.Error("Expected conversation_id to be set")
+		}
+		if conv.TurnCount == 0 {
+			t.Error("Expected turn_count > 0")
+		}
+		if conv.AvgConfidence < 0 || conv.AvgConfidence > 1 {
+			t.Errorf("Expected avg_confidence in [0,1], got %f", conv.AvgConfidence)
+		}
+		if conv.AgentName == "" {
+			t.Error("Expected agent_name to be set")
+		}
+
+		// Verify verdict counts sum to turn count
+		totalVerdicts := conv.VerdictCounts.Pass + conv.VerdictCounts.Review + conv.VerdictCounts.Fail
+		if totalVerdicts != conv.TurnCount {
+			t.Errorf("Verdict counts (%d) don't match turn_count (%d)", totalVerdicts, conv.TurnCount)
+		}
+
+		t.Logf("Conversation: id=%s, turns=%d, avg_confidence=%.3f, pass=%d, review=%d, fail=%d",
+			conv.ConversationID, conv.TurnCount, conv.AvgConfidence,
+			conv.VerdictCounts.Pass, conv.VerdictCounts.Review, conv.VerdictCounts.Fail)
+	}
+
+	t.Logf("List conversations: total=%d", response.Total)
+}
+
+/*
+TEST 16: Get Conversation by ID - Detail View
+Purpose: Test retrieving all turns in a specific conversation
+*/
+func TestAPI_GetConversationByID(t *testing.T) {
+	container := setupTestAPI(t)
+
+	conversationID := "conv-detail-test"
+
+	// Create multiple evaluations in the same conversation
+	evaluations := []models.EvaluationRequest{
+		{
+			EventID:        "conv-detail-001",
+			ConversationID: conversationID,
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "What is Go?",
+				Answer:    "Go is a programming language created by Google.",
+			},
+		},
+		{
+			EventID:        "conv-detail-002",
+			ConversationID: conversationID,
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "What are its features?",
+				Answer:    "Go features include concurrency support, garbage collection, and fast compilation.",
+			},
+		},
+		{
+			EventID:        "conv-detail-003",
+			ConversationID: conversationID,
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
+			Interaction: models.Interaction{
+				UserQuery: "Who uses it?",
+				Answer:    "Go is used by companies like Google, Docker, and Kubernetes.",
+			},
+		},
+	}
+
+	// Run evaluations
+	for _, evalReq := range evaluations {
+		body, _ := json.Marshal(evalReq)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		recorder := httptest.NewRecorder()
+		container.ServeHTTP(recorder, req)
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("Failed to run evaluation %s: status=%d", evalReq.EventID, recorder.Code)
+		}
+	}
+
+	// Now get conversation details
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/"+conversationID, nil)
+	recorder := httptest.NewRecorder()
+	container.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response api.ConversationDetailResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// Verify conversation details
+	if response.ConversationID != conversationID {
+		t.Errorf("Expected conversation_id='%s', got '%s'", conversationID, response.ConversationID)
+	}
+
+	if response.TurnCount != 3 {
+		t.Errorf("Expected turn_count=3, got %d", response.TurnCount)
+	}
+
+	if len(response.Turns) != 3 {
+		t.Errorf("Expected 3 turns, got %d", len(response.Turns))
+	}
+
+	// Verify turns contain full evaluation details
+	for i, turn := range response.Turns {
+		if turn.EventID == "" {
+			t.Errorf("Turn %d: Expected event_id to be set", i)
+		}
+		if turn.ConversationID != conversationID {
+			t.Errorf("Turn %d: Expected conversation_id='%s', got '%s'", i, conversationID, turn.ConversationID)
+		}
+		if turn.UserQuery == "" {
+			t.Errorf("Turn %d: Expected user_query to be set", i)
+		}
+		if turn.Answer == "" {
+			t.Errorf("Turn %d: Expected answer to be set", i)
+		}
+		if turn.Verdict == "" {
+			t.Errorf("Turn %d: Expected verdict to be set", i)
+		}
+		if len(turn.StageScores) == 0 {
+			t.Errorf("Turn %d: Expected stage_scores to be populated", i)
+		}
+
+		t.Logf("Turn %d: event_id=%s, query='%s', verdict=%s, confidence=%.3f",
+			i+1, turn.EventID, turn.UserQuery, turn.Verdict, turn.Confidence)
+	}
+
+	t.Logf("Get conversation: id=%s, turn_count=%d", response.ConversationID, response.TurnCount)
+}
+
+/*
+TEST 17: Get Conversation by ID - Not Found
+Purpose: Test 404 when requesting non-existent conversation ID
+*/
+func TestAPI_GetConversationByID_NotFound(t *testing.T) {
+	container := setupTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/non-existent-conv", nil)
+	recorder := httptest.NewRecorder()
+	container.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200 (empty result), got %d", recorder.Code)
+	}
+
+	var response api.ConversationDetailResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// Should return empty conversation with 0 turns
+	if response.TurnCount != 0 {
+		t.Errorf("Expected turn_count=0 for non-existent conversation, got %d", response.TurnCount)
+	}
+
+	if len(response.Turns) != 0 {
+		t.Errorf("Expected 0 turns for non-existent conversation, got %d", len(response.Turns))
+	}
+
+	t.Log("Get conversation not found: returned empty result as expected")
+}
+
+/*
+TEST 18: Conversation Isolation
+Purpose: Test that conversations are properly isolated from each other
+*/
+func TestAPI_ConversationIsolation(t *testing.T) {
+	container := setupTestAPI(t)
+
+	// Create evaluations in different conversations
+	conversations := map[string][]models.EvaluationRequest{
+		"conv-isolation-a": {
+			{EventID: "iso-a-001", ConversationID: "conv-isolation-a", Agent: models.Agent{Name: "agent-a", Version: "1.0"},
+				Interaction: models.Interaction{UserQuery: "Question 1", Answer: "Answer 1"}},
+			{EventID: "iso-a-002", ConversationID: "conv-isolation-a", Agent: models.Agent{Name: "agent-a", Version: "1.0"},
+				Interaction: models.Interaction{UserQuery: "Question 2", Answer: "Answer 2"}},
+		},
+		"conv-isolation-b": {
+			{EventID: "iso-b-001", ConversationID: "conv-isolation-b", Agent: models.Agent{Name: "agent-b", Version: "1.0"},
+				Interaction: models.Interaction{UserQuery: "Question 3", Answer: "Answer 3"}},
+		},
+	}
+
+	// Run all evaluations
+	for _, evals := range conversations {
+		for _, evalReq := range evals {
+			body, _ := json.Marshal(evalReq)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			container.ServeHTTP(recorder, req)
+		}
+	}
+
+	// Verify conv-isolation-a has 2 turns
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/conv-isolation-a", nil)
+	recorder := httptest.NewRecorder()
+	container.ServeHTTP(recorder, req)
+
+	var responseA api.ConversationDetailResponse
+	json.Unmarshal(recorder.Body.Bytes(), &responseA)
+
+	if responseA.TurnCount != 2 {
+		t.Errorf("Expected conv-isolation-a to have 2 turns, got %d", responseA.TurnCount)
+	}
+
+	// Verify conv-isolation-b has 1 turn
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/conversations/conv-isolation-b", nil)
+	recorder = httptest.NewRecorder()
+	container.ServeHTTP(recorder, req)
+
+	var responseB api.ConversationDetailResponse
+	json.Unmarshal(recorder.Body.Bytes(), &responseB)
+
+	if responseB.TurnCount != 1 {
+		t.Errorf("Expected conv-isolation-b to have 1 turn, got %d", responseB.TurnCount)
+	}
+
+	// Verify turns only belong to their respective conversations
+	for _, turn := range responseA.Turns {
+		if turn.ConversationID != "conv-isolation-a" {
+			t.Errorf("Found turn with conversation_id='%s' in conv-isolation-a", turn.ConversationID)
+		}
+	}
+
+	for _, turn := range responseB.Turns {
+		if turn.ConversationID != "conv-isolation-b" {
+			t.Errorf("Found turn with conversation_id='%s' in conv-isolation-b", turn.ConversationID)
+		}
+	}
+
+	t.Logf("Conversation isolation: conv-a has %d turns, conv-b has %d turns", responseA.TurnCount, responseB.TurnCount)
+}
