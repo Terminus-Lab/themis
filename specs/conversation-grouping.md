@@ -37,7 +37,7 @@
 - [X] Add `ConversationID` field to `Evaluation` struct
 - [X] Implement `GetConversation()` method
 - [X] Implement `ListConversations()` method
-- [ ] Add unit tests for conversation queries
+- [X] Add unit tests for conversation queries
 
 ### Phase 3: API Layer
 - [ ] Update `/api/v1/evaluate` handler to accept `conversation_id`

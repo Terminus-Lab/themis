@@ -526,3 +526,75 @@ func TestGetConversation_EmptyConversationID(t *testing.T) {
 		t.Errorf("Expected 0 result for empty conversation_id, got %d", len(results))
 	}
 }
+
+func TestGetConversation_GetConversations(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	// Store evaluations for multiple conversations
+	evals := []storage.Evaluation{
+		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-03", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-04", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+	}
+
+	for _, eval := range evals {
+		if err := repo.Store(ctx, &eval); err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+	}
+
+	// Query conv-A, should only get 2 results
+	results, err := repo.ListConversations(ctx)
+	if err != nil {
+		t.Fatalf("GetConversation failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 conversations, got %d", len(results))
+	}
+}
+
+func TestGetConversation_GetEmptyConversations(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	// Store evaluations for multiple conversations
+	evals := []storage.Evaluation{
+		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-03", ConversationID: "", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+		{EventID: "evt-04", ConversationID: "", AgentName: "agent", AgentVersion: "v1",
+			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
+	}
+
+	for _, eval := range evals {
+		if err := repo.Store(ctx, &eval); err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+	}
+
+	// Query conv-A, should only get 2 results
+	results, err := repo.ListConversations(ctx)
+	if err != nil {
+		t.Fatalf("GetConversation failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 conversations, got %d", len(results))
+	}
+}

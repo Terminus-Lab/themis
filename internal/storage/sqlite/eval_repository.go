@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/storage"
@@ -269,9 +270,12 @@ func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.Conve
 	}()
 
 	var summaries []storage.ConversationSummary
+	// format for sqlite
+	const sqliteDateTime = "2006-01-02 15:04:05"
 
 	for rows.Next() {
 		var summary storage.ConversationSummary
+		var firstTurnAt, lastTurnAt string
 		if err := rows.Scan(
 			&summary.ConversationID,
 			&summary.TurnCount,
@@ -279,12 +283,18 @@ func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.Conve
 			&summary.PassCount,
 			&summary.ReviewCount,
 			&summary.FailCount,
-			&summary.FirstTurnAt,
-			&summary.LastTurnAt,
+			&firstTurnAt,
+			&lastTurnAt,
 			&summary.AgentName,
 			&summary.AgentVersion,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		if t, err := time.Parse(sqliteDateTime, firstTurnAt); err == nil {
+			summary.FirstTurnAt = t
+		}
+		if t, err := time.Parse(sqliteDateTime, lastTurnAt); err == nil {
+			summary.LastTurnAt = t
 		}
 
 		summaries = append(summaries, summary)
