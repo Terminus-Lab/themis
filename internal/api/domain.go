@@ -9,15 +9,16 @@ type HealthResponse struct {
 
 // EvaluationDTO is the API response model for evaluation results
 type EvaluationDTO struct {
-	EventID      string       `json:"event_id" description:"Unique event identifier"`
-	AgentName    string       `json:"agent_name" description:"Name of the agent"`
-	AgentVersion string       `json:"agent_version" description:"Version of the agent"`
-	UserQuery    string       `json:"user_query" description:"User's original query"`
-	Answer       string       `json:"answer" description:"Agent's answer"`
-	Context      string       `json:"context,omitempty" description:"Retrieved context (optional)"`
-	Confidence   float64      `json:"confidence" description:"Overall confidence score"`
-	Verdict      string       `json:"verdict" description:"Evaluation verdict (pass, review, fail)"`
-	StageScores  []StageScore `json:"stage_scores" description:"Individual stage evaluation scores"`
+	EventID        string       `json:"event_id" description:"Unique event identifier"`
+	ConversationID string       `json:"conversation_id" description:"Conversation ID"`
+	AgentName      string       `json:"agent_name" description:"Name of the agent"`
+	AgentVersion   string       `json:"agent_version" description:"Version of the agent"`
+	UserQuery      string       `json:"user_query" description:"User's original query"`
+	Answer         string       `json:"answer" description:"Agent's answer"`
+	Context        string       `json:"context,omitempty" description:"Retrieved context (optional)"`
+	Confidence     float64      `json:"confidence" description:"Overall confidence score"`
+	Verdict        string       `json:"verdict" description:"Evaluation verdict (pass, review, fail)"`
+	StageScores    []StageScore `json:"stage_scores" description:"Individual stage evaluation scores"`
 }
 
 // StageScore represents an individual evaluation stage result
@@ -54,15 +55,16 @@ func toEvaluationDTO(e storage.Evaluation) EvaluationDTO {
 	}
 
 	return EvaluationDTO{
-		EventID:      e.EventID,
-		AgentName:    e.AgentName,
-		AgentVersion: e.AgentVersion,
-		UserQuery:    e.UserQuery,
-		Answer:       e.Answer,
-		Context:      e.Context,
-		Confidence:   e.Confidence,
-		Verdict:      e.Verdict,
-		StageScores:  stageScores,
+		EventID:        e.EventID,
+		ConversationID: e.ConversationID,
+		AgentName:      e.AgentName,
+		AgentVersion:   e.AgentVersion,
+		UserQuery:      e.UserQuery,
+		Answer:         e.Answer,
+		Context:        e.Context,
+		Confidence:     e.Confidence,
+		Verdict:        e.Verdict,
+		StageScores:    stageScores,
 	}
 }
 

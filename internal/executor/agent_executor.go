@@ -55,10 +55,11 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 	e.logger.Info().Str("requestID", id).Msg("starting evaluation")
 
 	result := models.EvaluationResult{
-		ID:         id,
-		Stages:     []models.StageResult{},
-		Confidence: 0,
-		Verdict:    "",
+		ID:             id,
+		ConversationID: evalCtx.ConversationID,
+		Stages:         []models.StageResult{},
+		Confidence:     0,
+		Verdict:        "",
 	}
 
 	stageEvalResults := e.precheckStageRunner.Run(evalCtx)
@@ -83,15 +84,16 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 
 		// Store early exit result
 		evaluationResult := storage.Evaluation{
-			EventID:      result.ID,
-			AgentName:    evalCtx.AgentName,
-			AgentVersion: evalCtx.AgentVersion,
-			UserQuery:    evalCtx.Query,
-			Answer:       evalCtx.Answer,
-			Context:      evalCtx.Context,
-			Confidence:   result.Confidence,
-			Verdict:      string(result.Verdict),
-			StageScores:  stageEvalResults,
+			EventID:        result.ID,
+			ConversationID: result.ConversationID,
+			AgentName:      evalCtx.AgentName,
+			AgentVersion:   evalCtx.AgentVersion,
+			UserQuery:      evalCtx.Query,
+			Answer:         evalCtx.Answer,
+			Context:        evalCtx.Context,
+			Confidence:     result.Confidence,
+			Verdict:        string(result.Verdict),
+			StageScores:    stageEvalResults,
 		}
 
 		err := e.repository.Store(ctx, &evaluationResult)
@@ -105,21 +107,22 @@ func (e *Executor) Execute(ctx context.Context, evalCtx models.EvaluationContext
 	judgeEvaResults := e.judgeRunner.Run(ctx, evalCtx)
 
 	finalResult := e.aggregator.Aggregate(id, stageEvalResults, judgeEvaResults)
+	finalResult.ConversationID = result.ConversationID
 
 	evaluationResult := storage.Evaluation{
-		EventID:      finalResult.ID,
-		AgentName:    evalCtx.AgentName,
-		AgentVersion: evalCtx.AgentVersion,
-		UserQuery:    evalCtx.Query,
-		Answer:       evalCtx.Answer,
-		Context:      evalCtx.Context,
-		Confidence:   finalResult.Confidence,
-		Verdict:      string(finalResult.Verdict),
-		StageScores:  judgeEvaResults,
+		EventID:        finalResult.ID,
+		ConversationID: result.ConversationID,
+		AgentName:      evalCtx.AgentName,
+		AgentVersion:   evalCtx.AgentVersion,
+		UserQuery:      evalCtx.Query,
+		Answer:         evalCtx.Answer,
+		Context:        evalCtx.Context,
+		Confidence:     finalResult.Confidence,
+		Verdict:        string(finalResult.Verdict),
+		StageScores:    judgeEvaResults,
 	}
 
 	err := e.repository.Store(ctx, &evaluationResult)
-
 	if err != nil {
 		e.logger.Error().Err(err).Msg("unable to store evaluation result in the repository")
 		return finalResult

@@ -26,8 +26,8 @@ func NewEvalRepository(db *DB, logger *zerolog.Logger) *EvalRepository {
 func (e *EvalRepository) Store(ctx context.Context, eval *storage.Evaluation) error {
 	query := `
 		INSERT INTO eval_results
-		(id, event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+		(id, event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
 	`
 
 	id := uuid.New().String()
@@ -40,6 +40,7 @@ func (e *EvalRepository) Store(ctx context.Context, eval *storage.Evaluation) er
 	_, err = e.db.client.ExecContext(ctx, query,
 		id,
 		eval.EventID,
+		eval.ConversationID,
 		eval.AgentName,
 		eval.AgentVersion,
 		eval.UserQuery,
@@ -89,7 +90,7 @@ func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFil
 
 	// Build data query
 	query := fmt.Sprintf(`
-		SELECT event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		SELECT event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
 		FROM eval_results
 		%s
 		ORDER BY created_at DESC
@@ -122,6 +123,7 @@ func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFil
 		var evaluation storage.Evaluation
 		if err := rows.Scan(
 			&evaluation.EventID,
+			&evaluation.ConversationID,
 			&evaluation.AgentName,
 			&evaluation.AgentVersion,
 			&evaluation.UserQuery,
@@ -151,7 +153,7 @@ func (e *EvalRepository) Query(ctx context.Context, queryFilters models.QueryFil
 
 func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storage.Evaluation, error) {
 	query := `
-		SELECT event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		SELECT event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
 		FROM eval_results
 		WHERE event_id = ?
 	`
@@ -161,6 +163,7 @@ func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storag
 
 	err := e.db.client.QueryRowContext(ctx, query, eventID).Scan(
 		&evaluation.EventID,
+		&evaluation.ConversationID,
 		&evaluation.AgentName,
 		&evaluation.AgentVersion,
 		&evaluation.UserQuery,

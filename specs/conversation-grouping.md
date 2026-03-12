@@ -29,12 +29,12 @@
 ## Implementation Phases
 
 ### Phase 1: Schema Migration
-- [ ] Add `conversation_id` column to evaluations table
-- [ ] Create indexes for conversation queries
-- [ ] Test migration on SQLite and PostgreSQL
+- [X] Add `conversation_id` column to evaluations table
+- [X] Create indexes for conversation queries
+- [X] Test migration on SQLite and PostgreSQL
 
 ### Phase 2: Storage Layer
-- [ ] Add `ConversationID` field to `Evaluation` struct
+- [X] Add `ConversationID` field to `Evaluation` struct
 - [ ] Implement `GetConversation()` method
 - [ ] Implement `ListConversations()` method
 - [ ] Add unit tests for conversation queries

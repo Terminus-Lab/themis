@@ -44,14 +44,15 @@ func TestEvalRepository_Store_Success(t *testing.T) {
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 
 	eval := &storage.Evaluation{
-		EventID:      "evt-001",
-		AgentName:    "test-agent",
-		AgentVersion: "v1.0.0",
-		UserQuery:    "What is Go?",
-		Answer:       "Go is a programming language",
-		Context:      "Go documentation",
-		Confidence:   0.85,
-		Verdict:      "pass",
+		EventID:        "evt-001",
+		ConversationID: "conv-01",
+		AgentName:      "test-agent",
+		AgentVersion:   "v1.0.0",
+		UserQuery:      "What is Go?",
+		Answer:         "Go is a programming language",
+		Context:        "Go documentation",
+		Confidence:     0.85,
+		Verdict:        "pass",
 		StageScores: []models.StageResult{
 			{Name: "relevance", Score: 0.9, Reason: "relevant", Duration: 100 * time.Millisecond, Weight: 0.3},
 			{Name: "faithfulness", Score: 0.8, Reason: "faithful", Duration: 200 * time.Millisecond, Weight: 0.7},

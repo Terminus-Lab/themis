@@ -58,6 +58,7 @@ func (h *Handler) Evaluate(req *restful.Request, resp *restful.Response) {
 
 	h.logger.Info().
 		Str("event_id", evalRequest.EventID).
+		Str("conversation_id", evalRequest.ConversationID).
 		Str("event_type", string(evalRequest.EventType)).
 		Str("agent_name", string(evalRequest.Agent.Name)).
 		Msg("Start evaluation")
@@ -69,6 +70,7 @@ func (h *Handler) Evaluate(req *restful.Request, resp *restful.Response) {
 
 	h.logger.Info().
 		Str("event_id", evalResult.ID).
+		Str("conversation_id", evalResult.ConversationID).
 		Str("verdict", string(evalResult.Verdict)).
 		Float64("confidence", evalResult.Confidence).
 		Msg("Evaluation complete")
@@ -110,6 +112,7 @@ func (h *Handler) EvaluateSingleJudge(req *restful.Request, resp *restful.Respon
 
 	h.logger.Info().
 		Str("event_id", evalRequest.EventID).
+		Str("conversation_id", evalRequest.ConversationID).
 		Str("judge_name", judgeName).
 		Float64("threshold", threshold).
 		Str("event_type", string(evalRequest.EventType)).
@@ -141,6 +144,7 @@ func (h *Handler) EvaluateSingleJudge(req *restful.Request, resp *restful.Respon
 		Str("judge_name", judgeName).
 		Float64("threshold", threshold).
 		Str("event_id", evalResult.ID).
+		Str("conversation_id", evalResult.ConversationID).
 		Str("verdict", string(evalResult.Verdict)).
 		Float64("confidence", evalResult.Confidence).
 		Msg("Evaluation complete")
@@ -162,6 +166,7 @@ func (h *Handler) Health(req *restful.Request, resp *restful.Response) {
 func normalize(req models.EvaluationRequest) models.EvaluationContext {
 	return models.EvaluationContext{
 		RequestID:      req.EventID,
+		ConversationID: req.ConversationID,
 		AgentName:      req.Agent.Name,
 		AgentVersion:   req.Agent.Version,
 		Query:          req.Interaction.UserQuery,
