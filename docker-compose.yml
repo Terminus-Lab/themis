@@ -1,5 +1,6 @@
 services:
   themis-db:
+    container_name: themis-db
     hostname: themis-db
     image: postgres:16
     ports:

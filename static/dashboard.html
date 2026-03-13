@@ -636,6 +636,13 @@
             border-radius: 6px;
             padding: 12px;
             margin-bottom: 10px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .turn-item:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent-color);
         }
 
         .turn-header {
@@ -1151,7 +1158,22 @@
             // Read tab from URL hash, default to 'results'
             const hash = window.location.hash.substring(1); // Remove '#'
 
-            if (hash.startsWith('conversations/')) {
+            if (hash.startsWith('results/')) {
+                // Results tab with specific event_id
+                const eventId = hash.substring('results/'.length);
+                showTab('results');
+                // Wait for results to load, then expand the row
+                setTimeout(() => {
+                    expandedRows.add(eventId);
+                    const row = document.getElementById(`row-${eventId}`);
+                    const detailRow = document.getElementById(`detail-${eventId}`);
+                    if (row && detailRow) {
+                        row.classList.add('expanded');
+                        detailRow.classList.add('visible');
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 500); // Give time for results to render
+            } else if (hash.startsWith('conversations/')) {
                 // Conversation detail view
                 const conversationId = hash.substring('conversations/'.length);
                 showTab('conversations');
@@ -1180,7 +1202,23 @@
             document.getElementById('resultsTab').classList.remove('active');
             document.getElementById('conversationsTab').classList.remove('active');
 
-            if (hash.startsWith('conversations/')) {
+            if (hash.startsWith('results/')) {
+                // Results tab with specific event_id
+                const eventId = hash.substring('results/'.length);
+                document.getElementById('resultsTabBtn').classList.add('active');
+                document.getElementById('resultsTab').classList.add('active');
+                // Expand the specific row
+                setTimeout(() => {
+                    expandedRows.add(eventId);
+                    const row = document.getElementById(`row-${eventId}`);
+                    const detailRow = document.getElementById(`detail-${eventId}`);
+                    if (row && detailRow) {
+                        row.classList.add('expanded');
+                        detailRow.classList.add('visible');
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            } else if (hash.startsWith('conversations/')) {
                 // Conversation detail view
                 const conversationId = hash.substring('conversations/'.length);
                 document.getElementById('conversationsTabBtn').classList.add('active');
@@ -1365,10 +1403,10 @@
             // Render each turn
             turns.forEach((turn, index) => {
                 html += `
-                    <div class="turn-item">
+                    <div class="turn-item" onclick="viewTurnInResults('${turn.event_id}')" title="Click to view full evaluation in Results tab">
                         <div class="turn-header">
                             <div style="color: var(--accent-color); font-weight: 600; font-size: 12px;">
-                                Turn ${index + 1}
+                                Turn ${index + 1} →
                             </div>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <span class="verdict verdict-${turn.verdict}">${turn.verdict}</span>
@@ -1389,7 +1427,7 @@
                         ` : ''}
                         <div class="turn-footer">
                             <span style="color: var(--text-secondary);">
-                                ${turn.stage_scores.length} evaluation stages
+                                ${turn.stage_scores.length} evaluation stages • Click to view details
                             </span>
                         </div>
                     </div>
@@ -1432,6 +1470,12 @@
 
         function clearConversationError() {
             document.getElementById('conversationErrorContainer').innerHTML = '';
+        }
+
+        // Navigate from conversation turn to full evaluation in Results tab
+        function viewTurnInResults(eventId) {
+            // Navigate to results tab with event_id in hash
+            window.location.hash = `results/${eventId}`;
         }
 
         // Initial setup

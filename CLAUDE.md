@@ -116,6 +116,8 @@ Four entry points sharing core evaluation logic:
    - `POST /api/v1/evaluate/judge/{name}` - single judge evaluation
    - `GET /api/v1/results` - query evaluation results with filters (agent_name, verdict, limit, offset)
    - `GET /api/v1/results/{event_id}` - get single evaluation result by ID
+   - `GET /api/v1/conversations` - list all conversations with summary metrics
+   - `GET /api/v1/conversations/{id}` - get conversation turns with detailed evaluations
    - `GET /` - dashboard UI (static HTML at `static/dashboard.html`)
    - CORS enabled, structured logging
    - **Can run in two modes:**
@@ -129,9 +131,11 @@ Four entry points sharing core evaluation logic:
      - Horizontal scaling with multiple consumer instances
    - **Dashboard UI:**
      - Dark terminal theme (Claude Code-inspired)
-     - Real-time visualization of evaluation results
-     - Filtering by agent, verdict, pagination
-     - Expandable rows for detailed inspection
+     - Two-tab interface: Results and Conversations
+     - **Results tab**: Real-time visualization with filtering by agent/verdict, expandable rows
+     - **Conversations tab**: Multi-turn conversation tracking with turn-by-turn drill-down
+     - Clickable turns navigate to full evaluation details
+     - URL-based navigation with browser back/forward support
      - Auto-refresh every 10 seconds
      - No authentication required (local dev only)
 
@@ -142,7 +146,8 @@ Four entry points sharing core evaluation logic:
 
 3. **MCP** (`cmd/mcp/main.go`): Model Context Protocol server
    - Stdio-based communication
-   - Exposes `evaluate_response` and `evaluate_single_judge` tools
+   - Exposes `evaluate_response`, `evaluate_single_judge`, and `get_conversation` tools
+   - Supports conversation tracking with `conversation_id`, `agent_name`, `agent_version` fields
    - Docker deployment for Claude Code/Desktop/Cursor
 
 4. **Producer** (`cmd/producer/main.go`): Test data generator for Redis
