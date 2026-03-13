@@ -83,7 +83,8 @@ Examples:
 
   # Output as summary only
   themis-cli evaluate -i input.jsonl -o summary.json -f summary`,
-	RunE: runEvaluate,
+	SilenceUsage: true,
+	RunE:         runEvaluate,
 }
 
 // validateCmd represents the validation command
@@ -105,7 +106,8 @@ Examples:
 
   # Output to file
   themis-cli validate -i annotated.jsonl > validation-result.json`,
-	RunE: runValidate,
+	SilenceUsage: true,
+	RunE:         runValidate,
 }
 
 // versionCmd represents the version command
@@ -127,13 +129,13 @@ func init() {
 	evaluateCmd.Flags().StringVarP(&format, "format", "f", "jsonl", "Output format: jsonl, summary")
 	evaluateCmd.Flags().StringVarP(&summary, "summary", "s", "", "Optional separate summary file")
 
-	evaluateCmd.MarkFlagRequired("input")
+	_ = evaluateCmd.MarkFlagRequired("input")
 
 	// Validate command flags
 	validateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
 	validateCmd.Flags().Float64Var(&corrThreshold, "correlation-threshold", 0.3, "Kendall's tau threshold")
 
-	validateCmd.MarkFlagRequired("input")
+	_ = validateCmd.MarkFlagRequired("input")
 
 	// Add commands to root
 	rootCmd.AddCommand(evaluateCmd)
@@ -397,8 +399,12 @@ func validateAndOutput(pairs []batch.AnnotationPair, threshold float64) error {
 
 	// Exit based on result
 	if !validationResult.Passed {
-		return fmt.Errorf("validation failed: Kendall's tau (%.3f) below threshold (%.3f)",
-			validationResult.KendallTau, threshold)
+		log.Error().
+			Float64("kendall_tau", validationResult.KendallTau).
+			Float64("threshold", threshold).
+			Msg("Validation failed: Kendall's tau below threshold")
+		log.Error().Msg("Review configs/judges.yaml prompts and re-run validation")
+		os.Exit(1)
 	}
 
 	log.Info().Msg("LLM judge validated against human annotations")
