@@ -136,7 +136,7 @@ go mod download
 ```bash
 go build -o bin/themis-api cmd/api/main.go
 go build -o bin/themis-mcp cmd/mcp/main.go
-go build -o bin/themis-batch cmd/batch/main.go
+go build -o bin/themis-cli cmd/batch/main.go
 ```
 
 #### 4. Configure Environment
@@ -210,8 +210,8 @@ go build -o bin/themis-api cmd/api/main.go
 ### Batch CLI
 
 ```bash
-go build -o bin/themis-batch cmd/batch/main.go
-./bin/themis-batch -input dataset.jsonl -output results.jsonl
+go build -o bin/themis-cli cmd/batch/main.go
+./bin/themis-cli evaluate -input dataset.jsonl -output results.jsonl
 ```
 
 ### MCP Server

@@ -1,6 +1,6 @@
 ---
-title: Batch CLI Test Cases
-description: Test scenarios for Themis batch evaluation CLI
+title: CLI Test Cases
+description: Test scenarios for Themis CLI
 version: 1.0.0
 tags: [testing, batch, cli, offline, validation, kendall]
 related:
@@ -10,7 +10,7 @@ related:
   - getting-started/configuration.md
 ---
 
-# Batch Evaluation CLI Test Cases
+# CLI Test Cases
 
 Test scenarios for processing multiple evaluation requests from JSONL files using concurrent workers.
 
@@ -45,14 +45,20 @@ EARLY_EXIT_THRESHOLD=0.2
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `-input` | string | **required** | Input JSONL file path (or "-" for stdin) |
-| `-output` | string | stdout | Output file path |
+| `-input` | string | **required** | Input JSONL file path |
+| `-output` | string | **required** | Output file path |
 | `-format` | string | "jsonl" | Output format: "jsonl" or "summary" |
 | `-summary` | string | "" | Optional separate summary file |
-| `-workers` | int | 5 | Concurrent evaluation workers |
-| `-continue-on-error` | bool | true | Continue on evaluation failures |
-| `-dry-run` | bool | false | Validate input without evaluating |
-| `-validate` | bool | false | Validation mode: compute correlation with human annotations |
+
+**Environment Variables:**
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `THEMIS_BATCH_WORKERS` | int | 5 | Number of concurrent evaluation workers |
+
+**Validate Command Flags:**
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `-input` | string | **required** | Input file path with human annotations |
 | `-correlation-threshold` | float | 0.3 | Kendall's tau threshold for validation |
 
 ## Input Format (JSONL)
@@ -86,7 +92,7 @@ This groups 3 evaluations as turns in conversation `conv-abc123`, enabling conve
 
 ### JSONL Output (Default)
 
-One evaluation result per line, directly pipeable to `jq`:
+One evaluation result per line (can be processed with `jq`):
 
 ```jsonl
 {"id":"eval-001","stages":[{"name":"length-checker","score":1.0,"reason":"Answer Length is acceptable","duration_ns":12500},{"name":"overlap-checker","score":0.85,"duration_ns":10000},{"name":"format-checker","score":1.0,"duration_ns":8500},{"name":"relevance-judge","score":0.95,"duration_ns":1850000000}],"confidence":0.92,"verdict":"pass"}
@@ -118,7 +124,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test-valid.jsonl -output results.jsonl
+./themis-cli evaluate -input test-valid.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -138,7 +144,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test-invalid.jsonl -output results.jsonl
+./themis-cli evaluate -input test-invalid.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -146,26 +152,11 @@ Aggregate statistics in JSON format:
 - Warning log: "Skipping record with parse error" for line 2
 - `results.jsonl` contains 2 lines (valid records only)
 
-### Test Case 3: Dry Run Validation
-
-**Input:** `test-mixed.jsonl` (contains 1 valid + 1 invalid)
+### Test Case 3: Summary Format
 
 **Command:**
 ```bash
-./themis-batch -input test-mixed.jsonl -dry-run
-```
-
-**Expected Output:**
-- Exit code: 1 (fails on validation errors)
-- Error log: "Validation error" for invalid line
-- Final log: "Validation failed" with error count
-- No evaluations performed (no LLM calls)
-
-### Test Case 4: Summary Format
-
-**Command:**
-```bash
-./themis-batch -input test-valid.jsonl -format summary
+./themis-cli evaluate -input test-valid.jsonl -format summary
 ```
 
 **Expected Output:**
@@ -179,12 +170,12 @@ Aggregate statistics in JSON format:
 }
 ```
 
-### Test Case 5: Graceful Shutdown (SIGINT)
+### Test Case 4: Graceful Shutdown (SIGINT)
 
 **Command:**
 ```bash
 # Start processing large file
-./themis-batch -input large-dataset.jsonl -output results.jsonl
+./themis-cli evaluate -input large-dataset.jsonl -output results.jsonl
 
 # Press Ctrl+C after 2 seconds
 ```
@@ -196,11 +187,11 @@ Aggregate statistics in JSON format:
 - Files properly closed
 - Exit code: 0 or signal exit code
 
-### Test Case 6: High Concurrency
+### Test Case 5: High Concurrency
 
 **Command:**
 ```bash
-./themis-batch -input dataset-100.jsonl -workers 20 -output results.jsonl
+THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -209,11 +200,11 @@ Aggregate statistics in JSON format:
 - Processing time < sequential execution time
 - All results written correctly
 
-### Test Case 7: Invalid Format Flag
+### Test Case 6: Invalid Format Flag
 
 **Command:**
 ```bash
-./themis-batch -input test.jsonl -format csv
+./themis-cli evaluate -input test.jsonl -format csv
 ```
 
 **Expected Output:**
@@ -221,7 +212,7 @@ Aggregate statistics in JSON format:
 - Fatal error: "Invalid format. Supported: jsonl, summary"
 - No processing occurs
 
-### Test Case 8: Validation Mode (Human Annotation Correlation)
+### Test Case 7: Validation Mode (Human Annotation Correlation)
 
 **Input:** `resources/annotated_sample.jsonl` (20 records with human annotations)
 
@@ -231,9 +222,8 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch \
+./themis-cli validate \
   -input resources/annotated_sample.jsonl \
-  -validate \
   -correlation-threshold 0.3
 ```
 
@@ -282,7 +272,7 @@ INFO Computing Kendall's correlation...
 # Create test file with missing human_annotation
 echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
 
-./themis-batch -input test-no-annotation.jsonl -validate
+./themis-cli evaluate -input test-no-annotation.jsonl -validate
 ```
 
 **Expected:**
@@ -290,11 +280,11 @@ echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > t
 - Error: "Validation mode requires all records to have 'human_annotation' field"
 - Lists records missing annotations
 
-### Test Case 9: Combined Results + Summary
+### Test Case 8: Combined Results + Summary
 
 **Command:**
 ```bash
-./themis-batch \
+./themis-cli \
   -input resources/dataset.jsonl \
   -output resources/results.jsonl \
   -summary resources/summary.json
@@ -305,31 +295,17 @@ echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > t
 - `summary.json` contains aggregate statistics
 - Both files created successfully
 
-### Test Case 10: Pipeline from stdin
-
-**Command:**
-```bash
-cat dataset.jsonl | ./themis-batch -input - | jq 'select(.verdict=="fail")'
-```
-
-**Expected:**
-- Reads from stdin
-- Outputs to stdout
-- Pipes successfully to jq for filtering
-- Only failed evaluations displayed
-
 ## Performance Tests
 
-### Test Case 11: Large Dataset Performance
+### Test Case 9: Large Dataset Performance
 
 **Input:** 1000 records
 
 **Command:**
 ```bash
-time ./themis-batch \
+time THEMIS_BATCH_WORKERS=10 ./themis-cli \
   -input dataset-1000.jsonl \
-  -output results-1000.jsonl \
-  -workers 10
+  -output results-1000.jsonl
 ```
 
 **Expected:**
@@ -338,7 +314,7 @@ time ./themis-batch \
 - **Cost**: Each evaluation = 1 precheck + 5 LLM calls (unless early exit)
 - Processing time significantly faster than sequential
 
-### Test Case 12: Conversation Tracking
+### Test Case 10: Conversation Tracking
 
 **Input:** `conversation-dataset.jsonl`
 ```jsonl
@@ -349,7 +325,7 @@ time ./themis-batch \
 
 **Command:**
 ```bash
-./themis-batch -input conversation-dataset.jsonl -output results.jsonl
+./themis-cli evaluate -input conversation-dataset.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -369,19 +345,19 @@ jq -s 'group_by(.conversation_id) | map({conversation: .[0].conversation_id, tur
 # ]
 ```
 
-### Test Case 13: Worker Pool Scaling
+### Test Case 11: Worker Pool Scaling
 
 Test with different worker counts:
 
 ```bash
 # 1 worker (sequential)
-time ./themis-batch -input dataset-100.jsonl -workers 1 -output /dev/null
+time THEMIS_BATCH_WORKERS=1 ./themis-cli evaluate -input dataset-100.jsonl -output /dev/null
 
 # 5 workers (default)
-time ./themis-batch -input dataset-100.jsonl -workers 5 -output /dev/null
+time ./themis-cli evaluate -input dataset-100.jsonl -output /dev/null
 
 # 20 workers (high concurrency)
-time ./themis-batch -input dataset-100.jsonl -workers 20 -output /dev/null
+time THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output /dev/null
 ```
 
 **Expected:**
@@ -394,13 +370,21 @@ time ./themis-batch -input dataset-100.jsonl -workers 20 -output /dev/null
 ### Filter Failed Evaluations with jq
 
 ```bash
-./themis-batch -input dataset.jsonl | jq 'select(.verdict=="fail")'
+# Run evaluation first
+./themis-cli evaluate -input dataset.jsonl -output results.jsonl
+
+# Then analyze results
+jq 'select(.verdict=="fail")' results.jsonl
 ```
 
 ### Calculate Average Confidence with jq
 
 ```bash
-./themis-batch -input dataset.jsonl | jq -s 'map(.confidence) | add/length'
+# Run evaluation first
+./themis-cli evaluate -input dataset.jsonl -output results.jsonl
+
+# Calculate average confidence
+jq -s 'map(.confidence) | add/length' results.jsonl
 ```
 
 ### Import to pandas (Python)
@@ -424,7 +408,7 @@ print(fails[['id', 'confidence', 'verdict']])
 **Solution:** Ensure you specify `-input` flag with a valid file path.
 
 ```bash
-./themis-batch -input dataset.jsonl
+./themis-cli evaluate -input dataset.jsonl
 ```
 
 ### Issue: "Failed to open input file"
@@ -438,11 +422,7 @@ chmod 644 dataset.jsonl
 
 ### Issue: Worker Pool Processes 0 Records
 
-**Solution:** Check for parse errors in input JSONL. Use `-dry-run` to validate.
-
-```bash
-./themis-batch -input dataset.jsonl -dry-run
-```
+**Solution:** Check for parse errors in input JSONL. Check the logs during evaluation - invalid records will show warnings but evaluation continues.
 
 ### Issue: High Memory Usage
 
@@ -458,7 +438,7 @@ split -l 10000 large-dataset.jsonl batch-
 **Solution:** Reduce worker count to stay within rate limits.
 
 ```bash
-./themis-batch -input dataset.jsonl -workers 3
+THEMIS_BATCH_WORKERS=3 ./themis-cli evaluate -input dataset.jsonl -output results.jsonl
 ```
 
 ## Validation Mode Details

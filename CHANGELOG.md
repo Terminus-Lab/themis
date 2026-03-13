@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - In-memory storage by default (data persists during MCP session)
 
 ### Changed
+- **CLI Refactoring**: Migrated batch CLI to Cobra framework with subcommands
+  - Renamed binary: `themis-batch` → `themis-cli`
+  - New command structure: `themis-cli evaluate` and `themis-cli validate`
+  - Moved worker count to environment variable: `THEMIS_BATCH_WORKERS` (default: 5)
+  - Removed `--dry-run` flag (not useful for AI agents)
+  - Removed `--continue-on-error` flag (always continues on errors now)
+  - Removed `-w/--workers` flag (use `THEMIS_BATCH_WORKERS` env var instead)
+  - Removed stdin/stdout support (always uses file paths for clarity)
+  - Kept `-f/--format` flag for future format support (e.g., parquet)
+  - Kept `-s/--summary` flag for separate summary file generation
+  - Auto-generated help text with examples and shell completion support
+  - Better error handling with proper exit codes
 - **API Response Enhancement**: `GET /api/v1/conversations/{id}` now includes:
   - `avg_confidence` - Average confidence across all turns
   - `agent_name` - Agent name from first turn
@@ -55,6 +67,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now matches API handler normalize() behavior
 
 ### Documentation
+- Updated all references from `themis-batch` to `themis-cli` across documentation
+  - README.md, CLAUDE.md, installation guide, quick-start guide
+  - `docs/testing/batch-tests.md` renamed title and updated all examples
+  - Updated `.goreleaser.yaml` release notes
+- Updated CLI command examples to use new subcommand structure
+  - `themis-cli evaluate -i input.jsonl -o output.jsonl`
+  - `themis-cli validate -i annotated.jsonl`
+- Updated `docs/testing/batch-tests.md` with simplified flag reference
+  - Removed Test Case 3 (dry-run validation) - no longer supported
+  - Updated all examples to use `THEMIS_BATCH_WORKERS` env var
+  - Renumbered test cases 3-12 accordingly
+- Added `THEMIS_BATCH_WORKERS` environment variable documentation
 - Updated README.md with MCP conversation tracking examples
 - Updated CLAUDE.md with conversation API endpoints and dashboard features
 - Added 5 MCP test cases for conversation tracking (Test Cases 24-28)

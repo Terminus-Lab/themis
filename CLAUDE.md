@@ -23,7 +23,10 @@ go run cmd/api/main.go
 STREAMING_ENABLED=true go run cmd/api/main.go
 
 # Batch evaluation (offline datasets)
-go run cmd/batch/main.go -input dataset.jsonl -output results.jsonl -workers 5
+go run cmd/batch/main.go evaluate -input dataset.jsonl -output results.jsonl
+
+# With custom worker count (via env var)
+THEMIS_BATCH_WORKERS=10 go run cmd/batch/main.go evaluate -input dataset.jsonl -output results.jsonl
 
 # MCP server (Claude Code/Desktop integration)
 go run cmd/mcp/main.go
@@ -139,7 +142,7 @@ Four entry points sharing core evaluation logic:
      - Auto-refresh every 10 seconds
      - No authentication required (local dev only)
 
-2. **Batch** (`cmd/batch/main.go`): CLI with concurrent worker pool
+2. **CLI** (`cmd/batch/main.go`): Command-line interface with concurrent worker pool
    - JSONL input/output formats
    - Validation mode with Kendall's τ correlation
    - Progress tracking, graceful shutdown
@@ -195,6 +198,9 @@ REDIS_PASSWORD=                    # Redis password (optional)
 REDIS_STREAM_KEY=eval-events       # Redis stream key
 REDIS_CONSUMER_GROUP=eval-group    # Consumer group name
 REDIS_CONSUMER_NAME=consumer-1     # Unique consumer name (for horizontal scaling)
+
+# CLI configuration
+THEMIS_BATCH_WORKERS=5             # Number of concurrent workers for CLI evaluation (default: 5)
 ```
 
 ### Judge Configuration (configs/judges.yaml)
@@ -331,9 +337,8 @@ Before deploying judge changes to production:
 ```bash
 # 1. Collect human annotations for sample dataset (25% recommended)
 # 2. Run validation mode
-go run cmd/batch/main.go \
+go run cmd/batch/main.go validate \
   -input human_annotated_sample.jsonl \
-  -validate \
   -correlation-threshold 0.3
 
 # 3. Check Kendall's τ ≥ 0.3 in JSON output
