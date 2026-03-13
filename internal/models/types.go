@@ -41,9 +41,9 @@ type Interaction struct {
 }
 
 // Input message
-
 type EvaluationRequest struct {
 	EventID         string      `json:"event_id"`
+	ConversationID  string      `json:"conversation_id"`
 	EventType       EventType   `json:"event_type"`
 	Agent           Agent       `json:"agent"`
 	Interaction     Interaction `json:"interaction"`
@@ -53,6 +53,7 @@ type EvaluationRequest struct {
 // Normalized internal object
 type EvaluationContext struct {
 	RequestID      string    `json:"request_id" jsonschema:"required,description=Unique event identifier"`
+	ConversationID string    `json:"conversation_id" jsonschema:"required,description=Unique conversation identifier"`
 	AgentName      string    `json:"agent_name,omitempty" jsonschema:"description=Name of the agent being evaluated"`
 	AgentVersion   string    `json:"agent_version,omitempty" jsonschema:"description=Version of the agent being evaluated"`
 	Query          string    `json:"user_query" jsonschema:"required,description=User's original query"`
@@ -71,13 +72,14 @@ type StageResult struct {
 	Weight   float64       `json:"weight,omitempty"` // Weight for this judge (0.0-1.0)
 }
 
-// Final output emitted to Kafka
+// Final output
 type EvaluationResult struct {
-	ID         string             `json:"id"`
-	Stages     []StageResult      `json:"stages"`
-	Confidence float64            `json:"confidence"`
-	Verdict    Verdict            `json:"verdict"`
-	Metrics    AggregationMetrics `json:"metrics"`
+	ID             string             `json:"id"`
+	ConversationID string             `json:"conversation_id"`
+	Stages         []StageResult      `json:"stages"`
+	Confidence     float64            `json:"confidence"`
+	Verdict        Verdict            `json:"verdict"`
+	Metrics        AggregationMetrics `json:"metrics"`
 }
 
 type AggregationMetrics struct {

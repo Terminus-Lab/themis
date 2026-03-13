@@ -1,10 +1,10 @@
 package api
 
 import (
-	restfulspec "github.com/emicklei/go-restful-openapi/v2"
-	"github.com/emicklei/go-restful/v3"
 	"github.com/Terminus-Lab/themis/internal/api/middleware"
 	"github.com/Terminus-Lab/themis/internal/models"
+	restfulspec "github.com/emicklei/go-restful-openapi/v2"
+	"github.com/emicklei/go-restful/v3"
 )
 
 func RegisterRoutes(container *restful.Container, handler *Handler) {
@@ -72,6 +72,26 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 			Writes(EvaluationResponse{}).
 			Returns(200, "OK", EvaluationResponse{}).
 			Returns(404, "Not Found", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
+	ws.
+		Route(ws.GET("/conversations/{conversation_id}").
+			To(handler.GetConversationID).
+			Doc("Get conversation details with all turns").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"conversations"}).
+			Param(ws.PathParameter("conversation_id", "Conversation ID").DataType("string")).
+			Writes(ConversationDetailResponse{}).
+			Returns(200, "OK", ConversationDetailResponse{}).
+			Returns(404, "Not Found", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
+	ws.
+		Route(ws.GET("/conversations").
+			To(handler.ListConversations).
+			Doc("List all conversations with summary metrics").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"conversations"}).
+			Writes(ConversationListResponse{}).
+			Returns(200, "OK", ConversationListResponse{}).
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
 	container.Add(ws)

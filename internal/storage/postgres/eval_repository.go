@@ -24,8 +24,8 @@ func NewEvalRepository(db *DB, logger *zerolog.Logger) *EvalRepository {
 
 func (e *EvalRepository) Store(ctx context.Context, evaluation *storage.Evaluation) error {
 	evalQuery := `
-		INSERT INTO eval_results (event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		INSERT INTO eval_results (event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
 	`
 	stageJsonScore, err := json.Marshal(evaluation.StageScores)
 	if err != nil {
@@ -36,6 +36,7 @@ func (e *EvalRepository) Store(ctx context.Context, evaluation *storage.Evaluati
 		ctx,
 		evalQuery,
 		evaluation.EventID,
+		evaluation.ConversationID,
 		evaluation.AgentName,
 		evaluation.AgentVersion,
 		evaluation.UserQuery,
@@ -90,7 +91,7 @@ func (e *EvalRepository) Query(ctx context.Context, filters models.QueryFilters)
 
 	// Build data query
 	query := fmt.Sprintf(`
-		SELECT event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		SELECT event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
 		FROM eval_results
 		%s
 		ORDER BY created_at DESC
@@ -120,6 +121,7 @@ func (e *EvalRepository) Query(ctx context.Context, filters models.QueryFilters)
 		var evaluation storage.Evaluation
 		if err := rows.Scan(
 			&evaluation.EventID,
+			&evaluation.ConversationID,
 			&evaluation.AgentName,
 			&evaluation.AgentVersion,
 			&evaluation.UserQuery,
@@ -149,7 +151,7 @@ func (e *EvalRepository) Query(ctx context.Context, filters models.QueryFilters)
 
 func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storage.Evaluation, error) {
 	query := `
-		SELECT event_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		SELECT event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
 		FROM eval_results
 		WHERE event_id = $1
 	`
@@ -159,6 +161,7 @@ func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storag
 
 	err := e.db.Pool.QueryRow(ctx, query, eventID).Scan(
 		&evaluation.EventID,
+		&evaluation.ConversationID,
 		&evaluation.AgentName,
 		&evaluation.AgentVersion,
 		&evaluation.UserQuery,
@@ -177,4 +180,112 @@ func (e *EvalRepository) QueryById(ctx context.Context, eventID string) (*storag
 	}
 
 	return &evaluation, nil
+}
+
+func (e *EvalRepository) GetConversation(ctx context.Context, conversationID string) ([]storage.Evaluation, error) {
+	var evaluations []storage.Evaluation
+	var stageScoreJSON []byte
+
+	if conversationID == "" {
+		return evaluations, nil
+	}
+
+	query := `
+		SELECT event_id, conversation_id, agent_name, agent_version,
+			user_query, answer, context, confidence, verdict,
+			stage_scores
+		FROM eval_results
+		WHERE conversation_id = $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := e.db.Pool.Query(ctx, query, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query storage. Error: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var evaluation storage.Evaluation
+		if err := rows.Scan(
+			&evaluation.EventID,
+			&evaluation.ConversationID,
+			&evaluation.AgentName,
+			&evaluation.AgentVersion,
+			&evaluation.UserQuery,
+			&evaluation.Answer,
+			&evaluation.Context,
+			&evaluation.Confidence,
+			&evaluation.Verdict,
+			&stageScoreJSON,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan row. Error: %w", err)
+		}
+
+		if err := json.Unmarshal(stageScoreJSON, &evaluation.StageScores); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal stage_scores. Error: %w", err)
+		}
+
+		evaluations = append(evaluations, evaluation)
+	}
+
+	// Check for errors from iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return evaluations, nil
+}
+
+func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.ConversationSummary, error) {
+	query := `
+          SELECT
+              conversation_id,
+              COUNT(*) as turn_count,
+              AVG(confidence) as avg_confidence,
+              SUM(CASE WHEN verdict = 'pass' THEN 1 ELSE 0 END) as pass_count,
+              SUM(CASE WHEN verdict = 'review' THEN 1 ELSE 0 END) as review_count,
+              SUM(CASE WHEN verdict = 'fail' THEN 1 ELSE 0 END) as fail_count,
+              MIN(created_at) as first_turn_at,
+              MAX(created_at) as last_turn_at,
+              agent_name,
+              agent_version
+          FROM eval_results
+          WHERE conversation_id IS NOT NULL AND conversation_id != ''
+          GROUP BY conversation_id, agent_name, agent_version
+          ORDER BY last_turn_at DESC
+      `
+	rows, err := e.db.Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("unable to query storage. Error: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []storage.ConversationSummary
+
+	for rows.Next() {
+		var summary storage.ConversationSummary
+		if err := rows.Scan(
+			&summary.ConversationID,
+			&summary.TurnCount,
+			&summary.AvgConfidence,
+			&summary.PassCount,
+			&summary.ReviewCount,
+			&summary.FailCount,
+			&summary.FirstTurnAt,
+			&summary.LastTurnAt,
+			&summary.AgentName,
+			&summary.AgentVersion,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		summaries = append(summaries, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return summaries, nil
 }

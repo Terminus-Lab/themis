@@ -1,6 +1,10 @@
 package api
 
-import "github.com/Terminus-Lab/themis/internal/storage"
+import (
+	"time"
+
+	"github.com/Terminus-Lab/themis/internal/storage"
+)
 
 type HealthResponse struct {
 	Status  string `json:"status" description:"Service status"`
@@ -9,15 +13,16 @@ type HealthResponse struct {
 
 // EvaluationDTO is the API response model for evaluation results
 type EvaluationDTO struct {
-	EventID      string       `json:"event_id" description:"Unique event identifier"`
-	AgentName    string       `json:"agent_name" description:"Name of the agent"`
-	AgentVersion string       `json:"agent_version" description:"Version of the agent"`
-	UserQuery    string       `json:"user_query" description:"User's original query"`
-	Answer       string       `json:"answer" description:"Agent's answer"`
-	Context      string       `json:"context,omitempty" description:"Retrieved context (optional)"`
-	Confidence   float64      `json:"confidence" description:"Overall confidence score"`
-	Verdict      string       `json:"verdict" description:"Evaluation verdict (pass, review, fail)"`
-	StageScores  []StageScore `json:"stage_scores" description:"Individual stage evaluation scores"`
+	EventID        string       `json:"event_id" description:"Unique event identifier"`
+	ConversationID string       `json:"conversation_id" description:"Conversation ID"`
+	AgentName      string       `json:"agent_name" description:"Name of the agent"`
+	AgentVersion   string       `json:"agent_version" description:"Version of the agent"`
+	UserQuery      string       `json:"user_query" description:"User's original query"`
+	Answer         string       `json:"answer" description:"Agent's answer"`
+	Context        string       `json:"context,omitempty" description:"Retrieved context (optional)"`
+	Confidence     float64      `json:"confidence" description:"Overall confidence score"`
+	Verdict        string       `json:"verdict" description:"Evaluation verdict (pass, review, fail)"`
+	StageScores    []StageScore `json:"stage_scores" description:"Individual stage evaluation scores"`
 }
 
 // StageScore represents an individual evaluation stage result
@@ -41,6 +46,35 @@ type EvaluationResponse struct {
 	Evaluation EvaluationDTO `json:"evaluation" description:"Evaluation result"`
 }
 
+type ConversationDetailResponse struct {
+	ConversationID string          `json:"conversation_id" description:"Conversation ID"`
+	TurnCount      int             `json:"turn_count" description:"The number of interactions/events from the conversation"`
+	AvgConfidence  float64         `json:"avg_confidence" description:"Average confidence across all turns"`
+	AgentName      string          `json:"agent_name" description:"Agent name"`
+	AgentVersion   string          `json:"agent_version" description:"Agent version"`
+	Turns          []EvaluationDTO `json:"turns"` // Full Evaluation
+}
+
+type ConversationSummaryDTO struct {
+	ConversationID string  `json:"conversation_id"`
+	TurnCount      int     `json:"turn_count"`
+	AvgConfidence  float64 `json:"avg_confidence"`
+	VerdictCounts  struct {
+		Pass   int `json:"pass"`
+		Review int `json:"review"`
+		Fail   int `json:"fail"`
+	} `json:"verdict_counts"`
+	FirstTurnAt  time.Time `json:"first_turn_at"`
+	LastTurnAt   time.Time `json:"last_turn_at"`
+	AgentName    string    `json:"agent_name"`
+	AgentVersion string    `json:"agent_version"`
+}
+
+type ConversationListResponse struct {
+	Conversations []ConversationSummaryDTO `json:"conversations"`
+	Total         int                      `json:"total"`
+}
+
 // toEvaluationDTO converts storage.Evaluation to API DTO
 func toEvaluationDTO(e storage.Evaluation) EvaluationDTO {
 	stageScores := make([]StageScore, len(e.StageScores))
@@ -54,15 +88,16 @@ func toEvaluationDTO(e storage.Evaluation) EvaluationDTO {
 	}
 
 	return EvaluationDTO{
-		EventID:      e.EventID,
-		AgentName:    e.AgentName,
-		AgentVersion: e.AgentVersion,
-		UserQuery:    e.UserQuery,
-		Answer:       e.Answer,
-		Context:      e.Context,
-		Confidence:   e.Confidence,
-		Verdict:      e.Verdict,
-		StageScores:  stageScores,
+		EventID:        e.EventID,
+		ConversationID: e.ConversationID,
+		AgentName:      e.AgentName,
+		AgentVersion:   e.AgentVersion,
+		UserQuery:      e.UserQuery,
+		Answer:         e.Answer,
+		Context:        e.Context,
+		Confidence:     e.Confidence,
+		Verdict:        e.Verdict,
+		StageScores:    stageScores,
 	}
 }
 
@@ -71,6 +106,52 @@ func toEvaluationDTOs(evaluations []storage.Evaluation) []EvaluationDTO {
 	dtos := make([]EvaluationDTO, len(evaluations))
 	for i, e := range evaluations {
 		dtos[i] = toEvaluationDTO(e)
+	}
+	return dtos
+}
+
+// toConversationDetailResponse converts storage.ConversationDetail to API response DTO
+func toConversationDetailResponse(detail storage.ConversationDetail) ConversationDetailResponse {
+	dtos := make([]EvaluationDTO, len(detail.Turns))
+	for i, turn := range detail.Turns {
+		dtos[i] = toEvaluationDTO(turn)
+	}
+
+	return ConversationDetailResponse{
+		ConversationID: detail.ConversationID,
+		TurnCount:      detail.TurnCount,
+		AvgConfidence:  detail.AvgConfidence,
+		AgentName:      detail.AgentName,
+		AgentVersion:   detail.AgentVersion,
+		Turns:          dtos,
+	}
+}
+
+func toConversationSummaryDTO(conversationSummaries storage.ConversationSummary) ConversationSummaryDTO {
+	return ConversationSummaryDTO{
+		ConversationID: conversationSummaries.ConversationID,
+		TurnCount:      conversationSummaries.TurnCount,
+		AvgConfidence:  conversationSummaries.AvgConfidence,
+		VerdictCounts: struct {
+			Pass   int `json:"pass"`
+			Review int `json:"review"`
+			Fail   int `json:"fail"`
+		}{
+			Pass:   conversationSummaries.PassCount,
+			Review: conversationSummaries.ReviewCount,
+			Fail:   conversationSummaries.FailCount,
+		},
+		FirstTurnAt:  conversationSummaries.FirstTurnAt,
+		LastTurnAt:   conversationSummaries.LastTurnAt,
+		AgentName:    conversationSummaries.AgentName,
+		AgentVersion: conversationSummaries.AgentVersion,
+	}
+}
+
+func toConversationSummaryDTOs(summaries []storage.ConversationSummary) []ConversationSummaryDTO {
+	dtos := make([]ConversationSummaryDTO, len(summaries))
+	for i, summary := range summaries {
+		dtos[i] = toConversationSummaryDTO(summary)
 	}
 	return dtos
 }

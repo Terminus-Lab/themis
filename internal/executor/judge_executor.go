@@ -35,8 +35,9 @@ func (e *JudgeExecutor) Execute(ctx context.Context, judgeName string, threshold
 	e.logger.Info().Str("requestID", id).Msg("starting evaluation")
 
 	result := models.EvaluationResult{
-		ID:     id,
-		Stages: []models.StageResult{},
+		ID:             id,
+		ConversationID: evalCtx.ConversationID,
+		Stages:         []models.StageResult{},
 	}
 
 	judge, err := e.judgeFactory.Get(judgeName)
@@ -56,15 +57,16 @@ func (e *JudgeExecutor) Execute(ctx context.Context, judgeName string, threshold
 	result.Confidence = judgeResponse.Score
 
 	evaluationResult := storage.Evaluation{
-		EventID:      id,
-		AgentName:    evalCtx.AgentName,
-		AgentVersion: evalCtx.AgentVersion,
-		UserQuery:    evalCtx.Query,
-		Answer:       evalCtx.Answer,
-		Context:      evalCtx.Context,
-		Confidence:   result.Confidence,
-		Verdict:      string(result.Verdict),
-		StageScores:  result.Stages,
+		EventID:        id,
+		ConversationID: result.ConversationID,
+		AgentName:      evalCtx.AgentName,
+		AgentVersion:   evalCtx.AgentVersion,
+		UserQuery:      evalCtx.Query,
+		Answer:         evalCtx.Answer,
+		Context:        evalCtx.Context,
+		Confidence:     result.Confidence,
+		Verdict:        string(result.Verdict),
+		StageScores:    result.Stages,
 	}
 
 	err = e.repository.Store(ctx, &evaluationResult)

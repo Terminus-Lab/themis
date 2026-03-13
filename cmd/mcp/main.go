@@ -67,12 +67,18 @@ func createMCPServer(deps *setup.Dependencies) *mcp.Server {
 	// Add Tools
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "evaluate_response",
-		Description: "Evaluate an AI agent response for relevance, faithfulness, coherence, completeness, and instruction-following",
+		Description: "Evaluate an AI agent response for relevance, faithfulness, coherence, completeness, and instruction-following. Optionally provide conversation_id to group multi-turn interactions.",
 	}, mcpadapter.NewEvaluateHandler(deps.Executor))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "evaluate_single_judge",
-		Description: "Evaluate with a single judge (relevance, faithfulness, coherence, completeness, or instruction). Faster than full pipeline.",
+		Description: "Evaluate with a single judge (relevance, faithfulness, coherence, completeness, instruction, or correctness). Faster than full pipeline. Optionally provide conversation_id to group multi-turn interactions.",
 	}, mcpadapter.NewEvaluateSingleJudgeHandler(deps.JudgeExecutor))
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_conversation",
+		Description: "Retrieve all evaluation turns for a given conversation_id. Returns turn count, average confidence, and detailed results for each turn in chronological order.",
+	}, mcpadapter.NewGetConversationHandler(deps.Repository))
+
 	return server
 }

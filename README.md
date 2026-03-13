@@ -111,6 +111,14 @@ For detailed API examples and test cases, see [API Mode Documentation](docs/depl
 
 The MCP server exposes Themis evaluation as tools for Claude Code, Claude Desktop, and Cursor. Use natural language to evaluate agent responses during development.
 
+**Available Tools:**
+- `evaluate_response` - Full pipeline evaluation with all judges
+- `evaluate_single_judge` - Fast evaluation with single judge (relevance, faithfulness, etc.)
+- `get_conversation` - Retrieve all turns for a conversation ID
+
+**Conversation Tracking:**
+All evaluation tools accept optional `conversation_id`, `agent_name`, and `agent_version` fields to group multi-turn interactions. Use `get_conversation` to view all turns and metrics for a conversation.
+
 **Installation:**
 ```bash
 # Build MCP server
@@ -129,9 +137,15 @@ claude mcp add --transport stdio themis -- /absolute/path/to/bin/themis-mcp
 }
 ```
 
-**Usage in conversation:**
+**Usage Examples:**
 ```
+# Basic evaluation
 "Evaluate this response: User asked 'What is AI?' and agent answered 'Artificial Intelligence is...'"
+
+# Multi-turn conversation tracking
+"Evaluate turn 1 for conversation conv-123: Query='What is Python?' Answer='Programming language'"
+"Evaluate turn 2 for conversation conv-123: Query='Is it hard?' Answer='Easy to learn'"
+"Show me conversation conv-123"
 ```
 
 For setup details and advanced usage, see [MCP Test Cases](docs/testing/mcp-tests.md).

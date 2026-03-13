@@ -13,6 +13,7 @@ const schema = `
       confidence REAL NOT NULL,
       verdict TEXT NOT NULL,
       stage_scores JSONB NOT NULL,
+      conversation_id TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (event_id)
   );
@@ -20,6 +21,7 @@ const schema = `
   CREATE INDEX IF NOT EXISTS idx_agent_name ON eval_results(agent_name, created_at);
   CREATE INDEX IF NOT EXISTS idx_verdict ON eval_results(verdict, created_at);
   CREATE INDEX IF NOT EXISTS idx_created_at ON eval_results(created_at);
+  CREATE INDEX IF NOT EXISTS idx_conversation_id ON eval_results(conversation_id, created_at);
 `
 
 func (d *DB) InitSchema(ctx context.Context) error {
