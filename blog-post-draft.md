@@ -1,16 +1,12 @@
 # AI Agent Evaluation: Build First, Decide Later
 
-AI agent evaluation looks deceptively simple.
+AI agent evaluation looks deceptively simple. Write a prompt that asks an LLM to score responses. Get a number between 0 and 1. Done.
 
-Write a prompt that asks an LLM to score responses. Get a number between 0 and 1. Done.
+This is how I started. But my goal wasn't to ship an evaluation framework—it was to understand the problem space deeply enough to evaluate evaluation tools intelligently.
 
-This is how most teams start, and it's exactly how I started. But my goal wasn't to ship an evaluation framework—it was to understand the problem space deeply enough to evaluate evaluation tools intelligently.
+I've always learned by building. Not reading documentation, but writing code until I hit walls I didn't know existed. Two months of building an evaluation system taught me why platforms are complex, what problems they're solving, and which features actually matter.
 
-I've always learned by building. Not reading documentation or watching tutorials, but writing code until I hit walls I didn't know existed. This is how you discover what's actually hard versus what just looks hard.
-
-Two months of building an evaluation system taught me why evaluation platforms are complex, what problems they're solving, and which features actually matter. The challenges aren't where you expect them.
-
-This is what I learned, and why building first—even if you ultimately use an existing solution—makes you a better evaluator of evaluation tools.
+This is what I learned.
 
 ## The Naive Start
 
