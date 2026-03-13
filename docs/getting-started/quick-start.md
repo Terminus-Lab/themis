@@ -319,7 +319,7 @@ go mod download
 # Build binaries
 go build -o bin/themis-api cmd/api/main.go
 go build -o bin/themis-mcp cmd/mcp/main.go
-go build -o bin/themis-batch cmd/batch/main.go
+go build -o bin/themis-cli cmd/batch/main.go
 
 # Run from source
 go run cmd/api/main.go

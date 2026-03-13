@@ -25,9 +25,9 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
 
-  # Batch CLI
-  - id: themis-batch
-    binary: themis-batch
+  # CLI
+  - id: themis-cli
+    binary: themis-cli
     main: ./cmd/batch
     env:
       - CGO_ENABLED=0
@@ -147,7 +147,7 @@ release:
     ### What's Included
     - **themis-api** - HTTP API server with web dashboard
     - **themis-mcp** - MCP server for Claude Code/Desktop integration
-    - **themis-batch** - CLI batch processor with Kendall's τ validation
+    - **themis-cli** - CLI for batch evaluation and validation with Kendall's τ
     - **configs/** - Judge configurations (judges.yaml)
     - **docs/** - Complete documentation
     - **static/** - Web dashboard assets

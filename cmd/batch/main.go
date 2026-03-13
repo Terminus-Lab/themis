@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -24,13 +25,10 @@ var (
 	verbose bool
 
 	// Evaluate command flags
-	input           string
-	output          string
-	format          string
-	summary         string
-	workers         int
-	continueOnError bool
-	dryRun          bool
+	input   string
+	output  string
+	format  string
+	summary string
 
 	// Validate command flags
 	corrThreshold float64
@@ -48,9 +46,9 @@ func main() {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "themis-batch",
-	Short: "Themis batch evaluation CLI",
-	Long: `Themis batch evaluation tool for processing datasets offline.
+	Use:   "themis-cli",
+	Short: "Themis CLI for batch evaluation and validation",
+	Long: `Themis CLI for batch evaluation and validation of AI agent responses.
 
 Supports JSONL input/output, concurrent evaluation, validation mode,
 and Kendall's tau correlation against human annotations.`,
@@ -78,16 +76,13 @@ results to output file. Supports concurrent evaluation with worker pool.
 
 Examples:
   # Basic evaluation
-  themis-batch evaluate -i input.jsonl -o results.jsonl
+  themis-cli evaluate -i input.jsonl -o results.jsonl
 
-  # With custom workers and summary
-  themis-batch evaluate -i input.jsonl -o results.jsonl -w 10 -s summary.json
+  # With summary stats file
+  themis-cli evaluate -i input.jsonl -o results.jsonl -s summary.json
 
-  # Read from stdin, write to stdout
-  cat input.jsonl | themis-batch evaluate -i - -o -
-
-  # Dry run validation
-  themis-batch evaluate -i input.jsonl --dry-run`,
+  # Output as summary only
+  themis-cli evaluate -i input.jsonl -o summary.json -f summary`,
 	RunE: runEvaluate,
 }
 
@@ -103,13 +98,13 @@ Recommended threshold: 0.3 (moderate agreement).
 
 Examples:
   # Validate with default threshold (0.3)
-  themis-batch validate -i annotated.jsonl
+  themis-cli validate -i annotated.jsonl
 
   # Custom threshold
-  themis-batch validate -i annotated.jsonl --correlation-threshold 0.5
+  themis-cli validate -i annotated.jsonl --correlation-threshold 0.5
 
   # Output to file
-  themis-batch validate -i annotated.jsonl > validation-result.json`,
+  themis-cli validate -i annotated.jsonl > validation-result.json`,
 	RunE: runValidate,
 }
 
@@ -118,7 +113,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Themis Batch CLI v1.0.0")
+		fmt.Println("Themis CLI v1.1.0")
 	},
 }
 
@@ -127,13 +122,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 
 	// Evaluate command flags
-	evaluateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path (use '-' for stdin)")
-	evaluateCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path (use '-' for stdout, default: stdout)")
+	evaluateCmd.Flags().StringVarP(&input, "input", "i", "", "Input JSONL file path")
+	evaluateCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path")
 	evaluateCmd.Flags().StringVarP(&format, "format", "f", "jsonl", "Output format: jsonl, summary")
 	evaluateCmd.Flags().StringVarP(&summary, "summary", "s", "", "Optional separate summary file")
-	evaluateCmd.Flags().IntVarP(&workers, "workers", "w", 5, "Number of concurrent workers")
-	evaluateCmd.Flags().BoolVar(&continueOnError, "continue-on-error", true, "Continue on evaluation failures")
-	evaluateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate input without evaluating")
 
 	evaluateCmd.MarkFlagRequired("input")
 
@@ -168,22 +160,15 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open input file
-	var inputFile io.Reader
-	if input == "-" {
-		inputFile = os.Stdin
-		log.Info().Msg("Reading from stdin")
-	} else {
-		f, err := os.Open(input)
-		if err != nil {
-			return fmt.Errorf("failed to open input file %q: %w", input, err)
-		}
-		defer closeFile(f)
-		inputFile = f
-		log.Info().Str("file", input).Msg("Reading input file")
+	f, err := os.Open(input)
+	if err != nil {
+		return fmt.Errorf("failed to open input file %q: %w", input, err)
 	}
+	defer closeFile(f)
+	log.Info().Str("file", input).Msg("Reading input file")
 
 	// Read records
-	reader := batch.NewReader(inputFile, deps.Logger)
+	reader := batch.NewReader(f, deps.Logger)
 	recordsCh := reader.ReadAll(ctx)
 
 	var records []batch.InputRecord
@@ -193,38 +178,35 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 
 	log.Info().Int("total", len(records)).Msg("Input file parsed")
 
-	// Dry run validation
-	if dryRun {
-		return dryRunValidation(records)
+	// Require output flag
+	if output == "" {
+		return fmt.Errorf("required flag \"output\" not set")
 	}
 
 	// Open output file
-	var outputFile io.Writer
-	if output == "" || output == "-" {
-		outputFile = os.Stdout
-		log.Info().Msg("Writing to stdout")
-	} else {
-		f, err := os.Create(output)
-		if err != nil {
-			return fmt.Errorf("failed to create output file %q: %w", output, err)
-		}
-		defer closeFile(f)
-		outputFile = f
-		log.Info().Str("file", output).Msg("Writing to output file")
+	outFile, err := os.Create(output)
+	if err != nil {
+		return fmt.Errorf("failed to create output file %q: %w", output, err)
 	}
+	defer closeFile(outFile)
+	log.Info().Str("file", output).Msg("Writing to output file")
 
 	// Create writer
-	writer, err := batch.NewWriter(outputFile, format, deps.Logger)
+	writer, err := batch.NewWriter(outFile, format, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create writer: %w", err)
 	}
 	defer closeFile(writer)
 
+	// Get worker count from env var or use default
+	workers := getWorkersFromEnv()
+	log.Info().Int("workers", workers).Msg("Starting worker pool")
+
 	// Process with worker pool
 	processor := batch.NewProcessor(deps.Executor, workers, deps.Logger)
 	results := processor.Process(ctx, records)
 
-	// Write results
+	// Write results (always continue on error)
 	successCount := 0
 	errorCount := 0
 	var allResults []models.EvaluationResult
@@ -235,10 +217,6 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 		if err := writer.Write(result); err != nil {
 			log.Error().Err(err).Str("id", result.ID).Msg("Failed to write result")
 			errorCount++
-
-			if !continueOnError {
-				return fmt.Errorf("stopping due to write error: %w", err)
-			}
 		} else {
 			successCount++
 		}
@@ -273,20 +251,14 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open input file
-	var inputFile io.Reader
-	if input == "-" {
-		inputFile = os.Stdin
-	} else {
-		f, err := os.Open(input)
-		if err != nil {
-			return fmt.Errorf("failed to open input file %q: %w", input, err)
-		}
-		defer closeFile(f)
-		inputFile = f
+	f, err := os.Open(input)
+	if err != nil {
+		return fmt.Errorf("failed to open input file %q: %w", input, err)
 	}
+	defer closeFile(f)
 
 	// Read records
-	reader := batch.NewReader(inputFile, deps.Logger)
+	reader := batch.NewReader(f, deps.Logger)
 	recordsCh := reader.ReadAll(ctx)
 
 	var records []batch.InputRecord
@@ -317,7 +289,9 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	log.Info().Int("total", len(records)).Msg("Evaluating records with human annotations...")
 
 	// Evaluate all records
-	processor := batch.NewProcessor(deps.Executor, 5, deps.Logger)
+	workers := getWorkersFromEnv()
+	log.Info().Int("workers", workers).Msg("Starting worker pool")
+	processor := batch.NewProcessor(deps.Executor, workers, deps.Logger)
 	results := processor.Process(ctx, records)
 
 	// Collect annotation pairs
@@ -365,6 +339,18 @@ func closeFile(f io.Closer) {
 	}
 }
 
+func getWorkersFromEnv() int {
+	workers := 5 // default
+	if envWorkers := os.Getenv("THEMIS_BATCH_WORKERS"); envWorkers != "" {
+		if w, err := strconv.Atoi(envWorkers); err == nil && w > 0 {
+			workers = w
+		} else {
+			log.Warn().Str("value", envWorkers).Msg("Invalid THEMIS_BATCH_WORKERS, using default")
+		}
+	}
+	return workers
+}
+
 func writeSummary(path string, results []models.EvaluationResult) error {
 	summaryFile, err := os.Create(path)
 	if err != nil {
@@ -384,26 +370,6 @@ func writeSummary(path string, results []models.EvaluationResult) error {
 	}
 
 	log.Info().Str("file", path).Msg("Summary written")
-	return nil
-}
-
-func dryRunValidation(records []batch.InputRecord) error {
-	errorCount := 0
-	for _, record := range records {
-		if record.Error != nil {
-			log.Error().
-				Int("line", record.LineNumber).
-				Err(record.Error).
-				Msg("Validation error")
-			errorCount++
-		}
-	}
-
-	if errorCount > 0 {
-		return fmt.Errorf("validation failed with %d errors", errorCount)
-	}
-
-	log.Info().Msg("Validation successful")
 	return nil
 }
 

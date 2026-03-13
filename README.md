@@ -15,7 +15,7 @@ go build -o bin/themis-api cmd/api/main.go
 go build -o bin/themis-mcp cmd/mcp/main.go
 
 # CLI (batch processing)
-go build -o bin/themis-batch cmd/batch/main.go
+go build -o bin/themis-cli cmd/batch/main.go
 ```
 
 ## Purpose
@@ -77,7 +77,7 @@ cp .env.example .env
 **What's included:**
 - **themis-api**: HTTP REST API server with web dashboard at `http://localhost:18082`
 - **themis-mcp**: Model Context Protocol server for Claude Code/Desktop/Cursor integration
-- **themis-batch**: CLI for batch processing and validation
+- **themis-cli**: CLI for batch processing and validation
 - **configs/**: Judge configuration files (judges.yaml)
 - **docs/**: Complete documentation
 - **.env.example**: Environment template
@@ -156,12 +156,12 @@ Process datasets offline with concurrent workers and validate judge accuracy aga
 
 **Basic evaluation:**
 ```bash
-./bin/themis-batch -input dataset.jsonl -output results.jsonl -workers 10
+./bin/themis-cli -input dataset.jsonl -output results.jsonl -workers 10
 ```
 
 **Validation mode** (Kendall's τ):
 ```bash
-./bin/themis-batch -input annotated.jsonl -validate -correlation-threshold 0.3
+./bin/themis-cli -input annotated.jsonl -validate -correlation-threshold 0.3
 ```
 
 Input format: JSONL with `event_id`, `agent`, `interaction`, and optional `human_score` fields. For detailed examples and validation workflows, see [Batch Test Cases](docs/testing/batch-tests.md).
