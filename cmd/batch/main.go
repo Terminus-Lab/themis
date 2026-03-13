@@ -124,6 +124,7 @@ func main() {
 	results := processor.Process(ctx, records)
 
 	// Write results
+	// Note: Results are already saved to database by executor
 	successCount := 0
 	errorCount := 0
 	var allResults []models.EvaluationResult

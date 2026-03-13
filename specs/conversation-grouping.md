@@ -8,7 +8,7 @@
 
 ## Status Summary
 
-**Completion**: 5.67/7 Phases Complete (81%)
+**Completion**: 6.67/7 Phases Complete (95%)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
@@ -16,14 +16,14 @@
 | Phase 2: Storage Layer | ✅ Complete | 100% |
 | Phase 3: API Layer | ✅ Complete | 100% |
 | Phase 4: Entry Points | ⚠️ Partial | 67% (2/3 complete) |
-| Phase 5: Dashboard | ❌ Not Started | 0% |
+| Phase 5: Dashboard | ✅ Complete | 100% |
 | Phase 6: Documentation | ✅ Complete | 100% |
 | Phase 7: Performance Opt | ⏸️ On Hold | N/A (trigger-based) |
 
 **Next Steps**:
 1. ~~Fix streaming consumer normalize() function~~ ✅ **Done**
-2. Update MCP adapter for conversation_id
-3. (Optional) Add dashboard UI for conversations
+2. ~~Add dashboard UI for conversations~~ ✅ **Done**
+3. Update MCP adapter for conversation_id (optional)
 
 ---
 
@@ -79,10 +79,24 @@
   - Added comprehensive tests: `TestNormalize()` with 3 test cases + `TestNormalize_CreatedAtTimestamp()`
   - Now matches API handler normalize() function
 
-### Phase 5: Dashboard (Optional)
-- [ ] Add "Conversations" tab to dashboard
-- [ ] Show conversation list with filters
-- [ ] Drill-down view for conversation turns
+### Phase 5: Dashboard
+- [X] Add "Conversations" tab to dashboard
+  - Tab navigation between Results and Conversations views
+  - Load Conversations button with status indicator
+- [X] Show conversation list with summary cards
+  - Conversation ID, turn count, agent info
+  - Average confidence across turns
+  - Verdict distribution (pass/review/fail counts)
+  - First/last turn timestamps
+- [X] Drill-down view for conversation turns
+  - Click conversation card to view all turns
+  - Sequential display of query/answer pairs per turn
+  - Individual turn verdicts and confidence scores
+  - Back button to return to conversations list
+- [X] Stats dashboard for conversations
+  - Total conversations count
+  - Average turns per conversation
+  - Average confidence across all conversations
 
 ### Phase 6: Documentation
 - [X] Update documentation. Update the existing examples

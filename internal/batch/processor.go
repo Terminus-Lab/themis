@@ -75,6 +75,9 @@ func (p *Processor) worker(ctx context.Context, workerID int, jobs <-chan InputR
 
 		evalCtx := models.EvaluationContext{
 			RequestID:      record.Request.EventID,
+			ConversationID: record.Request.ConversationID,
+			AgentName:      record.Request.Agent.Name,
+			AgentVersion:   record.Request.Agent.Version,
 			Query:          record.Request.Interaction.UserQuery,
 			Context:        record.Request.Interaction.Context,
 			Answer:         record.Request.Interaction.Answer,

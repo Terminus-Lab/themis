@@ -8,7 +8,7 @@ services:
     environment:
       - POSTGRES_DB=${THEMIS_DB_DATABASE}
       - POSTGRES_USER=${THEMIS_DB_USER}
-      - POSTGRES_PASSWORD=${THEMIS_DB_DATABASE}
+      - POSTGRES_PASSWORD=${THEMIS_DB_PASSWORD}
       - POSTGRES_HOST_AUTH_METHOD=trust
     volumes:
       - postgres_data:/var/lib/postgresql/data
