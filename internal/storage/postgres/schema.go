@@ -13,7 +13,7 @@ const schema = `
       confidence REAL NOT NULL,
       verdict TEXT NOT NULL,
       stage_scores JSONB NOT NULL,
-      conversation_id TEXT,
+      conversation_id TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (event_id)
   );

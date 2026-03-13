@@ -68,20 +68,22 @@ EARLY_EXIT_THRESHOLD=0.2
 Each line is a JSON object with the same structure as the API request:
 
 ```jsonl
-{"event_id":"eval-001","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country in Western Europe. Paris is its capital.","answer":"The capital of France is Paris."}}
-{"event_id":"eval-002","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"AI stands for Artificial Intelligence.","answer":"AI is the simulation of human intelligence by machines."}}
+{"event_id":"eval-001","conversation_id":"conv-batch-001","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country in Western Europe. Paris is its capital.","answer":"The capital of France is Paris."}}
+{"event_id":"eval-002","conversation_id":"conv-batch-002","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"AI stands for Artificial Intelligence.","answer":"AI is the simulation of human intelligence by machines."}}
 ```
 
+**Required fields:**
+- `conversation_id` - Groups related evaluations into multi-turn conversations. Every evaluation must have a conversation ID.
+
 **Optional fields:**
-- `conversation_id` - For grouping related evaluations into multi-turn conversations. Enables conversation-level analysis and metrics.
 - `expected_output` - For correctness evaluation (ground truth comparison). Only used if correctness judge is enabled in `judges.yaml`.
 
 **Example with expected_output:**
 ```jsonl
-{"event_id":"eval-003","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"Four","expected_output":"4"}}
+{"event_id":"eval-003","conversation_id":"conv-batch-003","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"Four","expected_output":"4"}}
 ```
 
-**Example with conversation_id (multi-turn conversation):**
+**Example of a multi-turn conversation:**
 ```jsonl
 {"event_id":"turn-001","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country in Europe.","answer":"The capital of France is Paris."}}
 {"event_id":"turn-002","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the population?","context":"Paris is the capital of France.","answer":"Paris has approximately 2.2 million inhabitants."}}

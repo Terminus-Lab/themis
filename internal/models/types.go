@@ -43,7 +43,7 @@ type Interaction struct {
 // Input message
 type EvaluationRequest struct {
 	EventID         string      `json:"event_id"`
-	ConversationID  string      `json:"conversation_id"`
+	ConversationID  string      `json:"conversation_id"` // Required: groups related turns
 	EventType       EventType   `json:"event_type"`
 	Agent           Agent       `json:"agent"`
 	Interaction     Interaction `json:"interaction"`

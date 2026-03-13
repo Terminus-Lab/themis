@@ -340,7 +340,6 @@ func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.Conve
               agent_name,
               agent_version
           FROM eval_results
-          WHERE conversation_id IS NOT NULL AND conversation_id != ''
           GROUP BY conversation_id, agent_name, agent_version
           ORDER BY last_turn_at DESC
       `

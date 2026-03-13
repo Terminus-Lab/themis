@@ -73,6 +73,7 @@ curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "qs-001",
+    "conversation_id": "conv-qs-001",
     "event_type": "agent_response",
     "agent": {"name": "my-agent", "version": "1.0"},
     "interaction": {
@@ -108,6 +109,7 @@ curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "qs-002",
+    "conversation_id": "conv-qs-002",
     "event_type": "agent_response",
     "agent": {"name": "my-agent", "version": "1.0"},
     "interaction": {

@@ -7,9 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-03-17
+## [1.2.0] - 2026-03-18
 
 ### Added
+- **Conversation Grouping**: Track multi-turn agent interactions across all entry points
+  - `conversation_id` field to group related evaluations — **now mandatory** in all requests
+  - `agent_name` and `agent_version` fields for agent metadata tracking
+  - Database schema migration with `conversation_id TEXT NOT NULL` column and indexes
+  - New API endpoints:
+    - `GET /api/v1/conversations` - List all conversations with summary metrics
+    - `GET /api/v1/conversations/{id}` - Get conversation turns with detailed evaluations
+  - Storage layer methods: `GetConversation()` and `ListConversations()`
+  - Conversation summary aggregates: turn count, avg confidence, verdict distribution
+- **Dashboard Conversations Tab**: Multi-turn conversation visualization
+  - Tab navigation between Results and Conversations views
+  - Conversation list with summary cards (turn count, avg confidence, verdict breakdown)
+  - Drill-down view for individual conversation turns
+  - Clickable turns that navigate to full evaluation in Results tab
+  - URL-based navigation with browser back/forward support
+  - Real-time stats: total conversations, avg turns, avg confidence
+- **MCP Conversation Support**: Added `get_conversation` tool
+  - Accepts `conversation_id`, `agent_name`, `agent_version` in evaluation tools
+  - Returns full conversation detail with all turns chronologically
+  - In-memory storage by default (data persists during MCP session)
 - **Validation Sample Download API**: `POST /api/v1/validation/sample/download`
   - Samples evaluation results by date range and percentage for human annotation
   - Returns JSONL with only interaction data (`event_id`, `agent`, `interaction`) — no Themis scores to avoid annotator bias
@@ -31,47 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `docs/metrics/interpretation-guide.md` - Decision framework and troubleshooting guide
 
 ### Changed
-- **Batch CLI: DB persistence disabled by default** (`themis-cli evaluate`)
-  - Results are no longer persisted to DB during batch evaluation by default
-  - Use `--save-to-db` / `-d` flag to opt in (requires `IN_MEMORY_DB=false` and `THEMIS_DB_URL`)
-  - Validation command (`themis-cli validate`) always uses in-memory DB — results are never persisted
-- **Validation Output Format**: Enhanced JSON structure with 3-metric framework
-  - `correlation_metrics` - Kendall's τ (PRIMARY - pass/fail decision)
-  - `agreement_metrics` - Cohen's Kappa (SECONDARY - industry reporting)
-  - `confusion_matrix` - Error breakdown (DIAGNOSTIC - debugging)
-  - `per_class_metrics` - Precision/recall/F1 per verdict class
-
-### Fixed
-- **Azure OpenAI**: Fixed Azure OpenAI provider implementation
-- **SQLite In-Memory Connection Pool**: Fixed "no such table: eval_results" error
-  - `database/sql` connection pool created separate in-memory databases per connection
-  - Fixed by setting `MaxOpenConns(1)` for `:memory:` databases to ensure all operations share one connection
-
-## [1.1.0] - 2026-03-13
-
-### Added
-- **Conversation Grouping**: Track multi-turn agent interactions across all entry points
-  - Optional `conversation_id` field to group related evaluations
-  - `agent_name` and `agent_version` fields for agent metadata tracking
-  - Database schema migration with `conversation_id` column and indexes
-  - New API endpoints:
-    - `GET /api/v1/conversations` - List all conversations with summary metrics
-    - `GET /api/v1/conversations/{id}` - Get conversation turns with detailed evaluations
-  - Storage layer methods: `GetConversation()` and `ListConversations()`
-  - Conversation summary aggregates: turn count, avg confidence, verdict distribution
-- **Dashboard Conversations Tab**: Multi-turn conversation visualization
-  - Tab navigation between Results and Conversations views
-  - Conversation list with summary cards (turn count, avg confidence, verdict breakdown)
-  - Drill-down view for individual conversation turns
-  - Clickable turns that navigate to full evaluation in Results tab
-  - URL-based navigation with browser back/forward support
-  - Real-time stats: total conversations, avg turns, avg confidence
-- **MCP Conversation Support**: Added `get_conversation` tool
-  - Accepts `conversation_id`, `agent_name`, `agent_version` in evaluation tools
-  - Returns full conversation detail with all turns chronologically
-  - In-memory storage by default (data persists during MCP session)
-
-### Changed
+- **`conversation_id` is now mandatory** across API, MCP, and CLI batch input
+  - API returns `400 "conversation_id is required"` if omitted
+  - MCP tools `evaluate_response` and `evaluate_single_judge` return error if omitted
+  - DB schema enforces `NOT NULL` constraint
 - **CLI Refactoring**: Migrated batch CLI to Cobra framework with subcommands
   - Renamed binary: `themis-batch` → `themis-cli`
   - New command structure: `themis-cli evaluate` and `themis-cli validate`
@@ -84,6 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Kept `-s/--summary` flag for separate summary file generation
   - Auto-generated help text with examples and shell completion support
   - Better error handling with proper exit codes
+- **Batch CLI: DB persistence disabled by default** (`themis-cli evaluate`)
+  - Results are no longer persisted to DB during batch evaluation by default
+  - Use `--save-to-db` / `-d` flag to opt in (requires `IN_MEMORY_DB=false` and `THEMIS_DB_URL`)
+  - Validation command (`themis-cli validate`) always uses in-memory DB — results are never persisted
 - **API Response Enhancement**: `GET /api/v1/conversations/{id}` now includes:
   - `avg_confidence` - Average confidence across all turns
   - `agent_name` - Agent name from first turn
@@ -92,8 +79,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created `storage.ConversationDetail` as single source of truth
   - MCP and API now share same core types
   - Eliminated duplicate calculations between handlers
+- **Validation Output Format**: Enhanced JSON structure with 3-metric framework
+  - `correlation_metrics` - Kendall's τ (PRIMARY - pass/fail decision)
+  - `agreement_metrics` - Cohen's Kappa (SECONDARY - industry reporting)
+  - `confusion_matrix` - Error breakdown (DIAGNOSTIC - debugging)
+  - `per_class_metrics` - Precision/recall/F1 per verdict class
 
 ### Fixed
+- **Azure OpenAI**: Fixed Azure OpenAI provider implementation
+- **SQLite In-Memory Connection Pool**: Fixed "no such table: eval_results" error
+  - `database/sql` connection pool created separate in-memory databases per connection
+  - Fixed by setting `MaxOpenConns(1)` for `:memory:` databases to ensure all operations share one connection
 - **PostgreSQL Password Bug**: Fixed docker-compose.yml using wrong env var
   - Changed `POSTGRES_PASSWORD=${THEMIS_DB_DATABASE}` to `${THEMIS_DB_PASSWORD}`
 - **API 404 Handling**: Non-existent conversations now return 404 with error message
@@ -123,7 +119,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated CLAUDE.md with conversation API endpoints and dashboard features
 - Added 5 MCP test cases for conversation tracking (Test Cases 24-28)
 - Updated `docs/testing/mcp-tests.md` with conversation examples
-- Updated `docs/testing/batch-tests.md` with conversation_id examples
+- Updated `docs/testing/batch-tests.md` — `conversation_id` moved from optional to required field
+- Updated `docs/testing/api-tests.md` — all request examples include `conversation_id`
+- Updated `docs/getting-started/quick-start.md` — all curl examples include `conversation_id`
 - Updated `specs/conversation-grouping.md` to 100% complete (7/7 phases)
 - Created `resources/conversation_example.jsonl` with multi-turn examples
 
@@ -132,9 +130,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```bash
   migrate -path ./migrations -database "$THEMIS_DB_URL" up
   ```
-- **Backward Compatible**: All conversation fields are optional
-  - Existing evaluations without `conversation_id` continue working
-  - No breaking changes to existing API endpoints or request formats
+- **Breaking Change**: `conversation_id` is now required in all evaluation requests
+  - API: returns `400` if `conversation_id` is missing
+  - CLI: batch input records without `conversation_id` will fail validation
+  - MCP: `evaluate_response` and `evaluate_single_judge` tools require `conversation_id`
 - **SQLite Auto-Migration**: In-memory SQLite automatically applies schema
   - No manual migration needed if using `IN_MEMORY_DB=true`
 
@@ -213,6 +212,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added warning that binaries must run from extracted directory for configs/judges.yaml discovery
 
 [Unreleased]: https://github.com/Terminus-Lab/themis/compare/v1.2.0...HEAD
-[1.2.0]: https://github.com/Terminus-Lab/themis/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...v1.1.0
+[1.2.0]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/Terminus-Lab/themis/releases/tag/v1.0.0

@@ -504,6 +504,9 @@ func validateEvaluationRequest(evalRequest models.EvaluationRequest) error {
 	if evalRequest.EventID == "" {
 		return errors.New("event_id is required")
 	}
+	if evalRequest.ConversationID == "" {
+		return errors.New("conversation_id is required")
+	}
 	if evalRequest.Interaction.UserQuery == "" {
 		return errors.New("user_query is required")
 	}

@@ -14,7 +14,7 @@ const schema = `
       confidence REAL NOT NULL,
       verdict TEXT NOT NULL,
       stage_scores TEXT NOT NULL,
-      conversation_id TEXT,
+      conversation_id TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 

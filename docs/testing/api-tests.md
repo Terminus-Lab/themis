@@ -67,6 +67,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-001",
+    "conversation_id": "conv-test-001",
     "event_type": "agent_response",
     "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -93,6 +94,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-002",
+    "conversation_id": "conv-test-002",
     "event_type": "agent_response",
     "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -118,6 +120,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-003",
+    "conversation_id": "conv-test-003",
     "event_type": "agent_response",
     "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -149,6 +152,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-004",
+    "conversation_id": "conv-test-004",
     "event_type": "agent_response",
     "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -188,6 +192,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate/judge/relevance \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-005",
+    "conversation_id": "conv-test-005",
     "event_type": "agent_response",
     "agent": {"name": "test", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -211,6 +216,7 @@ curl -X POST "http://localhost:18082/api/v1/evaluate/judge/faithfulness?threshol
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-006",
+    "conversation_id": "conv-test-006",
     "event_type": "agent_response",
     "agent": {"name": "test", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -234,6 +240,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate/judge/invalid-judge \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-007",
+    "conversation_id": "conv-test-007",
     "event_type": "agent_response",
     "agent": {"name": "test", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -254,12 +261,30 @@ curl -X POST http://localhost:18082/api/v1/evaluate/judge/invalid-judge \
 
 ### Test Case 8: Missing Required Fields
 
-**Request:**
+**Request (missing `conversation_id`):**
 ```bash
 curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-008",
+    "interaction": {
+      "user_query": "Test",
+      "answer": "Test answer"
+    }
+  }'
+```
+
+**Expected:**
+- Status Code: 400
+- Error: `"conversation_id is required"`
+
+**Request (missing `answer`):**
+```bash
+curl -X POST http://localhost:18082/api/v1/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "test-008b",
+    "conversation_id": "conv-test-008",
     "interaction": {
       "user_query": "Test"
     }
@@ -268,7 +293,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
 
 **Expected:**
 - Status Code: 400
-- Error message about missing required field
+- Error: `"answer is required"`
 
 ---
 
@@ -282,7 +307,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
 for i in {1..10}; do
   curl -X POST http://localhost:18082/api/v1/evaluate \
     -H "Content-Type: application/json" \
-    -d "{\"event_id\":\"perf-$i\",\"event_type\":\"agent_response\",\"agent\":{\"name\":\"test\",\"type\":\"rag\",\"version\":\"1.0\"},\"interaction\":{\"user_query\":\"Test\",\"context\":\"Test\",\"answer\":\"Test\"}}" &
+    -d "{\"event_id\":\"perf-$i\",\"conversation_id\":\"conv-perf-$i\",\"event_type\":\"agent_response\",\"agent\":{\"name\":\"test\",\"type\":\"rag\",\"version\":\"1.0\"},\"interaction\":{\"user_query\":\"Test\",\"context\":\"Test\",\"answer\":\"Test\"}}" &
 done
 wait
 ```
@@ -303,6 +328,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d "{
     \"event_id\": \"test-010\",
+    \"conversation_id\": \"conv-test-010\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test\", \"type\": \"rag\", \"version\": \"1.0\"},
     \"interaction\": {
@@ -330,6 +356,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-011",
+    "conversation_id": "conv-test-011",
     "event_type": "agent_response",
     "agent": {"name": "test", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -353,6 +380,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-012",
+    "conversation_id": "conv-test-012",
     "event_type": "agent_response",
     "agent": {"name": "test", "type": "rag", "version": "1.0"},
     "interaction": {
@@ -400,6 +428,7 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test-multi-provider",
+    "conversation_id": "conv-multi-provider",
     "event_type": "agent_response",
     "agent": {"name": "test-agent", "type": "rag", "version": "1.0"},
     "interaction": {
