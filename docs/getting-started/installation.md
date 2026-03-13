@@ -211,7 +211,7 @@ go build -o bin/themis-api cmd/api/main.go
 
 ```bash
 go build -o bin/themis-batch cmd/batch/main.go
-./bin/themis-batch -input dataset.jsonl -output results.jsonl
+./bin/themis-batch evaluate -input dataset.jsonl -output results.jsonl
 ```
 
 ### MCP Server

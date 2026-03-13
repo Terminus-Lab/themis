@@ -118,7 +118,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test-valid.jsonl -output results.jsonl
+./themis-batch evaluate -input test-valid.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -138,7 +138,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test-invalid.jsonl -output results.jsonl
+./themis-batch evaluate -input test-invalid.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -152,7 +152,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test-mixed.jsonl -dry-run
+./themis-batch evaluate -input test-mixed.jsonl -dry-run
 ```
 
 **Expected Output:**
@@ -165,7 +165,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test-valid.jsonl -format summary
+./themis-batch evaluate -input test-valid.jsonl -format summary
 ```
 
 **Expected Output:**
@@ -184,7 +184,7 @@ Aggregate statistics in JSON format:
 **Command:**
 ```bash
 # Start processing large file
-./themis-batch -input large-dataset.jsonl -output results.jsonl
+./themis-batch evaluate -input large-dataset.jsonl -output results.jsonl
 
 # Press Ctrl+C after 2 seconds
 ```
@@ -200,7 +200,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input dataset-100.jsonl -workers 20 -output results.jsonl
+./themis-batch evaluate -input dataset-100.jsonl -workers 20 -output results.jsonl
 ```
 
 **Expected Output:**
@@ -213,7 +213,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch -input test.jsonl -format csv
+./themis-batch evaluate -input test.jsonl -format csv
 ```
 
 **Expected Output:**
@@ -231,9 +231,8 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-batch \
+./themis-batch validate \
   -input resources/annotated_sample.jsonl \
-  -validate \
   -correlation-threshold 0.3
 ```
 
@@ -282,7 +281,7 @@ INFO Computing Kendall's correlation...
 # Create test file with missing human_annotation
 echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
 
-./themis-batch -input test-no-annotation.jsonl -validate
+./themis-batch evaluate -input test-no-annotation.jsonl -validate
 ```
 
 **Expected:**
@@ -309,7 +308,7 @@ echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > t
 
 **Command:**
 ```bash
-cat dataset.jsonl | ./themis-batch -input - | jq 'select(.verdict=="fail")'
+cat dataset.jsonl | ./themis-batch evaluate -input - | jq 'select(.verdict=="fail")'
 ```
 
 **Expected:**
@@ -349,7 +348,7 @@ time ./themis-batch \
 
 **Command:**
 ```bash
-./themis-batch -input conversation-dataset.jsonl -output results.jsonl
+./themis-batch evaluate -input conversation-dataset.jsonl -output results.jsonl
 ```
 
 **Expected Output:**
@@ -375,13 +374,13 @@ Test with different worker counts:
 
 ```bash
 # 1 worker (sequential)
-time ./themis-batch -input dataset-100.jsonl -workers 1 -output /dev/null
+time ./themis-batch evaluate -input dataset-100.jsonl -workers 1 -output /dev/null
 
 # 5 workers (default)
-time ./themis-batch -input dataset-100.jsonl -workers 5 -output /dev/null
+time ./themis-batch evaluate -input dataset-100.jsonl -workers 5 -output /dev/null
 
 # 20 workers (high concurrency)
-time ./themis-batch -input dataset-100.jsonl -workers 20 -output /dev/null
+time ./themis-batch evaluate -input dataset-100.jsonl -workers 20 -output /dev/null
 ```
 
 **Expected:**
@@ -394,13 +393,13 @@ time ./themis-batch -input dataset-100.jsonl -workers 20 -output /dev/null
 ### Filter Failed Evaluations with jq
 
 ```bash
-./themis-batch -input dataset.jsonl | jq 'select(.verdict=="fail")'
+./themis-batch evaluate -input dataset.jsonl | jq 'select(.verdict=="fail")'
 ```
 
 ### Calculate Average Confidence with jq
 
 ```bash
-./themis-batch -input dataset.jsonl | jq -s 'map(.confidence) | add/length'
+./themis-batch evaluate -input dataset.jsonl | jq -s 'map(.confidence) | add/length'
 ```
 
 ### Import to pandas (Python)
@@ -424,7 +423,7 @@ print(fails[['id', 'confidence', 'verdict']])
 **Solution:** Ensure you specify `-input` flag with a valid file path.
 
 ```bash
-./themis-batch -input dataset.jsonl
+./themis-batch evaluate -input dataset.jsonl
 ```
 
 ### Issue: "Failed to open input file"
@@ -441,7 +440,7 @@ chmod 644 dataset.jsonl
 **Solution:** Check for parse errors in input JSONL. Use `-dry-run` to validate.
 
 ```bash
-./themis-batch -input dataset.jsonl -dry-run
+./themis-batch evaluate -input dataset.jsonl -dry-run
 ```
 
 ### Issue: High Memory Usage
@@ -458,7 +457,7 @@ split -l 10000 large-dataset.jsonl batch-
 **Solution:** Reduce worker count to stay within rate limits.
 
 ```bash
-./themis-batch -input dataset.jsonl -workers 3
+./themis-batch evaluate -input dataset.jsonl -workers 3
 ```
 
 ## Validation Mode Details

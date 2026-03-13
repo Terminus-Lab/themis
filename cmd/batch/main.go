@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -17,60 +16,170 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+)
+
+var (
+	// Global flags (available to all subcommands)
+	verbose bool
+
+	// Evaluate command flags
+	input           string
+	output          string
+	format          string
+	summary         string
+	workers         int
+	continueOnError bool
+	dryRun          bool
+
+	// Validate command flags
+	corrThreshold float64
 )
 
 func main() {
-	startTime := time.Now()
-
+	// Setup logging
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
-	input := flag.String("input", "", "Input file relative path")
-	output := flag.String("output", "", "Output file relative path")
-	format := flag.String("format", "jsonl", "Output file format. Supported formats: 'jsonl', 'summary'")
-	summary := flag.String("summary", "", "Optional separate summary file")
-	workers := flag.Int("workers", 5, "Concurrent evaluators workers")
-	continueOnError := flag.Bool("continue-on-error", true, "Continue on evaluation failures")
-	dryRun := flag.Bool("dry-run", false, "Validate input without evaluating")
-	validate := flag.Bool("validate", false, "Validation mode: compute correlation with human annotations")
-	corrThreshold := flag.Float64("correlation-threshold", 0.3, "Kendall's tau threshold for validation")
-
-	flag.Parse()
-
-	if *input == "" {
-		log.Fatal().Msg("required flag -input not provided")
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
 	}
-	formatValidator(format)
+}
 
-	if err := godotenv.Load(); err != nil {
-		log.Warn().Msg("No .env file found, using environment variables")
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "themis-batch",
+	Short: "Themis batch evaluation CLI",
+	Long: `Themis batch evaluation tool for processing datasets offline.
+
+Supports JSONL input/output, concurrent evaluation, validation mode,
+and Kendall's tau correlation against human annotations.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Load .env file for all commands
+		if err := godotenv.Load(); err != nil {
+			log.Warn().Msg("No .env file found, using environment variables")
+		}
+
+		// Setup verbose logging if requested
+		if verbose {
+			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		}
+	},
+}
+
+// evaluateCmd represents the evaluate command (main functionality)
+var evaluateCmd = &cobra.Command{
+	Use:   "evaluate",
+	Short: "Evaluate responses from input file",
+	Long: `Evaluate AI agent responses from a JSONL input file.
+
+Processes records through the Themis evaluation pipeline and writes
+results to output file. Supports concurrent evaluation with worker pool.
+
+Examples:
+  # Basic evaluation
+  themis-batch evaluate -i input.jsonl -o results.jsonl
+
+  # With custom workers and summary
+  themis-batch evaluate -i input.jsonl -o results.jsonl -w 10 -s summary.json
+
+  # Read from stdin, write to stdout
+  cat input.jsonl | themis-batch evaluate -i - -o -
+
+  # Dry run validation
+  themis-batch evaluate -i input.jsonl --dry-run`,
+	RunE: runEvaluate,
+}
+
+// validateCmd represents the validation command
+var validateCmd = &cobra.Command{
+	Use:   "validate",
+	Short: "Validate judge accuracy against human annotations",
+	Long: `Validate LLM judge accuracy using Kendall's tau correlation.
+
+Requires input file with 'human_annotation' field for each record.
+Computes correlation between human annotations and LLM verdicts.
+Recommended threshold: 0.3 (moderate agreement).
+
+Examples:
+  # Validate with default threshold (0.3)
+  themis-batch validate -i annotated.jsonl
+
+  # Custom threshold
+  themis-batch validate -i annotated.jsonl --correlation-threshold 0.5
+
+  # Output to file
+  themis-batch validate -i annotated.jsonl > validation-result.json`,
+	RunE: runValidate,
+}
+
+// versionCmd represents the version command
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Themis Batch CLI v1.0.0")
+	},
+}
+
+func init() {
+	// Global persistent flags
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
+
+	// Evaluate command flags
+	evaluateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path (use '-' for stdin)")
+	evaluateCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path (use '-' for stdout, default: stdout)")
+	evaluateCmd.Flags().StringVarP(&format, "format", "f", "jsonl", "Output format: jsonl, summary")
+	evaluateCmd.Flags().StringVarP(&summary, "summary", "s", "", "Optional separate summary file")
+	evaluateCmd.Flags().IntVarP(&workers, "workers", "w", 5, "Number of concurrent workers")
+	evaluateCmd.Flags().BoolVar(&continueOnError, "continue-on-error", true, "Continue on evaluation failures")
+	evaluateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Validate input without evaluating")
+
+	evaluateCmd.MarkFlagRequired("input")
+
+	// Validate command flags
+	validateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
+	validateCmd.Flags().Float64Var(&corrThreshold, "correlation-threshold", 0.3, "Kendall's tau threshold")
+
+	validateCmd.MarkFlagRequired("input")
+
+	// Add commands to root
+	rootCmd.AddCommand(evaluateCmd)
+	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(versionCmd)
+}
+
+func runEvaluate(cmd *cobra.Command, args []string) error {
+	startTime := time.Now()
+
+	// Validate format
+	validFormats := map[string]bool{"jsonl": true, "summary": true}
+	if !validFormats[format] {
+		return fmt.Errorf("invalid format %q. Supported: jsonl, summary", format)
 	}
 
 	ctx, cancel := setupGracefulShutdown()
 	defer cancel()
 
 	cfg := setup.LoadConfig()
-
 	deps, err := setup.Wire(ctx, cfg, &log.Logger)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to wire dependencies")
+		return fmt.Errorf("failed to wire dependencies: %w", err)
 	}
 
 	// Open input file
 	var inputFile io.Reader
-	if *input == "-" {
+	if input == "-" {
 		inputFile = os.Stdin
 		log.Info().Msg("Reading from stdin")
 	} else {
-		f, err := os.Open(*input)
+		f, err := os.Open(input)
 		if err != nil {
-			log.Fatal().Err(err).Str("file", *input).Msg("Failed to open input file")
+			return fmt.Errorf("failed to open input file %q: %w", input, err)
 		}
-
 		defer closeFile(f)
-
 		inputFile = f
-		log.Info().Str("file", *input).Msg("Reading input file")
+		log.Info().Str("file", input).Msg("Reading input file")
 	}
 
 	// Read records
@@ -85,46 +194,37 @@ func main() {
 	log.Info().Int("total", len(records)).Msg("Input file parsed")
 
 	// Dry run validation
-	if *dryRun {
-		dryRunAndExit(records)
-	}
-
-	// Validation mode
-	if *validate {
-		runValidationMode(ctx, records, deps, *corrThreshold)
-		return
+	if dryRun {
+		return dryRunValidation(records)
 	}
 
 	// Open output file
 	var outputFile io.Writer
-	if *output == "" {
+	if output == "" || output == "-" {
 		outputFile = os.Stdout
 		log.Info().Msg("Writing to stdout")
 	} else {
-		f, err := os.Create(*output)
+		f, err := os.Create(output)
 		if err != nil {
-			log.Fatal().Err(err).Str("file", *output).Msg("Failed to create output file")
+			return fmt.Errorf("failed to create output file %q: %w", output, err)
 		}
 		defer closeFile(f)
-
 		outputFile = f
-		log.Info().Str("file", *output).Msg("Writing to output file")
+		log.Info().Str("file", output).Msg("Writing to output file")
 	}
 
 	// Create writer
-	writer, err := batch.NewWriter(outputFile, *format, deps.Logger)
+	writer, err := batch.NewWriter(outputFile, format, deps.Logger)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create writer")
+		return fmt.Errorf("failed to create writer: %w", err)
 	}
-
 	defer closeFile(writer)
 
 	// Process with worker pool
-	processor := batch.NewProcessor(deps.Executor, *workers, deps.Logger)
+	processor := batch.NewProcessor(deps.Executor, workers, deps.Logger)
 	results := processor.Process(ctx, records)
 
 	// Write results
-	// Note: Results are already saved to database by executor
 	successCount := 0
 	errorCount := 0
 	var allResults []models.EvaluationResult
@@ -136,8 +236,8 @@ func main() {
 			log.Error().Err(err).Str("id", result.ID).Msg("Failed to write result")
 			errorCount++
 
-			if !*continueOnError {
-				log.Fatal().Msg("Stopping due to write error")
+			if !continueOnError {
+				return fmt.Errorf("stopping due to write error: %w", err)
 			}
 		} else {
 			successCount++
@@ -150,85 +250,51 @@ func main() {
 		Dur("duration", time.Since(startTime)).
 		Msg("Processing complete")
 
-	if *summary != "" {
-		writeSummary(summary, allResults)
+	if summary != "" {
+		if err := writeSummary(summary, allResults); err != nil {
+			return fmt.Errorf("failed to write summary: %w", err)
+		}
 	}
 
 	log.Info().Msg("Batch processing complete")
+	return nil
 }
 
-func setupGracefulShutdown() (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		log.Warn().Msg("Received interrupt signal, finishing current work...")
-		cancel()
-	}()
-
-	return ctx, cancel
-}
-
-func formatValidator(format *string) {
-	validFormats := map[string]bool{"jsonl": true, "summary": true}
-	if !validFormats[*format] {
-		log.Fatal().
-			Str("format", *format).
-			Msg("Invalid format. Supported: jsonl, summary")
-	}
-}
-
-func writeSummary(summary *string, results []models.EvaluationResult) {
-	summaryFile, err := os.Create(*summary)
-	if err != nil {
-		log.Fatal().Err(err).Str("file", *summary).Msg("Failed to create summary file")
-	}
-
-	defer closeFile(summaryFile)
-
-	// Create a summary writer and populate it
-	summaryWriter := batch.NewSummaryWriter(summaryFile, &log.Logger)
-	for _, result := range results {
-		if err := summaryWriter.Write(result); err != nil {
-			log.Error().Err(err).Str("id", result.ID).Msg("Failed to add result to summary")
-		}
-	}
-
-	// Close writes the computed stats to the file
-	if err := summaryWriter.Close(); err != nil {
-		log.Fatal().Err(err).Str("file", *summary).Msg("Failed to write summary file")
-	}
-
-	log.Info().Str("file", *summary).Msg("Summary written")
-}
-
-func dryRunAndExit(records []batch.InputRecord) {
-	errorCount := 0
-	for _, record := range records {
-		if record.Error != nil {
-			log.Error().
-				Int("line", record.LineNumber).
-				Err(record.Error).
-				Msg("Validation error")
-			errorCount++
-		}
-	}
-
-	if errorCount > 0 {
-		log.Fatal().Int("errors", errorCount).Msg("Validation failed")
-	}
-
-	log.Info().Msg("Validation successful")
-	os.Exit(0)
-}
-
-func runValidationMode(ctx context.Context, records []batch.InputRecord, deps *setup.Dependencies, threshold float64) {
+func runValidate(cmd *cobra.Command, args []string) error {
 	log.Info().Msg("Validation mode enabled")
 
-	// Build map of event_id -> human_annotation for O(1) lookup
+	ctx, cancel := setupGracefulShutdown()
+	defer cancel()
+
+	cfg := setup.LoadConfig()
+	deps, err := setup.Wire(ctx, cfg, &log.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to wire dependencies: %w", err)
+	}
+
+	// Open input file
+	var inputFile io.Reader
+	if input == "-" {
+		inputFile = os.Stdin
+	} else {
+		f, err := os.Open(input)
+		if err != nil {
+			return fmt.Errorf("failed to open input file %q: %w", input, err)
+		}
+		defer closeFile(f)
+		inputFile = f
+	}
+
+	// Read records
+	reader := batch.NewReader(inputFile, deps.Logger)
+	recordsCh := reader.ReadAll(ctx)
+
+	var records []batch.InputRecord
+	for record := range recordsCh {
+		records = append(records, record)
+	}
+
+	// Build annotation map and validate
 	annotationMap := make(map[string]string)
 	missingAnnotations := 0
 
@@ -245,9 +311,7 @@ func runValidationMode(ctx context.Context, records []batch.InputRecord, deps *s
 	}
 
 	if missingAnnotations > 0 {
-		log.Fatal().
-			Int("missing", missingAnnotations).
-			Msg("Validation mode requires all records to have 'human_annotation' field")
+		return fmt.Errorf("validation requires all records to have 'human_annotation' field (missing: %d)", missingAnnotations)
 	}
 
 	log.Info().Int("total", len(records)).Msg("Evaluating records with human annotations...")
@@ -256,7 +320,7 @@ func runValidationMode(ctx context.Context, records []batch.InputRecord, deps *s
 	processor := batch.NewProcessor(deps.Executor, 5, deps.Logger)
 	results := processor.Process(ctx, records)
 
-	// Collect annotation pairs using map lookup
+	// Collect annotation pairs
 	var pairs []batch.AnnotationPair
 	for result := range results {
 		humanAnnotation, ok := annotationMap[result.ID]
@@ -275,23 +339,91 @@ func runValidationMode(ctx context.Context, records []batch.InputRecord, deps *s
 
 	log.Info().Msg("Computing Kendall's correlation...")
 
-	// Validate
-	validationResult, err := batch.ValidateAnnotations(pairs, threshold)
+	// Validate and output
+	return validateAndOutput(pairs, corrThreshold)
+}
+
+// Helper functions
+func setupGracefulShutdown() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Warn().Msg("Received interrupt signal, finishing current work...")
+		cancel()
+	}()
+
+	return ctx, cancel
+}
+
+func closeFile(f io.Closer) {
+	if err := f.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close file")
+	}
+}
+
+func writeSummary(path string, results []models.EvaluationResult) error {
+	summaryFile, err := os.Create(path)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Validation failed")
+		return err
+	}
+	defer closeFile(summaryFile)
+
+	summaryWriter := batch.NewSummaryWriter(summaryFile, &log.Logger)
+	for _, result := range results {
+		if err := summaryWriter.Write(result); err != nil {
+			log.Error().Err(err).Str("id", result.ID).Msg("Failed to add result to summary")
+		}
 	}
 
-	// Output validation result as JSON to stdout
+	if err := summaryWriter.Close(); err != nil {
+		return err
+	}
+
+	log.Info().Str("file", path).Msg("Summary written")
+	return nil
+}
+
+func dryRunValidation(records []batch.InputRecord) error {
+	errorCount := 0
+	for _, record := range records {
+		if record.Error != nil {
+			log.Error().
+				Int("line", record.LineNumber).
+				Err(record.Error).
+				Msg("Validation error")
+			errorCount++
+		}
+	}
+
+	if errorCount > 0 {
+		return fmt.Errorf("validation failed with %d errors", errorCount)
+	}
+
+	log.Info().Msg("Validation successful")
+	return nil
+}
+
+func validateAndOutput(pairs []batch.AnnotationPair, threshold float64) error {
+	validationResult, err := batch.ValidateAnnotations(pairs, threshold)
+	if err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	// Output JSON to stdout
 	validationJSON, err := json.MarshalIndent(validationResult, "", "  ")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to marshal validation result")
+		return fmt.Errorf("failed to marshal validation result: %w", err)
 	}
 	fmt.Println(string(validationJSON))
 
-	// Print summary to stderr (for logging)
+	// Log summary to stderr
 	printValidationSummary(validationResult)
 
-	// Write to file as well
+	// Write to file
 	summaryFile := "validation-summary.json"
 	if err := os.WriteFile(summaryFile, validationJSON, 0644); err == nil {
 		log.Info().Str("file", summaryFile).Msg("Validation summary written")
@@ -299,16 +431,13 @@ func runValidationMode(ctx context.Context, records []batch.InputRecord, deps *s
 
 	// Exit based on result
 	if !validationResult.Passed {
-		log.Error().
-			Float64("tau", validationResult.KendallTau).
-			Float64("threshold", threshold).
-			Msg("Validation failed: Kendall's tau below threshold")
-		log.Error().Msg("Review configs/judges.yaml prompts and re-run validation")
-		os.Exit(1)
+		return fmt.Errorf("validation failed: Kendall's tau (%.3f) below threshold (%.3f)",
+			validationResult.KendallTau, threshold)
 	}
 
 	log.Info().Msg("LLM judge validated against human annotations")
 	log.Info().Msg("Safe to evaluate full dataset with these judge prompts")
+	return nil
 }
 
 func printValidationSummary(result *batch.ValidationResult) {
@@ -326,10 +455,4 @@ func printValidationSummary(result *batch.ValidationResult) {
 		Str("status", status).
 		Str("interpretation", result.Interpretation).
 		Msg("Validation complete")
-}
-
-func closeFile(f io.Closer) {
-	if err := f.Close(); err != nil {
-		log.Error().Err(err).Msg("Failed to close file")
-	}
 }

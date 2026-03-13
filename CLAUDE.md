@@ -23,7 +23,7 @@ go run cmd/api/main.go
 STREAMING_ENABLED=true go run cmd/api/main.go
 
 # Batch evaluation (offline datasets)
-go run cmd/batch/main.go -input dataset.jsonl -output results.jsonl -workers 5
+go run cmd/batch/main.go evaluate -input dataset.jsonl -output results.jsonl -workers 5
 
 # MCP server (Claude Code/Desktop integration)
 go run cmd/mcp/main.go
@@ -331,9 +331,8 @@ Before deploying judge changes to production:
 ```bash
 # 1. Collect human annotations for sample dataset (25% recommended)
 # 2. Run validation mode
-go run cmd/batch/main.go \
+go run cmd/batch/main.go validate \
   -input human_annotated_sample.jsonl \
-  -validate \
   -correlation-threshold 0.3
 
 # 3. Check Kendall's τ ≥ 0.3 in JSON output

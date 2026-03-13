@@ -434,9 +434,8 @@ Before deploying prompt changes:
 ```bash
 # Collect human annotations (25+ samples)
 # Run validation
-go run cmd/batch/main.go \
+go run cmd/batch/main.go validate \
   -input annotated_sample.jsonl \
-  -validate \
   -correlation-threshold 0.3
 
 # Deploy only if Kendall's τ ≥ 0.3
