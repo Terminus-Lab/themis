@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-13
+
+### Added
+- **Conversation Grouping**: Track multi-turn agent interactions across all entry points
+  - Optional `conversation_id` field to group related evaluations
+  - `agent_name` and `agent_version` fields for agent metadata tracking
+  - Database schema migration with `conversation_id` column and indexes
+  - New API endpoints:
+    - `GET /api/v1/conversations` - List all conversations with summary metrics
+    - `GET /api/v1/conversations/{id}` - Get conversation turns with detailed evaluations
+  - Storage layer methods: `GetConversation()` and `ListConversations()`
+  - Conversation summary aggregates: turn count, avg confidence, verdict distribution
+- **Dashboard Conversations Tab**: Multi-turn conversation visualization
+  - Tab navigation between Results and Conversations views
+  - Conversation list with summary cards (turn count, avg confidence, verdict breakdown)
+  - Drill-down view for individual conversation turns
+  - Clickable turns that navigate to full evaluation in Results tab
+  - URL-based navigation with browser back/forward support
+  - Real-time stats: total conversations, avg turns, avg confidence
+- **MCP Conversation Support**: Added `get_conversation` tool
+  - Accepts `conversation_id`, `agent_name`, `agent_version` in evaluation tools
+  - Returns full conversation detail with all turns chronologically
+  - In-memory storage by default (data persists during MCP session)
+
+### Changed
+- **API Response Enhancement**: `GET /api/v1/conversations/{id}` now includes:
+  - `avg_confidence` - Average confidence across all turns
+  - `agent_name` - Agent name from first turn
+  - `agent_version` - Agent version from first turn
+- **Type Consolidation**: Unified conversation response types
+  - Created `storage.ConversationDetail` as single source of truth
+  - MCP and API now share same core types
+  - Eliminated duplicate calculations between handlers
+
+### Fixed
+- **PostgreSQL Password Bug**: Fixed docker-compose.yml using wrong env var
+  - Changed `POSTGRES_PASSWORD=${THEMIS_DB_DATABASE}` to `${THEMIS_DB_PASSWORD}`
+- **API 404 Handling**: Non-existent conversations now return 404 with error message
+  - Previous behavior incorrectly returned 200 with empty result
+  - Updated integration tests to expect proper REST semantics
+- **Batch CLI Database Integration**: Added conversation field mapping
+  - Fixed `processor.go` to pass `ConversationID`, `AgentName`, `AgentVersion` to context
+  - Results now properly saved with conversation metadata
+- **Streaming Consumer Normalization**: Fixed normalize() function
+  - Added missing `ConversationID`, `AgentName`, `AgentVersion` fields
+  - Now matches API handler normalize() behavior
+
+### Documentation
+- Updated README.md with MCP conversation tracking examples
+- Updated CLAUDE.md with conversation API endpoints and dashboard features
+- Added 5 MCP test cases for conversation tracking (Test Cases 24-28)
+- Updated `docs/testing/mcp-tests.md` with conversation examples
+- Updated `docs/testing/batch-tests.md` with conversation_id examples
+- Updated `specs/conversation-grouping.md` to 100% complete (7/7 phases)
+- Created `resources/conversation_example.jsonl` with multi-turn examples
+
+### Migration Notes
+- **Database Migration Required**: Run migrations before upgrading
+  ```bash
+  migrate -path ./migrations -database "$THEMIS_DB_URL" up
+  ```
+- **Backward Compatible**: All conversation fields are optional
+  - Existing evaluations without `conversation_id` continue working
+  - No breaking changes to existing API endpoints or request formats
+- **SQLite Auto-Migration**: In-memory SQLite automatically applies schema
+  - No manual migration needed if using `IN_MEMORY_DB=true`
+
 ## [1.0.0] - 2026-03-11
 
 ### Added
