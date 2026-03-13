@@ -2,32 +2,14 @@ package mcpadapter
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/Terminus-Lab/themis/internal/executor"
 	"github.com/Terminus-Lab/themis/internal/models"
+	"github.com/Terminus-Lab/themis/internal/storage"
 )
-
-// EvaluateInput is the MCP tool input schema for full pipeline evaluation.
-type EvaluateInput struct {
-	EventID        string `json:"event_id" jsonschema:"unique event identifier"`
-	Query          string `json:"user_query" jsonschema:"user's original query"`
-	Answer         string `json:"answer" jsonschema:"agent response to evaluate"`
-	Context        string `json:"context,omitempty" jsonschema:"optional context or retrieved documents"`
-	ExpectedOutput string `json:"expected_output,omitempty" jsonschema:"optional ground truth for correctness evaluation"`
-}
-
-// EvaluateSingleJudgeInput is the MCP tool input schema for single judge evaluation.
-type EvaluateSingleJudgeInput struct {
-	EventID        string  `json:"event_id" jsonschema:"unique event identifier"`
-	Query          string  `json:"user_query" jsonschema:"user's original query"`
-	Answer         string  `json:"answer" jsonschema:"agent response to evaluate"`
-	Context        string  `json:"context,omitempty" jsonschema:"optional context or retrieved documents"`
-	ExpectedOutput string  `json:"expected_output,omitempty" jsonschema:"optional ground truth for correctness evaluation"`
-	JudgeName      string  `json:"judge_name" jsonschema:"judge name: relevance, faithfulness, coherence, completeness, instruction, or correctness"`
-	Threshold      float64 `json:"threshold,omitempty" jsonschema:"pass/fail threshold (0.0-1.0, default: 0.7)"`
-}
 
 // NewEvaluateHandler returns a tool handler that uses the given executor.
 // Pass the returned function to mcp.AddTool.
@@ -46,6 +28,9 @@ func EvaluateResponse(
 ) (*mcp.CallToolResult, models.EvaluationResult, error) {
 	evalCtx := models.EvaluationContext{
 		RequestID:      input.EventID,
+		ConversationID: input.ConversationID,
+		AgentName:      input.AgentName,
+		AgentVersion:   input.AgentVersion,
 		Query:          input.Query,
 		Context:        input.Context,
 		Answer:         input.Answer,
@@ -74,6 +59,9 @@ func EvaluateSingleJudge(
 ) (*mcp.CallToolResult, models.EvaluationResult, error) {
 	evalCtx := models.EvaluationContext{
 		RequestID:      input.EventID,
+		ConversationID: input.ConversationID,
+		AgentName:      input.AgentName,
+		AgentVersion:   input.AgentVersion,
 		Query:          input.Query,
 		Context:        input.Context,
 		Answer:         input.Answer,
@@ -90,4 +78,51 @@ func EvaluateSingleJudge(
 	result, err := judgeExec.Execute(ctx, input.JudgeName, threshold, evalCtx)
 
 	return nil, result, err
+}
+
+// NewGetConversationHandler returns a tool handler for retrieving conversation turns.
+func NewGetConversationHandler(repo storage.Repository) func(context.Context, *mcp.CallToolRequest, ConversationInput) (*mcp.CallToolResult, storage.ConversationDetail, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest, input ConversationInput) (*mcp.CallToolResult, storage.ConversationDetail, error) {
+		return GetConversation(ctx, repo, req, input)
+	}
+}
+
+// GetConversation retrieves all turns for a given conversation ID.
+func GetConversation(
+	ctx context.Context,
+	repo storage.Repository,
+	req *mcp.CallToolRequest,
+	input ConversationInput,
+) (*mcp.CallToolResult, storage.ConversationDetail, error) {
+	if input.ConversationID == "" {
+		return nil, storage.ConversationDetail{}, fmt.Errorf("conversation_id is required")
+	}
+
+	turns, err := repo.GetConversation(ctx, input.ConversationID)
+	if err != nil {
+		return nil, storage.ConversationDetail{}, fmt.Errorf("failed to get conversation: %w", err)
+	}
+
+	if len(turns) == 0 {
+		return nil, storage.ConversationDetail{}, fmt.Errorf("conversation not found: %s", input.ConversationID)
+	}
+
+	// Calculate average confidence
+	totalConfidence := 0.0
+	for _, turn := range turns {
+		totalConfidence += turn.Confidence
+	}
+	avgConfidence := totalConfidence / float64(len(turns))
+
+	// Use agent info from first turn (should be same across all turns)
+	result := storage.ConversationDetail{
+		ConversationID: input.ConversationID,
+		TurnCount:      len(turns),
+		AvgConfidence:  avgConfidence,
+		AgentName:      turns[0].AgentName,
+		AgentVersion:   turns[0].AgentVersion,
+		Turns:          turns,
+	}
+
+	return nil, result, nil
 }

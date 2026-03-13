@@ -253,7 +253,7 @@ func (h *Handler) GetConversationID(req *restful.Request, resp *restful.Response
 		Msg("Get conversations by ID")
 
 	ctx := req.Request.Context()
-	evaluations, err := h.repository.GetConversation(ctx, conversationID)
+	turns, err := h.repository.GetConversation(ctx, conversationID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.logger.Warn().Str("conversation_id", conversationID).Msg("Result not found")
@@ -267,8 +267,33 @@ func (h *Handler) GetConversationID(req *restful.Request, resp *restful.Response
 		return
 	}
 
+	if len(turns) == 0 {
+		h.logger.Warn().Str("conversation_id", conversationID).Msg("Conversation not found")
+		_ = resp.WriteHeaderAndEntity(http.StatusNotFound, map[string]string{
+			"error": "conversation not found",
+		})
+		return
+	}
+
+	// Calculate average confidence
+	totalConfidence := 0.0
+	for _, turn := range turns {
+		totalConfidence += turn.Confidence
+	}
+	avgConfidence := totalConfidence / float64(len(turns))
+
+	// Build conversation detail
+	detail := storage.ConversationDetail{
+		ConversationID: conversationID,
+		TurnCount:      len(turns),
+		AvgConfidence:  avgConfidence,
+		AgentName:      turns[0].AgentName,
+		AgentVersion:   turns[0].AgentVersion,
+		Turns:          turns,
+	}
+
 	// Convert to DTO
-	conversationDetailResponse := toConversationDetailResponse(evaluations, conversationID)
+	conversationDetailResponse := toConversationDetailResponse(detail)
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, conversationDetailResponse)
 }

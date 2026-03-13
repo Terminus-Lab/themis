@@ -8,22 +8,21 @@
 
 ## Status Summary
 
-**Completion**: 6.67/7 Phases Complete (95%)
+**Completion**: 7/7 Phases Complete (100%)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
 | Phase 1: Schema Migration | ✅ Complete | 100% |
 | Phase 2: Storage Layer | ✅ Complete | 100% |
 | Phase 3: API Layer | ✅ Complete | 100% |
-| Phase 4: Entry Points | ⚠️ Partial | 67% (2/3 complete) |
+| Phase 4: Entry Points | ✅ Complete | 100% (3/3 complete) |
 | Phase 5: Dashboard | ✅ Complete | 100% |
 | Phase 6: Documentation | ✅ Complete | 100% |
 | Phase 7: Performance Opt | ⏸️ On Hold | N/A (trigger-based) |
 
-**Next Steps**:
-1. ~~Fix streaming consumer normalize() function~~ ✅ **Done**
-2. ~~Add dashboard UI for conversations~~ ✅ **Done**
-3. Update MCP adapter for conversation_id (optional)
+**Status**: ✅ **All phases complete!**
+
+**Next Steps**: None - feature complete and ready for production
 
 ---
 
@@ -69,11 +68,18 @@
 ### Phase 4: Entry Points
 - [X] Update batch CLI to support conversation_id in JSONL
   - Already supported via `models.EvaluationRequest`
+  - Fixed `internal/batch/processor.go` to pass ConversationID, AgentName, AgentVersion to EvaluationContext
   - Added test: `TestReader_WithConversationID()`
   - Added example file: `resources/conversation_example.jsonl`
   - Updated documentation in `docs/testing/batch-tests.md`
-- [ ] Update MCP adapter to accept conversation_id
-  - TODO: Update MCP request handling
+- [X] Update MCP adapter to accept conversation_id
+  - Added `conversation_id`, `agent_name`, `agent_version` to `EvaluateInput` and `EvaluateSingleJudgeInput` schemas
+  - Updated `EvaluateResponse()` and `EvaluateSingleJudge()` handlers to pass fields to EvaluationContext
+  - Created new `get_conversation` tool with `GetConversationInput` schema
+  - Implemented `GetConversation()` handler to retrieve all turns for a conversation_id
+  - Registered new tool in MCP server with description
+  - Added 5 test cases in `docs/testing/mcp-tests.md` (Test Cases 24-28)
+  - MCP defaults to in-memory DB (no setup required), user can override with `IN_MEMORY_DB=false`
 - [X] Update streaming consumer to parse conversation_id
   - Fixed `normalize()` in `internal/stream/redis/consumer.go` to include ConversationID, AgentName, AgentVersion
   - Added comprehensive tests: `TestNormalize()` with 3 test cases + `TestNormalize_CreatedAtTimestamp()`

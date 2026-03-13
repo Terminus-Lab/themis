@@ -32,3 +32,13 @@ type ConversationSummary struct {
 	AgentName      string
 	AgentVersion   string
 }
+
+// ConversationDetail provides full conversation data with all turns
+type ConversationDetail struct {
+	ConversationID string
+	TurnCount      int
+	AvgConfidence  float64
+	AgentName      string
+	AgentVersion   string
+	Turns          []Evaluation
+}

@@ -64,11 +64,12 @@ MCP Servers:
   Tools:
   - evaluate_response: Evaluate an AI agent response...
   - evaluate_single_judge: Evaluate with a single judge...
+  - get_conversation: Retrieve all evaluation turns for a given conversation_id...
 ```
 
 **Verification:**
 - themis server shows as "Ready"
-- Two tools are listed
+- Three tools are listed
 - Tool descriptions are visible
 
 ## evaluate_response Tool Tests
@@ -499,7 +500,171 @@ Which response had the lowest quality?
 - Tracks results across conversation
 - Correctly identifies Response 3 as lowest quality
 
+## Conversation Tracking Tests
+
+### Test Case 24: Multi-Turn Conversation Tracking
+
+**Prompt:**
+```
+I'm testing my chatbot assistant-v1.0 and want to track a multi-turn conversation.
+
+Turn 1:
+Query: "What is the capital of France?"
+Answer: "Paris is the capital of France, located in the north-central part of the country."
+Conversation ID: conv-001
+
+Turn 2 (same conversation):
+Query: "What's the population?"
+Answer: "Paris has approximately 2.1 million inhabitants within its city limits."
+Conversation ID: conv-001
+
+Turn 3 (same conversation):
+Query: "Tell me about the Eiffel Tower"
+Answer: "The Eiffel Tower is an iconic iron lattice tower on the Champ de Mars in Paris, built in 1889."
+Conversation ID: conv-001
+
+Now show me the full conversation analysis for conv-001
+```
+
+**Expected Behavior:**
+- Claude makes 3 calls to `evaluate_response` with same `conversation_id`
+- Each call includes `agent_name` and `agent_version`
+- Claude then calls `get_conversation` with `conversation_id: "conv-001"`
+- Results show all 3 turns in chronological order
+- Summary includes turn_count, avg_confidence, agent info
+
+**Verification:**
+- All 3 evaluations stored with conversation_id
+- get_conversation returns turns in order (by created_at)
+- Average confidence calculated correctly
+- Agent name and version preserved across turns
+
+### Test Case 25: Get Conversation Tool
+
+**Prompt:**
+```
+Use get_conversation to retrieve conversation conv-001
+```
+
+**Expected Response:**
+```json
+{
+  "conversation_id": "conv-001",
+  "turn_count": 3,
+  "avg_confidence": 0.87,
+  "agent_name": "assistant-v1.0",
+  "agent_version": "1.0",
+  "turns": [
+    {
+      "event_id": "turn-1",
+      "user_query": "What is the capital of France?",
+      "answer": "Paris is the capital...",
+      "verdict": "pass",
+      "confidence": 0.92
+    },
+    {
+      "event_id": "turn-2",
+      "user_query": "What's the population?",
+      "answer": "Paris has approximately...",
+      "verdict": "pass",
+      "confidence": 0.85
+    },
+    {
+      "event_id": "turn-3",
+      "user_query": "Tell me about the Eiffel Tower",
+      "answer": "The Eiffel Tower is...",
+      "verdict": "pass",
+      "confidence": 0.84
+    }
+  ]
+}
+```
+
+**Verification:**
+- Conversation summary correct
+- All turns returned in chronological order
+- Per-turn details include query, answer, verdict, confidence
+- Agent metadata consistent
+
+### Test Case 26: Conversation Not Found
+
+**Prompt:**
+```
+Get conversation conv-999 (doesn't exist)
+```
+
+**Expected Response:**
+- Error: "conversation not found: conv-999"
+- Claude explains no evaluations with that ID exist
+
+**Verification:**
+- Proper error handling
+- Clear error message
+
+### Test Case 27: In-Memory Persistence During Session
+
+**Scenario:**
+```
+Session 1 (MCP server running):
+1. Evaluate turn 1 with conversation_id: conv-session-test
+2. Evaluate turn 2 with same conversation_id
+3. Get conversation conv-session-test
+   → Returns both turns ✓
+
+4. Close Claude Desktop
+5. Reopen Claude Desktop (MCP server restarts)
+6. Get conversation conv-session-test
+   → Returns error "conversation not found" ✓ (expected - in-memory DB)
+```
+
+**Expected Behavior:**
+- Within same session: Data persists across calls
+- After MCP restart: Data lost (in-memory DB default)
+- This is expected behavior for lightweight testing
+
+**Note:** For persistent storage, set `IN_MEMORY_DB=false` and provide `THEMIS_DB_URL` in MCP config.
+
+### Test Case 28: Optional Fields in evaluate_response
+
+**Prompt:**
+```
+Evaluate without conversation_id:
+
+Query: "What is 2+2?"
+Answer: "4"
+
+(No conversation_id provided)
+```
+
+**Expected Behavior:**
+- Evaluation succeeds
+- conversation_id stored as empty string
+- get_conversation won't find it (requires conversation_id)
+- Backward compatible with old behavior
+
+**Verification:**
+- conversation_id is optional
+- Evaluations work with or without it
+- Only evaluations with conversation_id can be grouped
+
 ## Summary
+
+**Total Test Cases:** 28
+
+**Categories:**
+- Tool Discovery: 1 test
+- evaluate_response: 4 tests
+- evaluate_single_judge: 3 tests
+- Error Handling: 2 tests
+- Integration: 2 tests
+- Performance: 2 tests
+- Docker: 1 test
+- Platform Integration: 2 tests
+- Troubleshooting: 3 tests
+- Advanced Use Cases: 3 tests
+- Conversation Tracking: 5 tests
+
+**Expected Pass Rate:** 100% with proper setup
 
 **Total Test Cases:** 23
 

@@ -1207,25 +1207,21 @@ func TestAPI_GetConversationByID_NotFound(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	container.ServeHTTP(recorder, req)
 
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200 (empty result), got %d", recorder.Code)
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", recorder.Code)
 	}
 
-	var response api.ConversationDetailResponse
+	var response map[string]string
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
+		t.Fatalf("Failed to parse error response: %v", err)
 	}
 
-	// Should return empty conversation with 0 turns
-	if response.TurnCount != 0 {
-		t.Errorf("Expected turn_count=0 for non-existent conversation, got %d", response.TurnCount)
+	// Should return error message
+	if response["error"] != "conversation not found" {
+		t.Errorf("Expected error='conversation not found', got '%s'", response["error"])
 	}
 
-	if len(response.Turns) != 0 {
-		t.Errorf("Expected 0 turns for non-existent conversation, got %d", len(response.Turns))
-	}
-
-	t.Log("Get conversation not found: returned empty result as expected")
+	t.Log("Get conversation not found: returned 404 as expected")
 }
 
 /*

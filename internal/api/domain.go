@@ -49,6 +49,9 @@ type EvaluationResponse struct {
 type ConversationDetailResponse struct {
 	ConversationID string          `json:"conversation_id" description:"Conversation ID"`
 	TurnCount      int             `json:"turn_count" description:"The number of interactions/events from the conversation"`
+	AvgConfidence  float64         `json:"avg_confidence" description:"Average confidence across all turns"`
+	AgentName      string          `json:"agent_name" description:"Agent name"`
+	AgentVersion   string          `json:"agent_version" description:"Agent version"`
 	Turns          []EvaluationDTO `json:"turns"` // Full Evaluation
 }
 
@@ -107,24 +110,21 @@ func toEvaluationDTOs(evaluations []storage.Evaluation) []EvaluationDTO {
 	return dtos
 }
 
-// toConversationDetailResponse convert Evaluations to ConversationDetailResponse
-func toConversationDetailResponse(evaluations []storage.Evaluation, conversationID string) ConversationDetailResponse {
-	response := ConversationDetailResponse{
-		ConversationID: conversationID,
-		TurnCount:      len(evaluations),
-		Turns:          []EvaluationDTO{},
+// toConversationDetailResponse converts storage.ConversationDetail to API response DTO
+func toConversationDetailResponse(detail storage.ConversationDetail) ConversationDetailResponse {
+	dtos := make([]EvaluationDTO, len(detail.Turns))
+	for i, turn := range detail.Turns {
+		dtos[i] = toEvaluationDTO(turn)
 	}
 
-	if len(evaluations) == 0 {
-		return response
+	return ConversationDetailResponse{
+		ConversationID: detail.ConversationID,
+		TurnCount:      detail.TurnCount,
+		AvgConfidence:  detail.AvgConfidence,
+		AgentName:      detail.AgentName,
+		AgentVersion:   detail.AgentVersion,
+		Turns:          dtos,
 	}
-
-	for _, evaluation := range evaluations {
-		evaluationDTO := toEvaluationDTO(evaluation)
-		response.Turns = append(response.Turns, evaluationDTO)
-	}
-
-	return response
 }
 
 func toConversationSummaryDTO(conversationSummaries storage.ConversationSummary) ConversationSummaryDTO {
