@@ -4,6 +4,8 @@ AI agent evaluation service using configurable LLM judges and statistical valida
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Terminus-Lab/themis)
+
 
 **Build Commands**
 
