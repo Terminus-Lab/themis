@@ -309,8 +309,8 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 **Goal:** Create reusable metrics package with clean interfaces
 
 **Tasks:**
-- [ ] Create `internal/metrics/` package structure
-- [ ] Define core types: `Label`, `ConfusionMatrix`, `ClassMetrics`, `MetricsSummary`
+- [X] Create `internal/metrics/` package structure
+- [X] Define core types: `Label`, `ConfusionMatrix`, `ClassMetrics`, `MetricsSummary`
 - [ ] Set up test framework with edge cases
 - [ ] Document metric formulas in README
 
@@ -323,11 +323,11 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 **Goal:** Implement confusion matrix as foundation for other metrics
 
 **Tasks:**
-- [ ] Implement `Build()` - creates 3x3 matrix from actual/predicted labels
-- [ ] Implement `ComputeClassMetrics()` - calculates precision/recall/F1
+- [X] Implement `Build()` - creates 3x3 matrix from actual/predicted labels
+- [X] Implement `ComputeClassMetrics()` - calculates precision/recall/F1
 - [ ] Implement `String()` - pretty-prints matrix for CLI
 - [ ] Implement `ToBinary()` - collapses to 2x2 (fail+review vs pass)
-- [ ] Add comprehensive tests
+- [X] Add comprehensive tests
 
 **Deliverable:** Working confusion matrix with per-class metrics
 
