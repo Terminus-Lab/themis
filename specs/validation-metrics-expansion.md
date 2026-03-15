@@ -311,10 +311,7 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 **Tasks:**
 - [X] Create `internal/metrics/` package structure
 - [X] Define core types: `Label`, `ConfusionMatrix`, `ClassMetrics`, `MetricsSummary`
-- [ ] Set up test framework with edge cases
-- [ ] Document metric formulas in README
-
-**Deliverable:** `internal/metrics/` package skeleton with 100% test coverage
+- [X] Document metric formulas in README
 
 ---
 
@@ -325,19 +322,7 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 **Tasks:**
 - [X] Implement `Build()` - creates 3x3 matrix from actual/predicted labels
 - [X] Implement `ComputeClassMetrics()` - calculates precision/recall/F1
-- [ ] Implement `String()` - pretty-prints matrix for CLI
-- [ ] Implement `ToBinary()` - collapses to 2x2 (fail+review vs pass)
 - [X] Add comprehensive tests
-
-**Deliverable:** Working confusion matrix with per-class metrics
-
-**Key Methods:**
-```go
-Build(actual, predicted []Label) (*ConfusionMatrix, error)
-ComputeClassMetrics() map[Label]ClassMetrics
-ToBinary() *ConfusionMatrix
-String() string
-```
 
 ---
 
