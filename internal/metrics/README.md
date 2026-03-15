@@ -2,6 +2,91 @@
 
 Validation metrics for evaluating LLM judge accuracy against human annotations.
 
+**3 Core Metrics:**
+1. **Kendall's τ (PRIMARY)** - Pass/fail decision (τ ≥ 0.3 = deploy)
+2. **Confusion Matrix (DEBUG)** - Shows WHERE judge fails (actionable insights)
+3. **Cohen's Kappa (REPORT)** - Industry standard for stakeholder communication
+
+---
+
+## Kendall's Tau (τ)
+
+### Why It's Required
+
+**Kendall's τ answers:** "Do the judge's scores correlate with human rankings?"
+
+**Primary purpose:** Pass/fail decision for judge deployment (τ ≥ 0.3 = deploy)
+
+Kendall's tau measures rank correlation between human annotations and LLM verdicts:
+- τ = 1.0: Perfect agreement (all pairs ranked same way)
+- τ = 0.0: No correlation (random guessing)
+- τ = -1.0: Perfect disagreement (all pairs ranked opposite)
+
+---
+
+### Formula
+
+```
+τ = (concordant - discordant) / total_pairs
+
+where:
+  concordant = pairs where both humans and judge rank in same direction
+  discordant = pairs where humans and judge rank in opposite directions
+  total_pairs = n × (n - 1) / 2
+```
+
+**Ranking:**
+- fail = 0 (worst)
+- review = 1 (middle)
+- pass = 2 (best)
+
+**Example:**
+```
+Human:  [fail, review, pass]  →  [0, 1, 2]
+Judge:  [fail, review, pass]  →  [0, 1, 2]
+
+All 3 pairs concordant:
+  (0,1): human 0<1, judge 0<1 ✓
+  (0,2): human 0<2, judge 0<2 ✓
+  (1,2): human 1<2, judge 1<2 ✓
+
+τ = (3 - 0) / 3 = 1.0 (perfect)
+```
+
+---
+
+### Interpretation Scale
+
+| τ Value | Interpretation | Action |
+|---------|----------------|--------|
+| ≥ 0.7 | Strong agreement | Deploy confidently |
+| 0.5 - 0.69 | Moderate to strong agreement | Deploy with monitoring |
+| 0.3 - 0.49 | Moderate agreement | Deploy (minimum threshold) |
+| 0.1 - 0.29 | Weak agreement | Reject, improve judge |
+| < 0.1 | Very weak or no agreement | Reject, major issues |
+
+**Decision threshold:** τ ≥ 0.3 is minimum for production deployment
+
+---
+
+### When to Use Tau
+
+**Use Kendall's τ as PRIMARY metric:**
+- Pass/fail decision for judge deployment
+- Validates that judge understands quality ordering
+- Works with ordinal labels (fail < review < pass)
+- Robust to ties and small sample sizes
+
+**Limitations:**
+- Doesn't show WHERE judge fails (use confusion matrix)
+- Doesn't account for class imbalance (use Cohen's Kappa for reporting)
+- Only measures rank correlation, not exact agreement
+
+**Decision flow:**
+1. Compute τ on validation set
+2. If τ ≥ 0.3 → PASSED, judge is deployable
+3. If τ < 0.3 → FAILED, investigate with confusion matrix
+
 ---
 
 ## Confusion Matrix
@@ -237,4 +322,4 @@ go test ./internal/metrics/...        # Run tests
 go test -cover ./internal/metrics/... # With coverage
 ```
 
-Current coverage: **100%**
+Current coverage: **95.1%** (24 tests passing)

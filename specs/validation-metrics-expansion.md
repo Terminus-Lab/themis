@@ -400,7 +400,7 @@ InterpretTau(tau float64) string
 **Goal:** Integrate new metrics into existing validation workflow
 
 **Tasks:**
-- [ ] Update `internal/batch/validator.go` to use metrics package
+- [X] Update `internal/batch/validator.go` to use metrics package
 - [ ] Enhance `ValidationReport` struct with comprehensive metrics
 - [ ] Add CLI pretty-printing for terminal output
 - [ ] Maintain backwards compatibility (legacy τ-only output)
