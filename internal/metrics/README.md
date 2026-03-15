@@ -149,6 +149,87 @@ Actual negative   43        10     ← 81% caught
 
 ---
 
+## Cohen's Kappa
+
+### Why It's Required
+
+**Problem with accuracy:** A judge that always predicts "pass" gets 90% accuracy if 90% of data is "pass" (useless!)
+
+**Cohen's Kappa corrects for chance agreement:**
+- Accuracy = "How often do we agree?"
+- Kappa = "How often do we agree, **minus expected agreement by random guessing**?"
+
+**Use case:** Validating judges for research papers, stakeholder reporting
+
+---
+
+### Formula
+
+```
+κ = (observed_agreement - expected_agreement) / (1 - expected_agreement)
+
+Where:
+  observed_agreement = (diagonal sum) / total
+  expected_agreement = Σ(p_actual_i × p_predicted_i)
+```
+
+**Intuition:**
+- If judge agrees with humans more than random guessing → κ > 0
+- If judge agrees exactly as much as random guessing → κ = 0
+- If judge disagrees more than random guessing → κ < 0
+
+---
+
+### Interpretation Scale
+
+| κ Value | Interpretation | Meaning |
+|---------|----------------|---------|
+| < 0.00 | Poor | Worse than random |
+| 0.00-0.20 | Slight | Barely better than random |
+| 0.21-0.40 | Fair | Some agreement, not great |
+| 0.41-0.60 | Moderate | Reasonable agreement |
+| 0.61-0.80 | Substantial | Strong agreement |
+| 0.81-1.00 | Almost perfect | Excellent agreement |
+
+**Industry standard:** κ ≥ 0.40 is acceptable, κ ≥ 0.60 is good
+
+---
+
+### When to Use Kappa
+
+**Use Kappa when:**
+- Data has class imbalance (e.g., 90% pass, 5% review, 5% fail)
+- Writing research papers (required for inter-rater agreement)
+- Communicating with stakeholders who know ML standards
+- Comparing judges across different datasets
+
+**Don't rely on Kappa alone:**
+- Always check confusion matrix (Kappa won't tell you where judge fails)
+- Always check Kendall's τ first (that's the pass/fail decision)
+- Kappa is **report-only** metric, not decision metric
+
+---
+
+### Example: Why Kappa Matters
+
+**Scenario 1: Imbalanced dataset (90% pass)**
+
+Judge always predicts "pass":
+- Accuracy = 90% (looks good!)
+- Cohen's Kappa = 0.0 (no better than random)
+- **Verdict:** Judge is useless
+
+**Scenario 2: Balanced errors**
+
+Judge agrees 75% of time on balanced dataset:
+- Accuracy = 75%
+- Cohen's Kappa = 0.62 (substantial agreement)
+- **Verdict:** Judge is reliable
+
+**Key insight:** Kappa tells you if judge is actually evaluating or just exploiting class distribution
+
+---
+
 ## Testing
 
 ```bash

@@ -1,7 +1,26 @@
 # Validation Metrics Expansion - Specification
 
-**Status:** Planning
+**Status:** In Progress
 **Date:** 2026-03-14
+**Updated:** 2026-03-15
+
+---
+
+## Status Summary
+
+**Completion**: 2/5 Phases Complete (40%)
+
+| Phase | Status | Progress |
+|-------|--------|----------|
+| Phase 1: Metrics Package Infrastructure | ✅ Complete | 100% |
+| Phase 2: Confusion Matrix Implementation | ✅ Complete | 100% |
+| Phase 3: Cohen's Kappa Implementation | 🔄 In Progress | 0% |
+| Phase 4: Integration with Validation Pipeline | 🔲 Not Started | 0% |
+| Phase 5: Documentation & Testing | 🔲 Not Started | 0% |
+
+**Current Status:** ✅ Phases 1-2 complete. Ready for Phase 3 (Cohen's Kappa)
+
+**Next Steps:** Implement Cohen's Kappa calculation and interpretation
 
 ---
 
@@ -304,29 +323,36 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 
 ## 5. Implementation Phases
 
-### Phase 1: Metrics Package Infrastructure (Week 1, Day 1-2)
+### Phase 1: Metrics Package Infrastructure ✅ COMPLETE
 
 **Goal:** Create reusable metrics package with clean interfaces
 
 **Tasks:**
 - [X] Create `internal/metrics/` package structure
-- [X] Define core types: `Label`, `ConfusionMatrix`, `ClassMetrics`, `MetricsSummary`
+- [X] Define core types: `Label`, `ConfusionMatrix`, `ClassMetrics`
 - [X] Document metric formulas in README
+
+**Deliverable:** ✅ Package structure with types and documentation
 
 ---
 
-### Phase 2: Confusion Matrix Implementation (Week 1, Day 3)
+### Phase 2: Confusion Matrix Implementation ✅ COMPLETE
 
 **Goal:** Implement confusion matrix as foundation for other metrics
 
 **Tasks:**
 - [X] Implement `Build()` - creates 3x3 matrix from actual/predicted labels
+- [X] Implement `Get()`, `TotalActual()`, `TotalPredict()`, `TotalCorrect()`, `TotalSample()`
 - [X] Implement `ComputeClassMetrics()` - calculates precision/recall/F1
-- [X] Add comprehensive tests
+- [X] Implement `ToBinary()` - collapses to 2x2 matrix
+- [X] Add comprehensive tests (16 tests, 100% coverage)
+- [X] Document confusion matrix concepts in README
+
+**Deliverable:** ✅ Full confusion matrix implementation with tests and documentation
 
 ---
 
-### Phase 3: Cohen's Kappa Implementation (Week 1, Day 4)
+### Phase 3: Cohen's Kappa Implementation (CURRENT - Week 1, Day 4)
 
 **Goal:** Implement Cohen's Kappa (industry standard categorical agreement metric)
 
@@ -362,7 +388,7 @@ InterpretKappa(kappa float64) string
 
 ---
 
-### Phase 4: Integration with Validation Pipeline (Week 1, Day 5 + Week 2, Day 1)
+### Phase 4: Integration with Validation Pipeline 
 
 **Goal:** Integrate new metrics into existing validation workflow
 
@@ -392,27 +418,27 @@ go run cmd/batch/main.go validate -input data.jsonl -output-format json
 
 ---
 
-### Phase 5: Documentation & Testing (Week 2, Day 2-5)
+### Phase 5: Documentation & Testing
 
 **Goal:** Comprehensive documentation and validation with test dataset
 
-**Task 5.1: Create Test Dataset** (Day 3)
+**Task 5.1: Create Test Dataset**
 - [ ] Generate 150 synthetic samples (50 fail, 50 review, 50 pass)
 - [ ] Include edge cases (ambiguous, boundary, perfect matches)
 - [ ] Add to `resources/validation_test_dataset.jsonl`
 
-**Task 5.2: Metric Comparison Analysis** (Day 3-4)
+**Task 5.2: Metric Comparison Analysis**
 - [ ] Run validation with test dataset
 - [ ] Compare metrics across different error patterns
 - [ ] Document when each metric provides unique insight
 
-**Task 5.3: Documentation** (Day 4-5)
+**Task 5.3: Documentation**
 - [ ] Create `docs/metrics/README.md` - formulas and interpretations
 - [ ] Create `docs/metrics/interpretation-guide.md` - case studies
 - [ ] Update `docs/testing/batch-tests.md` - new validation examples
 - [ ] Create `docs/examples/validation-report-examples.md` - 5 scenarios
 
-**Task 5.4: Unit Testing** (Day 5)
+**Task 5.4: Unit Testing**
 - [ ] Achieve >95% code coverage for `internal/metrics/`
 - [ ] Add integration tests for full validation pipeline
 - [ ] Performance benchmarks (10k samples in <1s)
@@ -424,317 +450,37 @@ go run cmd/batch/main.go validate -input data.jsonl -output-format json
 ## 6. Success Criteria
 
 ### Technical Requirements
-- ✅ All 3 core metrics in `internal/metrics/` implemented and tested:
+- All 3 core metrics in `internal/metrics/` implemented and tested:
   - `kendalls_tau.go` (moved from batch/validator.go)
   - `confusion_matrix.go`
   - `cohens_kappa.go`
   - `validator.go` (orchestrator)
-- ✅ >95% test coverage for `internal/metrics/` package
-- ✅ Backwards compatibility maintained (existing scripts work unchanged)
-- ✅ Performance: Process 1000 samples in <2 seconds
-- ✅ Clean integration with existing validation pipeline
-- ✅ Simple 3-metric decision framework documented
+- >95% test coverage for `internal/metrics/` package
+- Backwards compatibility maintained (existing scripts work unchanged)
+- Performance: Process 1000 samples in <2 seconds
+- Clean integration with existing validation pipeline
+- Simple 3-metric decision framework documented
 
 ### User Experience
-- ✅ CLI output is readable and actionable
-- ✅ JSON output is machine-parseable
-- ✅ Confusion matrix reveals error patterns clearly
-- ✅ Per-class metrics help debug specific issues
-- ✅ Metric interpretation is well-documented
+- CLI output is readable and actionable
+- JSON output is machine-parseable
+- Confusion matrix reveals error patterns clearly
+- Per-class metrics help debug specific issues
+- Metric interpretation is well-documented
 
 ### Documentation
-- ✅ Each metric has formula + interpretation guide
-- ✅ Examples show when each metric provides unique insight
-- ✅ Test dataset (150 samples) demonstrates metric behavior
-- ✅ Integration with future `themis validate` command documented
+- Each metric has formula + interpretation guide
+- Examples show when each metric provides unique insight
+- Test dataset (150 samples) demonstrates metric behavior
+- Integration with future `themis validate` command documented
 
----
+## 7. Future Enhancements
 
-## 7. Dependencies
-
-### Go Packages (New)
-- **None** - Pure Go implementation (no external dependencies)
-
-### Go Packages (Existing)
-- `gonum.org/v1/gonum/stat` - Already used for Kendall's τ
-
-### Test Data
-- 150-sample annotated dataset with balanced classes
-- Edge case examples (ambiguous labels, boundary cases)
-
-### Documentation Tools
-- Existing docs structure (`docs/metrics/`, `docs/examples/`)
-
----
-
-## 8. Risks & Mitigations
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Metric formulas implemented incorrectly | High | Validate against published papers + Python scikit-learn |
-| Confusion matrix visualization unclear | Medium | User testing with CLI output, iterate on format |
-| Performance issues with large datasets | Low | Benchmark with 10k samples, optimize if needed |
-| Users confused by multiple metrics | Medium | Clear documentation + interpretation guide |
-| Breaking changes to existing validation | High | Maintain backwards compatibility, `--output-format legacy` |
-
----
-
-## 9. Comparison to Alternatives
-
-### Alternative 1: Use Python scikit-learn for Validation
-**Pros:** Battle-tested, comprehensive metrics
-**Cons:** Requires Python, fragmented toolchain, users need both Go and Python
-
-**Decision:** Implement in Go for unified experience
-
-### Alternative 2: Only Add Confusion Matrix (Skip Kappa)
-**Pros:** Simpler implementation
-**Cons:** Cohen's Kappa is industry standard for inter-rater agreement
-
-**Decision:** Include κ for research/publication requirements
-
-### Alternative 3: External Metrics Service
-**Pros:** Separation of concerns
-**Cons:** Extra infrastructure, API calls, complexity
-
-**Decision:** Inline metrics package is simpler
-
----
-
-## 10. Open Questions
-
-### Q1: Should we report both 3-class and binary metrics by default?
-**Proposal:** Yes, include both in JSON output. CLI shows 3-class by default, add `--binary` flag for 2x2 view.
-
-### Q2: What weight scheme for weighted kappa?
-**Proposal:** Use linear weights (ordinal distance) by default. Add `--weight-scheme` flag: `linear`, `quadratic`.
-
-### Q3: Should confusion matrix show counts or percentages?
-**Proposal:** Show counts by default (easier to understand). Add row percentages in parentheses for normalized view.
-
-### Q4: Minimum sample size for reliable metrics?
-**Proposal:** Warn if n < 30 samples. Document that κ requires n > 50 for stability.
-
-### Q5: Should we add per-judge metrics (validate each judge individually)?
-**Proposal:** Not in this phase. Add `--judge <name>` flag in future iteration.
-
----
-
-## 11. Timeline
-
-**Week 1 (Implementation):**
-- Day 1-2: Metrics package infrastructure (types, tests, README)
-- Day 3: Confusion matrix implementation + per-class metrics
-- Day 4: Cohen's Kappa implementation
-- Day 5: Integration with validation pipeline (part 1)
-
-**Week 2 (Integration & Documentation):**
-- Day 1: Integration with validation pipeline (part 2) + CLI output formatting
-- Day 2: Test dataset creation (150 samples)
-- Day 3-4: Metric comparison analysis + interpretation guide
-- Day 5: Final documentation + examples
-
-**Total:** 2 weeks to production-ready 3-metric validation (simplified from original 5-metric proposal)
-
----
-
-## 12. Next Steps
-
-1. **Approve this specification** (review and sign off)
-2. **Create GitHub issues** for each phase
-3. **Begin Phase 1** (Metrics package structure)
-4. **Iterate based on test results** (adjust formulas, output format)
-5. **Release with v0.x.0** (breaking change to validation output format)
-
----
-
-## 13. Future Enhancements (Post-Launch)
-
-### Phase 6: Additional Metrics (If User Demand)
+### Phase 6: Additional Metrics
 - **Weighted Cohen's Kappa** - Partial credit for ordinal errors (fail→review vs fail→pass)
 - **Agreement Rate** - Simple accuracy (% exact matches)
 - **Spearman's ρ** - Parametric alternative to Kendall's τ
 - **Mean Absolute Error (MAE)** - For continuous scores
 - **Per-judge validation** - Validate each judge independently
 
-**Note:** Intentionally excluded from initial release to keep simple (3 metrics only)
-
-### Phase 7: Visualization (Optional)
-- HTML report generation (confusion matrix heatmap)
-- Time-series tracking (τ/κ over multiple validation runs)
-- Dashboard integration (show metrics in web UI)
-
-### Phase 8: Statistical Tests (Optional)
-- Bootstrap confidence intervals for κ
-- Statistical significance testing (McNemar's test)
-- Sample size recommendations (power analysis)
-
----
-
-## Appendix A: Metric Formulas
-
-### Cohen's Kappa
-```
-κ = (p_o - p_e) / (1 - p_e)
-
-where:
-  p_o = observed agreement = (diagonal sum) / total
-  p_e = expected agreement = Σ(p_actual_i × p_predicted_i)
-
-Interpretation:
-  < 0.00: Poor (worse than chance)
-  0.00-0.20: Slight agreement
-  0.21-0.40: Fair agreement
-  0.41-0.60: Moderate agreement
-  0.61-0.80: Substantial agreement
-  0.81-1.00: Almost perfect agreement
-```
-
-### Per-Class Metrics (Derived from Confusion Matrix)
-```
-precision_i = TP_i / (TP_i + FP_i)
-  "Of predicted class i, how many were correct?"
-
-recall_i = TP_i / (TP_i + FN_i)
-  "Of actual class i, how many did we detect?"
-
-F1_i = 2 × (precision_i × recall_i) / (precision_i + recall_i)
-  "Harmonic mean of precision and recall"
-
-where:
-  TP_i = true positives for class i (diagonal cell)
-  FP_i = false positives (column sum - diagonal)
-  FN_i = false negatives (row sum - diagonal)
-```
-
----
-
-## Appendix B: Example Scenarios
-
-### Scenario 1: High Accuracy, Low Kappa (Class Imbalance)
-**Situation:** 90% of samples are "pass", judge predicts "pass" for everything.
-
-```
-Accuracy: 90% (looks good!)
-Cohen's Kappa: 0.0 (no better than random guessing)
-
-Conclusion: Judge is exploiting class imbalance, not actually evaluating.
-Action: Check confusion matrix - likely predicting majority class only.
-```
-
-### Scenario 2: Moderate Kappa with Few Critical Errors
-**Situation:** Judge has moderate kappa but confusion matrix shows most errors are minor (review↔pass).
-
-```
-Cohen's Kappa: 0.35 (fair agreement)
-Confusion matrix: Only 2 fail→pass errors (critical), but many review→pass (8)
-
-Conclusion: Judge is safe (few critical errors) but over-predicts "review".
-Action: Consider adjusting VERDICT_PASS_THRESHOLD slightly lower to reduce review cases.
-```
-
-### Scenario 3: Low Kendall's τ, Moderate Kappa (Scaling Issue)
-**Situation:** Judge agrees on categorical labels but assigns different continuous scores.
-
-```
-Kendall's τ: 0.25 (weak correlation)
-Cohen's Kappa: 0.45 (moderate agreement)
-
-Conclusion: Verdict mapping works, but scoring scale needs adjustment.
-Action: Judge's continuous scores (0-1) map correctly to verdicts, no changes needed.
-```
-
-### Scenario 4: High Recall, Low Precision for "fail" (False Alarms)
-**Situation:** Judge detects all failures but flags many false positives.
-
-```
-Recall(fail): 0.95 (excellent - catches failures)
-Precision(fail): 0.45 (poor - many false alarms)
-
-Confusion matrix shows:
-  - 1 pass → fail (false positive)
-  - 8 review → fail (false positives)
-
-Conclusion: Judge is too strict, over-predicting failures.
-Action: Increase VERDICT_REVIEW_THRESHOLD to reduce false "fail" predictions.
-```
-
-### Scenario 5: Weak Review Class (Expected)
-**Situation:** Review class has low F1 score (common pattern).
-
-```
-F1(fail): 0.78 (good)
-F1(review): 0.55 (weak)
-F1(pass): 0.82 (good)
-
-Confusion matrix shows:
-  - Many review → pass (8)
-  - Many review → fail (3)
-
-Conclusion: Borderline cases are hard to classify (expected behavior).
-Action: This is acceptable - review cases are inherently ambiguous. Monitor over time.
-```
-
----
-
-## Appendix C: CLI Output Examples
-
-### Compact Format (Terminal)
-```
-=== Validation Report ===
-Total: 150 | Status: ✓ PASSED
-
-Metrics:
-  τ=0.420  κ=0.382  κ_w=0.451  acc=83.3%
-
-Confusion Matrix (fail/review/pass):
-     f   r   p
-f | 20   5   2  (27)
-r |  3  15   8  (26)
-p |  1   6  40  (47)
-
-Key Insights:
-  ✓ Strong performance (75% accuracy)
-  ⚠️ Review class weak (F1=0.58)
-  ✓ Only 2 critical errors (fail→pass)
-```
-
-### Detailed Format (Full Report)
-```
-=== Validation Report ===
-Total Records: 150
-Threshold: 0.30
-Status: ✓ PASSED
-
-Correlation Metrics (PRIMARY - Pass/Fail):
-  Kendall's τ: 0.420 (Moderate positive correlation) → PASSED ✅
-
-Agreement Metrics (REPORT - Industry Standard):
-  Cohen's Kappa: 0.382 (Fair agreement)
-
-Confusion Matrix (DEBUG - Actionable Insights):
-                    Predicted
-                fail  review  pass  | Total
-Actual  fail     20      5      2   |  27
-        review    3     15      8   |  26
-        pass      1      6     40   |  47
-        --------------------------------
-        Total    24     26     50   | 100
-
-Per-Class Performance:
-                Precision  Recall    F1      Support
-  fail          0.833      0.741    0.785      27
-  review        0.577      0.577    0.577      26
-  pass          0.800      0.851    0.825      47
-
-Binary Classification (fail+review vs pass):
-  Cohen's Kappa:    0.521
-  Agreement Rate:   87.3%
-
-Interpretation:
-  ✓ Judge is production-ready (τ ≥ 0.3, κ ≥ 0.3)
-  ✓ Strong diagonal (75% accuracy)
-  ⚠️ Review class weak (58% F1) - expected for borderline cases
-  ✓ Minimal critical errors (only 2 fail→pass)
-  → Recommendation: Deploy, monitor review class over time
-```
+**Note:** Intentionally excluded to keep simple (3 metrics only)
