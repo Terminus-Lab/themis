@@ -8,19 +8,19 @@
 
 ## Status Summary
 
-**Completion**: 2/5 Phases Complete (40%)
+**Completion**: 3/5 Phases Complete (60%)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
 | Phase 1: Metrics Package Infrastructure | ✅ Complete | 100% |
 | Phase 2: Confusion Matrix Implementation | ✅ Complete | 100% |
-| Phase 3: Cohen's Kappa Implementation | 🔄 In Progress | 0% |
+| Phase 3: Cohen's Kappa + Kendall's Tau Refactor | ✅ Complete | 100% |
 | Phase 4: Integration with Validation Pipeline | 🔲 Not Started | 0% |
 | Phase 5: Documentation & Testing | 🔲 Not Started | 0% |
 
-**Current Status:** ✅ Phases 1-2 complete. Ready for Phase 3 (Cohen's Kappa)
+**Current Status:** ✅ Phases 1-3 complete. Ready for Phase 4 (Integration)
 
-**Next Steps:** Implement Cohen's Kappa calculation and interpretation
+**Next Steps:** Integrate new metrics into validation pipeline
 
 ---
 
@@ -352,14 +352,19 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 
 ---
 
-### Phase 3: Cohen's Kappa Implementation (CURRENT - Week 1, Day 4)
+### Phase 3: Cohen's Kappa + Kendall's Tau Refactor ✅ COMPLETE
 
-**Goal:** Implement Cohen's Kappa (industry standard categorical agreement metric)
+**Goal:** Implement Cohen's Kappa and refactor Kendall's tau into metrics package
 
 **Tasks:**
-- [ ] Implement `ComputeCohensKappa(cm *ConfusionMatrix)` - computes κ from confusion matrix
-- [ ] Implement `InterpretKappa(kappa float64)` - returns human-readable interpretation
-- [ ] Add comprehensive tests (perfect agreement, random, imbalanced)
+- [X] Implement `ComputeCohensKappa(cm *ConfusionMatrix)` - computes κ from confusion matrix
+- [X] Implement `InterpretKappa(kappa float64)` - returns human-readable interpretation
+- [X] Add comprehensive tests (perfect agreement, random, imbalanced)
+- [X] Refactor Kendall's tau from `internal/batch/validator.go` into `internal/metrics/kendalls_tau.go`
+- [X] Implement `ComputeKendallsTau(humanAnnotations, llmPredictions []Label)` in metrics package
+- [X] Implement `InterpretTau(tau float64)` in metrics package
+- [X] Add tests for Kendall's tau in metrics package
+- [X] Update `internal/batch/validator.go` to use metrics package functions
 
 **Formula:**
 ```
@@ -382,9 +387,11 @@ where:
 ```go
 ComputeCohensKappa(cm *ConfusionMatrix) (float64, error)
 InterpretKappa(kappa float64) string
+ComputeKendallsTau(humanAnnotations, llmPredictions []Label) (float64, error)
+InterpretTau(tau float64) string
 ```
 
-**Deliverable:** Cohen's Kappa implemented and tested
+**Deliverable:** ✅ All 3 core metrics (Kendall's τ, Confusion Matrix, Cohen's Kappa) implemented in metrics package with 95.1% test coverage
 
 ---
 

@@ -2,8 +2,8 @@ package batch
 
 import (
 	"fmt"
-	"math"
 
+	"github.com/Terminus-Lab/themis/internal/metrics"
 	"github.com/Terminus-Lab/themis/internal/models"
 )
 
@@ -34,48 +34,17 @@ func ComputeKendallTau(pairs []AnnotationPair) (float64, error) {
 		return 0, fmt.Errorf("need at least 2 pairs to compute correlation")
 	}
 
-	// Convert verdicts to ranks
-	humanRanks := make([]int, len(pairs))
-	llmRanks := make([]int, len(pairs))
+	// Convert AnnotationPairs to Label slices
+	humanLabels := make([]metrics.Label, len(pairs))
+	llmLabels := make([]metrics.Label, len(pairs))
 
 	for i, pair := range pairs {
-		humanRanks[i] = verdictToRank(pair.HumanAnnotation)
-		llmRanks[i] = verdictToRank(string(pair.LLMVerdict))
-
-		if humanRanks[i] == -1 {
-			return 0, fmt.Errorf("invalid human annotation: %s", pair.HumanAnnotation)
-		}
-		if llmRanks[i] == -1 {
-			return 0, fmt.Errorf("invalid LLM verdict: %s", pair.LLMVerdict)
-		}
+		humanLabels[i] = metrics.Label(pair.HumanAnnotation)
+		llmLabels[i] = metrics.Label(string(pair.LLMVerdict))
 	}
 
-	// Count concordant and discordant pairs
-	concordant := 0
-	discordant := 0
-
-	for i := 0; i < len(humanRanks); i++ {
-		for j := i + 1; j < len(humanRanks); j++ {
-			humanDiff := humanRanks[i] - humanRanks[j]
-			llmDiff := llmRanks[i] - llmRanks[j]
-
-			if humanDiff*llmDiff > 0 {
-				concordant++ // Same direction
-			} else if humanDiff*llmDiff < 0 {
-				discordant++ // Opposite direction
-			}
-			// If either diff is 0, it's a tie - don't count
-		}
-	}
-
-	// Compute Kendall's tau
-	totalPairs := len(humanRanks) * (len(humanRanks) - 1) / 2
-	if totalPairs == 0 {
-		return 0, fmt.Errorf("not enough pairs to compute correlation")
-	}
-
-	tau := float64(concordant-discordant) / float64(totalPairs)
-	return tau, nil
+	// Use metrics package implementation
+	return metrics.ComputeKendallsTau(humanLabels, llmLabels)
 }
 
 // GenerateConfusionMatrix creates a confusion matrix from annotation pairs
@@ -143,35 +112,8 @@ func ValidateAnnotations(pairs []AnnotationPair, threshold float64) (*Validation
 	return result, nil
 }
 
-// verdictToRank converts verdict string to numeric rank
-// pass=2, review=1, fail=0
-func verdictToRank(verdict string) int {
-	switch verdict {
-	case "pass":
-		return 2
-	case "review":
-		return 1
-	case "fail":
-		return 0
-	default:
-		return -1 // Invalid
-	}
-}
 
 // InterpretTau provides human-readable interpretation of Kendall's tau
 func InterpretTau(tau float64) string {
-	absTau := math.Abs(tau)
-
-	switch {
-	case absTau >= 0.7:
-		return "Strong agreement"
-	case absTau >= 0.5:
-		return "Moderate to strong agreement"
-	case absTau >= 0.3:
-		return "Moderate agreement"
-	case absTau >= 0.1:
-		return "Weak agreement"
-	default:
-		return "Very weak or no agreement"
-	}
+	return metrics.InterpretTau(tau)
 }

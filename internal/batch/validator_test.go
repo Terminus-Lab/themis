@@ -6,29 +6,6 @@ import (
 	"github.com/Terminus-Lab/themis/internal/models"
 )
 
-func TestVerdictToRank(t *testing.T) {
-	tests := []struct {
-		name     string
-		verdict  string
-		expected int
-	}{
-		{"pass", "pass", 2},
-		{"review", "review", 1},
-		{"fail", "fail", 0},
-		{"invalid", "invalid", -1},
-		{"empty", "", -1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := verdictToRank(tt.verdict)
-			if result != tt.expected {
-				t.Errorf("verdictToRank(%q) = %d, want %d", tt.verdict, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestComputeKendallTau_PerfectAgreement(t *testing.T) {
 	pairs := []AnnotationPair{
 		{"1", "pass", models.VerdictPass, 0.9},
