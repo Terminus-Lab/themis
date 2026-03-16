@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Terminus-Lab/themis/internal/batch"
+	"github.com/Terminus-Lab/themis/internal/metrics"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/setup"
 	"github.com/joho/godotenv"
@@ -91,21 +92,27 @@ Examples:
 var validateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Validate judge accuracy against human annotations",
-	Long: `Validate LLM judge accuracy using Kendall's tau correlation.
+	Long: `Validate LLM judge accuracy using comprehensive metrics.
+
+Computes 3 core metrics:
+  1. Kendall's tau (PRIMARY) - Pass/fail decision based on rank correlation
+  2. Cohen's Kappa (REPORT) - Categorical agreement accounting for chance
+  3. Confusion Matrix (DEBUG) - Per-class precision/recall/F1 scores
 
 Requires input file with 'human_annotation' field for each record.
-Computes correlation between human annotations and LLM verdicts.
-Recommended threshold: 0.3 (moderate agreement).
+Pass/fail decision based on Kendall's tau threshold (default: 0.3).
+
+Outputs JSON with all metrics for comprehensive judge evaluation.
 
 Examples:
   # Validate with default threshold (0.3)
   themis-cli validate -i annotated.jsonl
 
-  # Custom threshold
+  # Custom threshold (stricter validation)
   themis-cli validate -i annotated.jsonl --correlation-threshold 0.5
 
-  # Output to file
-  themis-cli validate -i annotated.jsonl > validation-result.json`,
+  # Save validation report to file
+  themis-cli validate -i annotated.jsonl > validation-report.json`,
 	SilenceUsage: true,
 	RunE:         runValidate,
 }
@@ -241,7 +248,9 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 }
 
 func runValidate(cmd *cobra.Command, args []string) error {
-	log.Info().Msg("Validation mode enabled")
+	log.Info().
+		Float64("threshold", corrThreshold).
+		Msg("Validation mode enabled")
 
 	ctx, cancel := setupGracefulShutdown()
 	defer cancel()
@@ -313,7 +322,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	log.Info().Msg("Computing Kendall's correlation...")
+	log.Info().Msg("Computing validation metrics (Kendall's τ, Cohen's Kappa, Confusion Matrix)...")
 
 	// Validate and output
 	return validateAndOutput(pairs, corrThreshold)
@@ -400,7 +409,7 @@ func validateAndOutput(pairs []batch.AnnotationPair, threshold float64) error {
 	// Exit based on result
 	if !validationResult.Passed {
 		log.Error().
-			Float64("kendall_tau", validationResult.KendallTau).
+			Float64("kendall_tau", validationResult.CorrelationMetrics.KendallsTau).
 			Float64("threshold", threshold).
 			Msg("Validation failed: Kendall's tau below threshold")
 		log.Error().Msg("Review configs/judges.yaml prompts and re-run validation")
@@ -412,7 +421,7 @@ func validateAndOutput(pairs []batch.AnnotationPair, threshold float64) error {
 	return nil
 }
 
-func printValidationSummary(result *batch.ValidationResult) {
+func printValidationSummary(result *metrics.ValidationResult) {
 	status := "PASSED"
 	if !result.Passed {
 		status = "FAILED"
@@ -420,11 +429,11 @@ func printValidationSummary(result *batch.ValidationResult) {
 
 	log.Info().
 		Int("records", result.TotalRecords).
-		Int("agreement", result.AgreementCount).
-		Float64("agreement_rate", result.AgreementRate).
-		Float64("kendall_tau", result.KendallTau).
+		Float64("kendall_tau", result.CorrelationMetrics.KendallsTau).
+		Str("tau_interpretation", result.CorrelationMetrics.Interpretation).
+		Float64("cohens_kappa", result.AgreementMetrics.CohensKappa).
+		Str("kappa_interpretation", result.AgreementMetrics.Interpretation).
 		Float64("threshold", result.Threshold).
 		Str("status", status).
-		Str("interpretation", result.Interpretation).
 		Msg("Validation complete")
 }

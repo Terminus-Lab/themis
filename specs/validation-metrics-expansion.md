@@ -8,19 +8,19 @@
 
 ## Status Summary
 
-**Completion**: 3/5 Phases Complete (60%)
+**Completion**: 4/5 Phases Complete (80%)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
 | Phase 1: Metrics Package Infrastructure | ✅ Complete | 100% |
 | Phase 2: Confusion Matrix Implementation | ✅ Complete | 100% |
 | Phase 3: Cohen's Kappa + Kendall's Tau Refactor | ✅ Complete | 100% |
-| Phase 4: Integration with Validation Pipeline | 🔲 Not Started | 0% |
+| Phase 4: Integration with Validation Pipeline | ✅ Complete | 100% |
 | Phase 5: Documentation & Testing | 🔲 Not Started | 0% |
 
-**Current Status:** ✅ Phases 1-3 complete. Ready for Phase 4 (Integration)
+**Current Status:** ✅ Phases 1-4 complete. Ready for Phase 5 (Documentation & Testing)
 
-**Next Steps:** Integrate new metrics into validation pipeline
+**Next Steps:** Create test dataset and update documentation
 
 ---
 
@@ -171,18 +171,6 @@ Example Decision Flow:
   Step 4: Investigate those 7 cases to improve recall
 ```
 
-### Changes
-
-1. **Create:** `internal/metrics/` package with 3 core metrics:
-   - `kendalls_tau.go` (moved from batch/validator.go)
-   - `confusion_matrix.go` (new)
-   - `cohens_kappa.go` (new)
-   - `validator.go` (orchestrator)
-2. **Enhance:** `internal/batch/validator.go` to use new metrics package
-3. **Maintain:** Backwards compatibility (existing τ-only output preserved)
-4. **Add:** CLI pretty-printing for terminal output
-5. **Document:** Simple 3-metric decision framework
-
 ---
 
 ## 3. Metrics Overview
@@ -332,8 +320,6 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 - [X] Define core types: `Label`, `ConfusionMatrix`, `ClassMetrics`
 - [X] Document metric formulas in README
 
-**Deliverable:** ✅ Package structure with types and documentation
-
 ---
 
 ### Phase 2: Confusion Matrix Implementation ✅ COMPLETE
@@ -348,7 +334,6 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 - [X] Add comprehensive tests (16 tests, 100% coverage)
 - [X] Document confusion matrix concepts in README
 
-**Deliverable:** ✅ Full confusion matrix implementation with tests and documentation
 
 ---
 
@@ -366,62 +351,19 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 - [X] Add tests for Kendall's tau in metrics package
 - [X] Update `internal/batch/validator.go` to use metrics package functions
 
-**Formula:**
-```
-κ = (p_o - p_e) / (1 - p_e)
-
-where:
-  p_o = observed agreement (diagonal sum / total)
-  p_e = expected agreement by chance = Σ(p_actual_i × p_predicted_i)
-```
-
-**Interpretation Scale:**
-- κ < 0.00: Poor (worse than chance)
-- κ = 0.00-0.20: Slight agreement
-- κ = 0.21-0.40: Fair agreement
-- κ = 0.41-0.60: Moderate agreement
-- κ = 0.61-0.80: Substantial agreement
-- κ = 0.81-1.00: Almost perfect agreement
-
-**Key Methods:**
-```go
-ComputeCohensKappa(cm *ConfusionMatrix) (float64, error)
-InterpretKappa(kappa float64) string
-ComputeKendallsTau(humanAnnotations, llmPredictions []Label) (float64, error)
-InterpretTau(tau float64) string
-```
-
-**Deliverable:** ✅ All 3 core metrics (Kendall's τ, Confusion Matrix, Cohen's Kappa) implemented in metrics package with 95.1% test coverage
-
 ---
 
-### Phase 4: Integration with Validation Pipeline 
+### Phase 4: Integration with Validation Pipeline ✅ COMPLETE
 
 **Goal:** Integrate new metrics into existing validation workflow
 
 **Tasks:**
 - [X] Update `internal/batch/validator.go` to use metrics package
-- [ ] Enhance `ValidationReport` struct with comprehensive metrics
-- [ ] Add CLI pretty-printing for terminal output
-- [ ] Maintain backwards compatibility (legacy τ-only output)
-- [ ] Add `--output-format` flag: `legacy`, `full`, `json`
-
-**Deliverable:** Enhanced validation pipeline with full metrics reporting
-
-**Backwards Compatibility:**
-```bash
-# Legacy format (for existing scripts)
-go run cmd/batch/main.go validate -input data.jsonl -output-format legacy
-# Output: Only Kendall's τ (existing behavior)
-
-# Full format (default)
-go run cmd/batch/main.go validate -input data.jsonl
-# Output: All metrics with pretty-printing
-
-# JSON format (programmatic)
-go run cmd/batch/main.go validate -input data.jsonl -output-format json
-# Output: Machine-parseable JSON
-```
+- [X] Enhance `ValidationResult` struct with comprehensive metrics
+- [X] Update `ValidateAnnotations()` to return `metrics.ValidationResult`
+- [X] Compute all 3 metrics: Kendall's τ, Cohen's Kappa, Confusion Matrix
+- [X] Update CLI logging to display new metrics
+- [X] Update all tests to use new structure
 
 ---
 

@@ -138,25 +138,32 @@ func TestValidateAnnotations(t *testing.T) {
 		t.Errorf("TotalRecords = %d, want 4", result.TotalRecords)
 	}
 
-	if result.AgreementCount != 4 {
-		t.Errorf("AgreementCount = %d, want 4", result.AgreementCount)
-	}
-
-	if result.AgreementRate != 1.0 {
-		t.Errorf("AgreementRate = %f, want 1.0", result.AgreementRate)
-	}
-
 	// With ties, tau won't be exactly 1.0, but should be high
-	if result.KendallTau < 0.7 {
-		t.Errorf("KendallTau = %f, want >= 0.7", result.KendallTau)
+	if result.CorrelationMetrics.KendallsTau < 0.7 {
+		t.Errorf("KendallTau = %f, want >= 0.7", result.CorrelationMetrics.KendallsTau)
 	}
 
 	if !result.Passed {
 		t.Error("Validation should pass with high tau and threshold=0.3")
 	}
 
-	if result.Interpretation != "Strong agreement" && result.Interpretation != "Moderate to strong agreement" {
-		t.Errorf("Interpretation = %q, want strong agreement", result.Interpretation)
+	if !result.CorrelationMetrics.PassedThreshold {
+		t.Error("PassedThreshold should be true")
+	}
+
+	interp := result.CorrelationMetrics.Interpretation
+	if interp != "Strong agreement" && interp != "Moderate to strong agreement" {
+		t.Errorf("Interpretation = %q, want strong agreement", interp)
+	}
+
+	// Check that Cohen's Kappa was computed
+	if result.AgreementMetrics.CohensKappa < 0.7 {
+		t.Errorf("CohensKappa = %f, want >= 0.7 for perfect agreement", result.AgreementMetrics.CohensKappa)
+	}
+
+	// Check per-class metrics exist
+	if len(result.PerClassMetrics) != 3 {
+		t.Errorf("PerClassMetrics length = %d, want 3", len(result.PerClassMetrics))
 	}
 }
 
@@ -179,9 +186,13 @@ func TestValidateAnnotations_BelowThreshold(t *testing.T) {
 		t.Error("Validation should fail with negative correlation and threshold=0.5")
 	}
 
-	// Agreement count should be 0 (all disagree)
-	if result.AgreementCount != 0 {
-		t.Errorf("AgreementCount = %d, want 0", result.AgreementCount)
+	if result.CorrelationMetrics.PassedThreshold {
+		t.Error("PassedThreshold should be false")
+	}
+
+	// Kendall's tau should be negative (disagreement)
+	if result.CorrelationMetrics.KendallsTau >= 0 {
+		t.Errorf("KendallTau = %f, want < 0 for disagreement", result.CorrelationMetrics.KendallsTau)
 	}
 }
 

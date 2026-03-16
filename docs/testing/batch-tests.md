@@ -229,34 +229,49 @@ THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output r
 
 **Expected Output (if correlation passes):**
 - Exit code: 0
-- Validation report printed with:
-  - Kendall's τ ≥ 0.3
-  - Agreement rate
-  - Confusion matrix
-  - Status: "PASSED"
-- `validation-summary.json` file created
+- Validation report with comprehensive metrics:
+  - **Kendall's τ** (PRIMARY) - Pass/fail decision
+  - **Cohen's Kappa** (REPORT) - Industry standard agreement metric
+  - **Confusion Matrix** (DEBUG) - Per-class breakdown
+  - **Per-class metrics** - Precision/Recall/F1 for each label
+- Status: "PASSED"
 - Message: "LLM judge validated against human annotations"
 
-**Console output:**
+**Console output (JSON structured logging):**
 ```
-INFO Validation mode enabled
-INFO Evaluating 25 records with human annotations...
+INFO Starting validation records=25 threshold=0.3
 INFO Evaluation complete duration=12.3s
-INFO Computing Kendall's correlation...
+INFO Validation complete records=25 kendall_tau=0.42 tau_interpretation="Moderate agreement" cohens_kappa=0.38 kappa_interpretation="Fair agreement" threshold=0.3 status=PASSED
+INFO LLM judge validated against human annotations
+INFO Safe to evaluate full dataset with these judge prompts
+```
 
-┌──────────────────────────────────────────┐
-│ VALIDATION RESULTS                       │
-├──────────────────────────────────────────┤
-│ Records evaluated: 25                    │
-│ Agreement:         19 / 25 (76%)        │
-│ Kendall's τ:       0.42                 │
-│ Threshold:         0.3                   │
-│ Status:            ✅ PASSED             │
-│ Interpretation:    Moderate agreement    │
-└──────────────────────────────────────────┘
-
-✅ LLM judge validated against human annotations
-→ Safe to evaluate full dataset with these judge prompts
+**Validation summary JSON** (can save with `> validation-report.json`):
+```json
+{
+  "passed": true,
+  "total_records": 25,
+  "threshold": 0.3,
+  "correlation_metrics": {
+    "kendalls_tau": 0.42,
+    "interpretation": "Moderate agreement",
+    "passed_threshold": true
+  },
+  "agreement_metrics": {
+    "cohens_kappa": 0.38,
+    "interpretation": "Fair agreement"
+  },
+  "confusion_matrix": {
+    "fail": {"fail": 6, "review": 2, "pass": 1},
+    "review": {"fail": 1, "review": 5, "pass": 2},
+    "pass": {"fail": 0, "review": 1, "pass": 7}
+  },
+  "per_class_metrics": {
+    "fail": {"precision": 0.857, "recall": 0.667, "f1": 0.750, "support": 9},
+    "review": {"precision": 0.625, "recall": 0.625, "f1": 0.625, "support": 8},
+    "pass": {"precision": 0.700, "recall": 0.875, "f1": 0.778, "support": 8}
+  }
+}
 ```
 
 **Expected Output (if correlation fails):**

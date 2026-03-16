@@ -15,18 +15,6 @@ type AnnotationPair struct {
 	Confidence      float64
 }
 
-// ValidationResult holds the outcome of correlation analysis
-type ValidationResult struct {
-	TotalRecords    int                `json:"total_records"`
-	AgreementCount  int                `json:"agreement_count"`
-	AgreementRate   float64            `json:"agreement_rate"`
-	KendallTau      float64            `json:"kendall_tau"`
-	Threshold       float64            `json:"threshold"`
-	Passed          bool               `json:"passed"`
-	ConfusionMatrix map[string]int     `json:"confusion_matrix"`
-	Interpretation  string             `json:"interpretation"`
-}
-
 // ComputeKendallTau calculates Kendall's tau-b correlation coefficient
 // between human annotations and LLM verdicts
 func ComputeKendallTau(pairs []AnnotationPair) (float64, error) {
@@ -70,43 +58,60 @@ func GenerateConfusionMatrix(pairs []AnnotationPair) map[string]int {
 }
 
 // ValidateAnnotations performs full validation analysis
-func ValidateAnnotations(pairs []AnnotationPair, threshold float64) (*ValidationResult, error) {
+func ValidateAnnotations(pairs []AnnotationPair, threshold float64) (*metrics.ValidationResult, error) {
 	if len(pairs) == 0 {
 		return nil, fmt.Errorf("no annotation pairs to validate")
 	}
 
+	// Convert AnnotationPairs to Label slices
+	humanLabels := make([]metrics.Label, len(pairs))
+	llmLabels := make([]metrics.Label, len(pairs))
+
+	for i, pair := range pairs {
+		humanLabels[i] = metrics.Label(pair.HumanAnnotation)
+		llmLabels[i] = metrics.Label(string(pair.LLMVerdict))
+	}
+
+	// Build confusion matrix
+	cm, err := metrics.Build(humanLabels, llmLabels)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build confusion matrix: %w", err)
+	}
+
 	// Compute Kendall's tau
-	tau, err := ComputeKendallTau(pairs)
+	tau, err := metrics.ComputeKendallsTau(humanLabels, llmLabels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute Kendall's tau: %w", err)
 	}
 
-	// Count agreements
-	agreementCount := 0
-	for _, pair := range pairs {
-		if pair.HumanAnnotation == string(pair.LLMVerdict) {
-			agreementCount++
-		}
+	// Compute Cohen's Kappa
+	kappa, err := metrics.ComputeCohensKappa(cm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute Cohen's Kappa: %w", err)
 	}
 
-	// Generate confusion matrix
-	confusionMatrix := GenerateConfusionMatrix(pairs)
+	// Compute per-class metrics
+	perClassMetrics := cm.ComputeClassMetrics()
 
-	// Determine if validation passed
+	// Determine if validation passed (based on Kendall's tau threshold)
 	passed := tau >= threshold
 
-	// Interpretation
-	interpretation := InterpretTau(tau)
-
-	result := &ValidationResult{
-		TotalRecords:    len(pairs),
-		AgreementCount:  agreementCount,
-		AgreementRate:   float64(agreementCount) / float64(len(pairs)),
-		KendallTau:      tau,
-		Threshold:       threshold,
-		Passed:          passed,
-		ConfusionMatrix: confusionMatrix,
-		Interpretation:  interpretation,
+	// Build result
+	result := &metrics.ValidationResult{
+		Passed:       passed,
+		TotalRecords: len(pairs),
+		Threshold:    threshold,
+		CorrelationMetrics: metrics.CorrelationMetrics{
+			KendallsTau:     tau,
+			Interpretation:  metrics.InterpretTau(tau),
+			PassedThreshold: passed,
+		},
+		AgreementMetrics: metrics.AgreementMetrics{
+			CohensKappa:    kappa,
+			Interpretation: metrics.InterpretKappa(kappa),
+		},
+		ConfusionMatrix: cm.Matrix,
+		PerClassMetrics: perClassMetrics,
 	}
 
 	return result, nil
