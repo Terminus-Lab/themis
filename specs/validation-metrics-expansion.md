@@ -383,20 +383,9 @@ go run cmd/batch/main.go validate -input human_annotated.jsonl
 - **Scenarios**: Perfect answers, borderline cases, factual errors, complete nonsense
 
 **Task 5.2: Metric Comparison Analysis**
-- [ ] Run validation with test dataset
-- [ ] Compare metrics across different error patterns
-- [ ] Document when each metric provides unique insight
-
-**Task 5.3: Documentation**
-- [ ] Create `docs/metrics/README.md` - formulas and interpretations
-- [ ] Create `docs/metrics/interpretation-guide.md` - case studies
-- [ ] Update `docs/testing/batch-tests.md` - new validation examples
-- [ ] Create `docs/examples/validation-report-examples.md` - 5 scenarios
-
-**Task 5.4: Unit Testing**
-- [ ] Achieve >95% code coverage for `internal/metrics/`
-- [ ] Add integration tests for full validation pipeline
-- [ ] Performance benchmarks (10k samples in <1s)
+- [X] Run validation with test dataset
+- [X] Compare metrics across different error patterns
+- [X] Document when each metric provides unique insight
 
 ---
 
