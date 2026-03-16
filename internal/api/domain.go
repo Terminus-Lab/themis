@@ -75,6 +75,23 @@ type ConversationListResponse struct {
 	Total         int                      `json:"total"`
 }
 
+// HealthMetricsResponse is the response for GET /api/v1/metrics/health
+type HealthMetricsResponse struct {
+	Window              string  `json:"window"`
+	TotalEvaluations    int     `json:"total_evaluations"`
+	AvgConfidence       float64 `json:"avg_confidence"`
+	AvgDisagreementRate float64 `json:"avg_disagreement_rate"`
+}
+
+// SampleRequest is the request body for POST /api/v1/validation/sample/download
+type SampleRequest struct {
+	StartDate  string `json:"start_date" description:"Start of date range (RFC3339, e.g. 2026-01-01T00:00:00Z)"`
+	EndDate    string `json:"end_date" description:"End of date range (RFC3339, e.g. 2026-03-31T23:59:59Z)"`
+	Percentage int    `json:"percentage" description:"Percentage of records to sample (1-100, default: 25)"`
+	MinSize    int    `json:"min_size,omitempty" description:"Minimum sample size (0 = no minimum)"`
+	MaxSize    int    `json:"max_size,omitempty" description:"Maximum sample size (0 = no maximum)"`
+}
+
 // toEvaluationDTO converts storage.Evaluation to API DTO
 func toEvaluationDTO(e storage.Evaluation) EvaluationDTO {
 	stageScores := make([]StageScore, len(e.StageScores))

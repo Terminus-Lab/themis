@@ -105,6 +105,10 @@ The API server provides both a web dashboard and REST endpoints for evaluation a
 - `POST /api/v1/evaluate/judge/{name}` - Single judge evaluation
 - `GET /api/v1/results` - Query results with filters (agent_name, verdict, limit, offset)
 - `GET /api/v1/results/{event_id}` - Get specific result by ID
+- `GET /api/v1/conversations` - List all conversations with summary metrics
+- `GET /api/v1/conversations/{id}` - Get all turns for a conversation
+- `GET /api/v1/metrics/health?window=7d` - Production health metrics (confidence, disagreement rate)
+- `POST /api/v1/validation/sample/download` - Download a random sample as JSONL for human annotation
 - `GET /metrics` - Prometheus metrics
 
 For detailed API examples and test cases, see [API Mode Documentation](docs/deployment/api-mode.md) and [API Test Cases](docs/testing/api-tests.md).
@@ -158,15 +162,19 @@ Process datasets offline with concurrent workers and validate judge accuracy aga
 
 **Basic evaluation:**
 ```bash
-./bin/themis-cli -input dataset.jsonl -output results.jsonl -workers 10
+./bin/themis-cli evaluate -i dataset.jsonl -output results.jsonl
+# scale workers via env var
+THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -output results.jsonl
 ```
 
 **Validation mode** (Kendall's τ):
 ```bash
-./bin/themis-cli -input annotated.jsonl -validate -correlation-threshold 0.3
+./bin/themis-cli validate -i annotated.jsonl -c 0.3
+# or with long flags:
+./bin/themis-cli validate --input annotated.jsonl --correlation-threshold 0.3
 ```
 
-Input format: JSONL with `event_id`, `agent`, `interaction`, and optional `human_score` fields. For detailed examples and validation workflows, see [Batch Test Cases](docs/testing/batch-tests.md).
+Input format: JSONL with `event_id`, `agent`, `interaction`, and optional `human_annotation` fields. For detailed examples and validation workflows, see [Batch Test Cases](docs/testing/batch-tests.md).
 
 ## Configuration
 

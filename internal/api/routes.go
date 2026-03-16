@@ -94,5 +94,26 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 			Returns(200, "OK", ConversationListResponse{}).
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
+	ws.
+		Route(ws.GET("/metrics/health").
+			To(handler.HealthMetrics).
+			Doc("Proxy health metrics for drift detection (no human annotation required)").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"metrics"}).
+			Param(ws.QueryParameter("window", "Time window: e.g. 7d, 30d, 24h (default: 7d)").DataType("string").Required(false)).
+			Writes(HealthMetricsResponse{}).
+			Returns(200, "OK", HealthMetricsResponse{}).
+			Returns(400, "Bad Request", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
+	ws.
+		Route(ws.POST("/validation/sample/download").
+			To(handler.DownloadSample).
+			Doc("Sample evaluation results from a date range and download as JSONL").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"validation"}).
+			Reads(SampleRequest{}).
+			Returns(200, "OK (JSONL stream)", nil).
+			Returns(400, "Bad Request", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
 	container.Add(ws)
 }

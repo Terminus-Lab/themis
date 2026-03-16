@@ -127,7 +127,7 @@ curl -X POST "http://localhost:18082/api/v1/evaluate/judge/relevance?threshold=0
 ```
 
 **Query parameters**:
-- `threshold` (optional) - Custom pass/fail threshold (default: 0.8)
+- `threshold` (optional) - Custom pass/fail threshold (default: 0.7)
 
 **Response**:
 ```json
@@ -218,7 +218,55 @@ Web dashboard for visualizing results.
 - Auto-refresh every 10s
 - Dark terminal theme
 
-### 6. Health Check
+### 6. Validation Sample Download
+
+**POST** `/api/v1/validation/sample/download`
+
+Sample a percentage of evaluation results from a date range and download as JSONL for human annotation. Used in the periodic revalidation workflow to measure Kendall τ against production data.
+
+**Request**:
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2026-01-01T00:00:00Z",
+    "end_date": "2026-03-31T23:59:59Z",
+    "percentage": 25,
+    "min_size": 100,
+    "max_size": 2500
+  }' \
+  -o quarterly_sample.jsonl
+```
+
+**Request fields**:
+- `start_date` (required) — RFC3339 start of date range
+- `end_date` (required) — RFC3339 end of date range
+- `percentage` (optional) — Percentage to sample, 1–100 (default: 25)
+- `min_size` (optional) — Minimum sample size; bumps up if percentage gives fewer (default: 0)
+- `max_size` (optional) — Maximum sample size cap (default: 0 = no cap)
+
+**Response**: `application/x-ndjson` stream — one JSON evaluation object per line.
+
+```json
+{"event_id":"evt-001","agent_name":"my-agent","user_query":"...","answer":"...","confidence":0.85,"verdict":"pass","stage_scores":[...]}
+{"event_id":"evt-002","agent_name":"my-agent","user_query":"...","answer":"...","confidence":0.62,"verdict":"review","stage_scores":[...]}
+```
+
+**Workflow**:
+```bash
+# 1. Sample 25% of Q1 production data
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{"start_date":"2026-01-01T00:00:00Z","end_date":"2026-03-31T23:59:59Z","percentage":25}' \
+  -o quarterly_sample.jsonl
+
+# 2. Send to annotation team (Label Studio, Scale AI, etc.)
+# 3. Annotators add human_score field to each line
+# 4. Run validation against annotated sample
+go run cmd/batch/main.go validate -input quarterly_annotated.jsonl --threshold 0.3
+```
+
+### 7. Health Check
 
 **GET** `/health`
 

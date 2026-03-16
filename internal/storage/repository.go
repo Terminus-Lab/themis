@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"time"
 
 	"github.com/Terminus-Lab/themis/internal/models"
 )
@@ -17,4 +18,7 @@ type Repository interface {
 
 	GetConversation(ctx context.Context, conversationID string) ([]Evaluation, error)
 	ListConversations(ctx context.Context) ([]ConversationSummary, error)
+
+	Sample(ctx context.Context, filters SampleFilters) ([]Evaluation, error)
+	HealthMetrics(ctx context.Context, since time.Time) (HealthMetricsData, error)
 }

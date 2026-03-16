@@ -140,7 +140,7 @@ func init() {
 
 	// Validate command flags
 	validateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
-	validateCmd.Flags().Float64Var(&corrThreshold, "correlation-threshold", 0.3, "Kendall's tau threshold")
+	validateCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
 
 	_ = validateCmd.MarkFlagRequired("input")
 

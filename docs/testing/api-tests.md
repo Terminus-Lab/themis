@@ -499,6 +499,173 @@ curl http://localhost:18082/
 
 ---
 
+## Conversation Tests
+
+### Test Case 20: List All Conversations
+
+**Request:**
+```bash
+curl "http://localhost:18082/api/v1/conversations"
+```
+
+**Expected:**
+- Status Code: 200
+- Body: `{"conversations": [...], "total": N}`
+- Each entry includes `conversation_id`, `turn_count`, `avg_confidence`, `verdict_counts`, `agent_name`
+
+### Test Case 21: Get Conversation by ID
+
+**Request:**
+```bash
+curl "http://localhost:18082/api/v1/conversations/conv-abc123"
+```
+
+**Expected:**
+- Status Code: 200 (if exists) or 404 (if not found)
+- Body includes `turns` array with full evaluation details per turn, ordered by `created_at ASC`
+- `avg_confidence` is the mean across all turns
+
+---
+
+## Health Metrics Tests
+
+### Test Case 22: Health Metrics - Default Window
+
+**Request:**
+```bash
+curl "http://localhost:18082/api/v1/metrics/health"
+```
+
+**Expected:**
+- Status Code: 200
+- `window` = "7d"
+- Body:
+```json
+{
+  "window": "7d",
+  "total_evaluations": 42,
+  "avg_confidence": 0.81,
+  "avg_disagreement_rate": 0.12
+}
+```
+- `avg_disagreement_rate` is population std-dev of judge scores per evaluation, averaged across all evaluations (range 0–0.5)
+
+### Test Case 23: Health Metrics - Custom Window
+
+**Request:**
+```bash
+curl "http://localhost:18082/api/v1/metrics/health?window=24h"
+curl "http://localhost:18082/api/v1/metrics/health?window=30d"
+```
+
+**Expected:**
+- Status Code: 200
+- `window` echoes the requested value
+- Supported units: `h` (hours), `d` (days)
+
+### Test Case 24: Health Metrics - Invalid Window
+
+**Request:**
+```bash
+curl "http://localhost:18082/api/v1/metrics/health?window=7w"
+curl "http://localhost:18082/api/v1/metrics/health?window=abc"
+```
+
+**Expected:**
+- Status Code: 400
+- Body: `{"error": "invalid window \"7w\": use format like 7d or 24h"}`
+
+---
+
+## Validation Sampling Tests
+
+### Test Case 25: Download Sample - Basic
+
+**Request:**
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2020-01-01T00:00:00Z",
+    "end_date": "2099-01-01T00:00:00Z",
+    "percentage": 25
+  }' \
+  -o sample.jsonl
+```
+
+**Expected:**
+- Status Code: 200
+- `Content-Type: application/x-ndjson`
+- `Content-Disposition` header with filename `sample-<timestamp>.jsonl`
+- Body: one JSON evaluation object per line (JSONL format)
+- Each line parseable as JSON with fields: `event_id`, `agent_name`, `confidence`, `verdict`, `stage_scores`
+
+### Test Case 26: Download Sample - With Size Constraints
+
+**Request:**
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2020-01-01T00:00:00Z",
+    "end_date": "2099-01-01T00:00:00Z",
+    "percentage": 50,
+    "min_size": 100,
+    "max_size": 2500
+  }' \
+  -o sample.jsonl
+```
+
+**Expected:**
+- Status Code: 200
+- Line count between 100 and 2500 regardless of total records
+- Percentage applied first, then min/max clamp
+
+### Test Case 27: Download Sample - Missing Dates
+
+**Request:**
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{"percentage": 25}'
+```
+
+**Expected:**
+- Status Code: 400
+- Body: `{"error": "start_date and end_date are required"}`
+
+### Test Case 28: Download Sample - Invalid Date Format
+
+**Request:**
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{"start_date": "2026-01-01", "end_date": "2026-03-31", "percentage": 25}'
+```
+
+**Expected:**
+- Status Code: 400 (dates must be RFC3339 format with time and timezone)
+
+### Test Case 29: Download Sample - Empty Result Set
+
+**Request:**
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2000-01-01T00:00:00Z",
+    "end_date": "2000-12-31T23:59:59Z",
+    "percentage": 25
+  }' \
+  -o sample.jsonl
+```
+
+**Expected:**
+- Status Code: 200
+- Empty body (no records in that date range)
+
+---
+
 ## Next Steps
 
 - [Batch Test Cases](batch-tests.md) - CLI evaluation testing

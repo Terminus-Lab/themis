@@ -666,21 +666,6 @@ Answer: "4"
 
 **Expected Pass Rate:** 100% with proper setup
 
-**Total Test Cases:** 23
-
-**Categories:**
-- Tool Discovery: 1 test
-- evaluate_response: 4 tests
-- evaluate_single_judge: 3 tests
-- Error Handling: 2 tests
-- Integration: 2 tests
-- Performance: 2 tests
-- Docker: 1 test
-- Platform Integration: 2 tests
-- Troubleshooting: 3 tests
-- Advanced Use Cases: 3 tests
-
-**Expected Pass Rate:** 100% with proper setup
 
 ## Quick Verification Checklist
 

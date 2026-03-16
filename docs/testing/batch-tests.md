@@ -56,10 +56,10 @@ EARLY_EXIT_THRESHOLD=0.2
 | `THEMIS_BATCH_WORKERS` | int | 5 | Number of concurrent evaluation workers |
 
 **Validate Command Flags:**
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `-input` | string | **required** | Input file path with human annotations |
-| `-correlation-threshold` | float | 0.3 | Kendall's tau threshold for validation |
+| Flag | Shorthand | Type | Default | Description |
+|------|-----------|------|---------|-------------|
+| `--input` | `-i` | string | **required** | Input file path with human annotations |
+| `--correlation-threshold` | `-c` | float | 0.3 | Kendall's tau threshold for validation |
 
 ## Input Format (JSONL)
 
@@ -222,9 +222,9 @@ THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output r
 
 **Command:**
 ```bash
-./themis-cli validate \
-  -input resources/annotated_sample.jsonl \
-  -correlation-threshold 0.3
+./themis-cli validate -i resources/annotated_sample.jsonl -c 0.3
+# or with long flags:
+./themis-cli validate --input resources/annotated_sample.jsonl --correlation-threshold 0.3
 ```
 
 **Expected Output (if correlation passes):**

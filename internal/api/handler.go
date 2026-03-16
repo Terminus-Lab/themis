@@ -2,7 +2,9 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -321,6 +323,148 @@ func (h *Handler) ListConversations(req *restful.Request, resp *restful.Response
 	}
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, response)
+}
+
+// GET /api/v1/metrics/health?window=7d
+// Supported window units: h (hours), d (days). Default: 7d.
+func (h *Handler) HealthMetrics(req *restful.Request, resp *restful.Response) {
+	window := req.QueryParameter("window")
+	if window == "" {
+		window = "7d"
+	}
+
+	dur, err := parseWindow(window)
+	if err != nil {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("invalid window %q: use format like 7d or 24h", window),
+		})
+		return
+	}
+
+	since := time.Now().UTC().Add(-dur)
+
+	ctx := req.Request.Context()
+	data, err := h.repository.HealthMetrics(ctx, since)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to compute health metrics")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, HealthMetricsResponse{
+		Window:              window,
+		TotalEvaluations:    data.TotalEvaluations,
+		AvgConfidence:       data.AvgConfidence,
+		AvgDisagreementRate: data.AvgDisagreementRate,
+	})
+}
+
+// parseWindow parses a duration string like "7d" or "24h".
+func parseWindow(s string) (time.Duration, error) {
+	if len(s) < 2 {
+		return 0, fmt.Errorf("too short")
+	}
+	unit := s[len(s)-1]
+	value := s[:len(s)-1]
+	n, err := strconv.Atoi(value)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid number")
+	}
+	switch unit {
+	case 'h':
+		return time.Duration(n) * time.Hour, nil
+	case 'd':
+		return time.Duration(n) * 24 * time.Hour, nil
+	default:
+		return 0, fmt.Errorf("unknown unit %q, use h or d", string(unit))
+	}
+}
+
+// POST /api/v1/validation/sample/download
+// Samples a percentage of evaluation results from a date range and returns them as JSONL.
+func (h *Handler) DownloadSample(req *restful.Request, resp *restful.Response) {
+	var sampleReq SampleRequest
+	if err := req.ReadEntity(&sampleReq); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to parse sample request body")
+		middleware.HandleError(resp, err, http.StatusBadRequest)
+		return
+	}
+
+	if sampleReq.StartDate == "" || sampleReq.EndDate == "" {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+			"error": "start_date and end_date are required",
+		})
+		return
+	}
+
+	startDate, err := time.Parse(time.RFC3339, sampleReq.StartDate)
+	if err != nil {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("invalid start_date: %s", err.Error()),
+		})
+		return
+	}
+
+	endDate, err := time.Parse(time.RFC3339, sampleReq.EndDate)
+	if err != nil {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("invalid end_date: %s", err.Error()),
+		})
+		return
+	}
+
+	if endDate.Before(startDate) {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
+			"error": "end_date must be after start_date",
+		})
+		return
+	}
+
+	percentage := sampleReq.Percentage
+	if percentage <= 0 {
+		percentage = 25
+	}
+	if percentage > 100 {
+		percentage = 100
+	}
+
+	filters := storage.SampleFilters{
+		StartDate:  startDate,
+		EndDate:    endDate,
+		Percentage: percentage,
+		MinSize:    sampleReq.MinSize,
+		MaxSize:    sampleReq.MaxSize,
+	}
+
+	h.logger.Info().
+		Str("start_date", sampleReq.StartDate).
+		Str("end_date", sampleReq.EndDate).
+		Int("percentage", percentage).
+		Msg("Sampling evaluation results")
+
+	ctx := req.Request.Context()
+	evaluations, err := h.repository.Sample(ctx, filters)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to sample evaluations")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info().
+		Int("sampled_count", len(evaluations)).
+		Msg("Sample complete, streaming JSONL")
+
+	resp.Header().Set("Content-Type", "application/x-ndjson")
+	resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"sample-%s.jsonl\"", time.Now().Format("20060102-150405")))
+	resp.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(resp.ResponseWriter)
+	for _, e := range evaluations {
+		if err := encoder.Encode(toEvaluationDTO(e)); err != nil {
+			h.logger.Error().Err(err).Msg("Failed to encode evaluation to JSONL")
+			return
+		}
+	}
 }
 
 // Health handler GET API /api/v1/health
