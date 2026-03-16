@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Enhanced Validation Metrics**: Expanded judge validation beyond Kendall's τ
+  - **Cohen's Kappa** - Categorical agreement accounting for chance (industry standard)
+  - **Confusion Matrix** - Per-class error breakdown showing exactly where judges fail
+  - **Per-class metrics** - Precision, recall, F1 for fail/review/pass classes
+  - Validation now returns comprehensive metrics for debugging and reporting
+- **Validation Test Datasets**: Production-ready validation examples
+  - `resources/validation_test_dataset.jsonl` (150 records) - Successful validation example (τ=0.63, κ=0.91)
+  - `resources/validation_failed_dataset.jsonl` (150 records) - Failed validation with adversarial patterns
+  - Full interpretation guides with actionable recommendations for each dataset
+- **Metrics Documentation**: Comprehensive guides for all validation metrics
+  - `docs/metrics/cohens-kappa.md` - Agreement beyond chance explained with examples
+  - `docs/metrics/confusion-matrix.md` - Matrix interpretation and common patterns
+  - `docs/metrics/kendalls-tau.md` - Rank correlation for LLM judge validation
+  - `docs/metrics/interpretation-guide.md` - Decision framework and troubleshooting guide
+
+### Changed
+- **Validation Output Format**: Enhanced JSON structure with 3-metric framework
+  - `correlation_metrics` - Kendall's τ (PRIMARY - pass/fail decision)
+  - `agreement_metrics` - Cohen's Kappa (SECONDARY - industry reporting)
+  - `confusion_matrix` - Error breakdown (DIAGNOSTIC - debugging)
+  - `per_class_metrics` - Precision/recall/F1 per verdict class
+
 ## [1.1.0] - 2026-03-13
 
 ### Added

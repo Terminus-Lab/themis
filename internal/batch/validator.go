@@ -2,8 +2,8 @@ package batch
 
 import (
 	"fmt"
-	"math"
 
+	"github.com/Terminus-Lab/themis/internal/metrics"
 	"github.com/Terminus-Lab/themis/internal/models"
 )
 
@@ -15,18 +15,6 @@ type AnnotationPair struct {
 	Confidence      float64
 }
 
-// ValidationResult holds the outcome of correlation analysis
-type ValidationResult struct {
-	TotalRecords    int                `json:"total_records"`
-	AgreementCount  int                `json:"agreement_count"`
-	AgreementRate   float64            `json:"agreement_rate"`
-	KendallTau      float64            `json:"kendall_tau"`
-	Threshold       float64            `json:"threshold"`
-	Passed          bool               `json:"passed"`
-	ConfusionMatrix map[string]int     `json:"confusion_matrix"`
-	Interpretation  string             `json:"interpretation"`
-}
-
 // ComputeKendallTau calculates Kendall's tau-b correlation coefficient
 // between human annotations and LLM verdicts
 func ComputeKendallTau(pairs []AnnotationPair) (float64, error) {
@@ -34,48 +22,17 @@ func ComputeKendallTau(pairs []AnnotationPair) (float64, error) {
 		return 0, fmt.Errorf("need at least 2 pairs to compute correlation")
 	}
 
-	// Convert verdicts to ranks
-	humanRanks := make([]int, len(pairs))
-	llmRanks := make([]int, len(pairs))
+	// Convert AnnotationPairs to Label slices
+	humanLabels := make([]metrics.Label, len(pairs))
+	llmLabels := make([]metrics.Label, len(pairs))
 
 	for i, pair := range pairs {
-		humanRanks[i] = verdictToRank(pair.HumanAnnotation)
-		llmRanks[i] = verdictToRank(string(pair.LLMVerdict))
-
-		if humanRanks[i] == -1 {
-			return 0, fmt.Errorf("invalid human annotation: %s", pair.HumanAnnotation)
-		}
-		if llmRanks[i] == -1 {
-			return 0, fmt.Errorf("invalid LLM verdict: %s", pair.LLMVerdict)
-		}
+		humanLabels[i] = metrics.Label(pair.HumanAnnotation)
+		llmLabels[i] = metrics.Label(string(pair.LLMVerdict))
 	}
 
-	// Count concordant and discordant pairs
-	concordant := 0
-	discordant := 0
-
-	for i := 0; i < len(humanRanks); i++ {
-		for j := i + 1; j < len(humanRanks); j++ {
-			humanDiff := humanRanks[i] - humanRanks[j]
-			llmDiff := llmRanks[i] - llmRanks[j]
-
-			if humanDiff*llmDiff > 0 {
-				concordant++ // Same direction
-			} else if humanDiff*llmDiff < 0 {
-				discordant++ // Opposite direction
-			}
-			// If either diff is 0, it's a tie - don't count
-		}
-	}
-
-	// Compute Kendall's tau
-	totalPairs := len(humanRanks) * (len(humanRanks) - 1) / 2
-	if totalPairs == 0 {
-		return 0, fmt.Errorf("not enough pairs to compute correlation")
-	}
-
-	tau := float64(concordant-discordant) / float64(totalPairs)
-	return tau, nil
+	// Use metrics package implementation
+	return metrics.ComputeKendallsTau(humanLabels, llmLabels)
 }
 
 // GenerateConfusionMatrix creates a confusion matrix from annotation pairs
@@ -101,77 +58,67 @@ func GenerateConfusionMatrix(pairs []AnnotationPair) map[string]int {
 }
 
 // ValidateAnnotations performs full validation analysis
-func ValidateAnnotations(pairs []AnnotationPair, threshold float64) (*ValidationResult, error) {
+func ValidateAnnotations(pairs []AnnotationPair, threshold float64) (*metrics.ValidationResult, error) {
 	if len(pairs) == 0 {
 		return nil, fmt.Errorf("no annotation pairs to validate")
 	}
 
+	// Convert AnnotationPairs to Label slices
+	humanLabels := make([]metrics.Label, len(pairs))
+	llmLabels := make([]metrics.Label, len(pairs))
+
+	for i, pair := range pairs {
+		humanLabels[i] = metrics.Label(pair.HumanAnnotation)
+		llmLabels[i] = metrics.Label(string(pair.LLMVerdict))
+	}
+
+	// Build confusion matrix
+	cm, err := metrics.Build(humanLabels, llmLabels)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build confusion matrix: %w", err)
+	}
+
 	// Compute Kendall's tau
-	tau, err := ComputeKendallTau(pairs)
+	tau, err := metrics.ComputeKendallsTau(humanLabels, llmLabels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute Kendall's tau: %w", err)
 	}
 
-	// Count agreements
-	agreementCount := 0
-	for _, pair := range pairs {
-		if pair.HumanAnnotation == string(pair.LLMVerdict) {
-			agreementCount++
-		}
+	// Compute Cohen's Kappa
+	kappa, err := metrics.ComputeCohensKappa(cm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute Cohen's Kappa: %w", err)
 	}
 
-	// Generate confusion matrix
-	confusionMatrix := GenerateConfusionMatrix(pairs)
+	// Compute per-class metrics
+	perClassMetrics := cm.ComputeClassMetrics()
 
-	// Determine if validation passed
+	// Determine if validation passed (based on Kendall's tau threshold)
 	passed := tau >= threshold
 
-	// Interpretation
-	interpretation := InterpretTau(tau)
-
-	result := &ValidationResult{
-		TotalRecords:    len(pairs),
-		AgreementCount:  agreementCount,
-		AgreementRate:   float64(agreementCount) / float64(len(pairs)),
-		KendallTau:      tau,
-		Threshold:       threshold,
-		Passed:          passed,
-		ConfusionMatrix: confusionMatrix,
-		Interpretation:  interpretation,
+	// Build result
+	result := &metrics.ValidationResult{
+		Passed:       passed,
+		TotalRecords: len(pairs),
+		Threshold:    threshold,
+		CorrelationMetrics: metrics.CorrelationMetrics{
+			KendallsTau:     tau,
+			Interpretation:  metrics.InterpretTau(tau),
+			PassedThreshold: passed,
+		},
+		AgreementMetrics: metrics.AgreementMetrics{
+			CohensKappa:    kappa,
+			Interpretation: metrics.InterpretKappa(kappa),
+		},
+		ConfusionMatrix: cm.Matrix,
+		PerClassMetrics: perClassMetrics,
 	}
 
 	return result, nil
 }
 
-// verdictToRank converts verdict string to numeric rank
-// pass=2, review=1, fail=0
-func verdictToRank(verdict string) int {
-	switch verdict {
-	case "pass":
-		return 2
-	case "review":
-		return 1
-	case "fail":
-		return 0
-	default:
-		return -1 // Invalid
-	}
-}
 
 // InterpretTau provides human-readable interpretation of Kendall's tau
 func InterpretTau(tau float64) string {
-	absTau := math.Abs(tau)
-
-	switch {
-	case absTau >= 0.7:
-		return "Strong agreement"
-	case absTau >= 0.5:
-		return "Moderate to strong agreement"
-	case absTau >= 0.3:
-		return "Moderate agreement"
-	case absTau >= 0.1:
-		return "Weak agreement"
-	default:
-		return "Very weak or no agreement"
-	}
+	return metrics.InterpretTau(tau)
 }

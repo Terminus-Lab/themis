@@ -229,34 +229,49 @@ THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output r
 
 **Expected Output (if correlation passes):**
 - Exit code: 0
-- Validation report printed with:
-  - Kendall's τ ≥ 0.3
-  - Agreement rate
-  - Confusion matrix
-  - Status: "PASSED"
-- `validation-summary.json` file created
+- Validation report with comprehensive metrics:
+  - **Kendall's τ** (PRIMARY) - Pass/fail decision
+  - **Cohen's Kappa** (REPORT) - Industry standard agreement metric
+  - **Confusion Matrix** (DEBUG) - Per-class breakdown
+  - **Per-class metrics** - Precision/Recall/F1 for each label
+- Status: "PASSED"
 - Message: "LLM judge validated against human annotations"
 
-**Console output:**
+**Console output (JSON structured logging):**
 ```
-INFO Validation mode enabled
-INFO Evaluating 25 records with human annotations...
+INFO Starting validation records=25 threshold=0.3
 INFO Evaluation complete duration=12.3s
-INFO Computing Kendall's correlation...
+INFO Validation complete records=25 kendall_tau=0.42 tau_interpretation="Moderate agreement" cohens_kappa=0.38 kappa_interpretation="Fair agreement" threshold=0.3 status=PASSED
+INFO LLM judge validated against human annotations
+INFO Safe to evaluate full dataset with these judge prompts
+```
 
-┌──────────────────────────────────────────┐
-│ VALIDATION RESULTS                       │
-├──────────────────────────────────────────┤
-│ Records evaluated: 25                    │
-│ Agreement:         19 / 25 (76%)        │
-│ Kendall's τ:       0.42                 │
-│ Threshold:         0.3                   │
-│ Status:            ✅ PASSED             │
-│ Interpretation:    Moderate agreement    │
-└──────────────────────────────────────────┘
-
-✅ LLM judge validated against human annotations
-→ Safe to evaluate full dataset with these judge prompts
+**Validation summary JSON** (can save with `> validation-report.json`):
+```json
+{
+  "passed": true,
+  "total_records": 25,
+  "threshold": 0.3,
+  "correlation_metrics": {
+    "kendalls_tau": 0.42,
+    "interpretation": "Moderate agreement",
+    "passed_threshold": true
+  },
+  "agreement_metrics": {
+    "cohens_kappa": 0.38,
+    "interpretation": "Fair agreement"
+  },
+  "confusion_matrix": {
+    "fail": {"fail": 6, "review": 2, "pass": 1},
+    "review": {"fail": 1, "review": 5, "pass": 2},
+    "pass": {"fail": 0, "review": 1, "pass": 7}
+  },
+  "per_class_metrics": {
+    "fail": {"precision": 0.857, "recall": 0.667, "f1": 0.750, "support": 9},
+    "review": {"precision": 0.625, "recall": 0.625, "f1": 0.625, "support": 8},
+    "pass": {"precision": 0.700, "recall": 0.875, "f1": 0.778, "support": 8}
+  }
+}
 ```
 
 **Expected Output (if correlation fails):**
@@ -279,6 +294,130 @@ echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > t
 - Exit code: 1
 - Error: "Validation mode requires all records to have 'human_annotation' field"
 - Lists records missing annotations
+
+---
+
+### Test Case 7.1: Validation with Passing Dataset (Production-Ready Judge)
+
+**Input:** `resources/validation_test_dataset.jsonl` (150 records - 50 fail, 50 pass, 50 review)
+
+This dataset tests a well-calibrated judge with clear category boundaries and strong correctness enforcement.
+
+**Command:**
+```bash
+go run cmd/batch/main.go validate \
+  -input resources/validation_test_dataset.jsonl \
+  -correlation-threshold 0.3
+```
+
+**Expected Output:**
+- Exit code: 0
+- Status: ✓ PASSED
+- **Kendall's τ**: 0.632 (Moderate to strong agreement)
+- **Cohen's Kappa**: 0.910 (Almost perfect)
+- **Overall Accuracy**: 94% (141/150 correct)
+
+**Key Metrics:**
+```json
+{
+  "passed": true,
+  "total_records": 150,
+  "correlation_metrics": {
+    "kendalls_tau": 0.6315883668903803,
+    "interpretation": "Moderate to strong agreement",
+    "passed_threshold": true
+  },
+  "agreement_metrics": {
+    "cohens_kappa": 0.9099999999999999,
+    "interpretation": "Almost perfect"
+  },
+  "confusion_matrix": {
+    "fail": {"fail": 49, "pass": 0, "review": 1},
+    "pass": {"fail": 0, "pass": 50, "review": 0},
+    "review": {"fail": 0, "pass": 8, "review": 42}
+  },
+  "per_class_metrics": {
+    "fail": {"precision": 1.0, "recall": 0.98, "f1": 0.99, "support": 50},
+    "pass": {"precision": 0.86, "recall": 1.0, "f1": 0.93, "support": 50},
+    "review": {"precision": 0.98, "recall": 0.84, "f1": 0.90, "support": 50}
+  }
+}
+```
+
+**Interpretation:**
+- ✅ Judge exceeds threshold by 2.1x (0.63 vs 0.3)
+- ✅ Near-perfect categorical agreement (κ = 0.91)
+- ✅ Zero critical errors (no fail→pass)
+- ✅ Strong performance across all classes
+- ✅ **Recommendation**: Deploy to production
+
+**Full analysis:** See [resources/validation_test_dataset_interpretation.md](../../resources/validation_test_dataset_interpretation.md)
+
+**Use case:** Baseline validation to confirm judge configuration is production-ready.
+
+---
+
+### Test Case 7.2: Validation with Failing Dataset (Judge Issue Detection)
+
+**Input:** `resources/validation_failed_dataset.jsonl` (150 records - designed to expose common judge failure modes)
+
+This dataset contains:
+- **Fail cases (1-30)**: Verbose but empty answers (tests style-over-substance bias)
+- **Fail cases (31-50)**: Confidently wrong answers (tests correctness detection)
+- **Pass cases (51-100)**: Correct comprehensive answers
+- **Review cases (101-150)**: Terse but correct answers (tests brevity penalty)
+
+**Command:**
+```bash
+go run cmd/batch/main.go validate \
+  -input resources/validation_failed_dataset.jsonl \
+  -correlation-threshold 0.3
+```
+
+**Expected Output (with poorly calibrated judge):**
+- Exit code: 1
+- Status: ✗ FAILED
+- **Kendall's τ**: < 0.3 (Below threshold)
+- **Cohen's Kappa**: < 0.6 (Below industry standard)
+
+**Hypothetical Failed Results:**
+```json
+{
+  "passed": false,
+  "total_records": 150,
+  "correlation_metrics": {
+    "kendalls_tau": 0.22,
+    "interpretation": "Weak agreement",
+    "passed_threshold": false
+  },
+  "agreement_metrics": {
+    "cohens_kappa": 0.35,
+    "interpretation": "Fair agreement"
+  }
+}
+```
+
+**Common Failure Patterns Detected:**
+1. **Style-over-substance**: Judge promotes polite but empty answers (fail→pass)
+2. **Weak correctness**: Judge doesn't catch factually wrong answers (fail→review)
+3. **Penalizes brevity**: Judge rejects short but correct answers (review→fail)
+
+**Full failure analysis and fixes:** See [resources/validation_failed_dataset_interpretation.md](../../resources/validation_failed_dataset_interpretation.md)
+
+**Use case:**
+- Test judge robustness against adversarial cases
+- Identify systematic biases before production deployment
+- Validate judge improvements after configuration changes
+
+---
+
+**Metric Interpretation Resources:**
+
+For comprehensive guidance on interpreting validation results:
+- **Kendall's τ**: [docs/metrics/kendalls-tau.md](../metrics/kendalls-tau.md)
+- **Cohen's Kappa**: [docs/metrics/cohens-kappa.md](../metrics/cohens-kappa.md)
+- **Confusion Matrix**: [docs/metrics/confusion-matrix.md](../metrics/confusion-matrix.md)
+- **Interpretation Guide**: [docs/metrics/interpretation-guide.md](../metrics/interpretation-guide.md) - Decision framework and troubleshooting
 
 ### Test Case 8: Combined Results + Summary
 
