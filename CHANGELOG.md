@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-17
+
 ### Added
+- **Validation Sample Download API**: `POST /api/v1/validation/sample/download`
+  - Samples evaluation results by date range and percentage for human annotation
+  - Returns JSONL with only interaction data (`event_id`, `agent`, `interaction`) — no Themis scores to avoid annotator bias
+  - Configurable sample size: `percentage` (1-100, default: 25), `min_size`, `max_size`
+  - Random sampling with `ORDER BY RANDOM()` for unbiased selection
 - **Enhanced Validation Metrics**: Expanded judge validation beyond Kendall's τ
   - **Cohen's Kappa** - Categorical agreement accounting for chance (industry standard)
   - **Confusion Matrix** - Per-class error breakdown showing exactly where judges fail
@@ -24,11 +31,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `docs/metrics/interpretation-guide.md` - Decision framework and troubleshooting guide
 
 ### Changed
+- **Batch CLI: DB persistence disabled by default** (`themis-cli evaluate`)
+  - Results are no longer persisted to DB during batch evaluation by default
+  - Use `--save-to-db` / `-d` flag to opt in (requires `IN_MEMORY_DB=false` and `THEMIS_DB_URL`)
+  - Validation command (`themis-cli validate`) always uses in-memory DB — results are never persisted
 - **Validation Output Format**: Enhanced JSON structure with 3-metric framework
   - `correlation_metrics` - Kendall's τ (PRIMARY - pass/fail decision)
   - `agreement_metrics` - Cohen's Kappa (SECONDARY - industry reporting)
   - `confusion_matrix` - Error breakdown (DIAGNOSTIC - debugging)
   - `per_class_metrics` - Precision/recall/F1 per verdict class
+
+### Fixed
+- **Azure OpenAI**: Fixed Azure OpenAI provider implementation
+- **SQLite In-Memory Connection Pool**: Fixed "no such table: eval_results" error
+  - `database/sql` connection pool created separate in-memory databases per connection
+  - Fixed by setting `MaxOpenConns(1)` for `:memory:` databases to ensure all operations share one connection
 
 ## [1.1.0] - 2026-03-13
 
@@ -195,5 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed internal themis-producer from release binaries (not needed by end users)
 - Added warning that binaries must run from extracted directory for configs/judges.yaml discovery
 
-[Unreleased]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Terminus-Lab/themis/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Terminus-Lab/themis/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Terminus-Lab/themis/releases/tag/v1.0.0
