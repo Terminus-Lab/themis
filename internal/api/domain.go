@@ -83,6 +83,22 @@ type HealthMetricsResponse struct {
 	AvgDisagreementRate float64 `json:"avg_disagreement_rate"`
 }
 
+// SampleRecord is the JSONL record format for the sample download.
+// It contains only interaction data for human annotation — no Themis evaluation results.
+type SampleRecord struct {
+	EventID        string `json:"event_id"`
+	ConversationID string `json:"conversation_id"`
+	Agent          struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"agent"`
+	Interaction struct {
+		UserQuery string `json:"user_query"`
+		Context   string `json:"context,omitempty"`
+		Answer    string `json:"answer"`
+	} `json:"interaction"`
+}
+
 // SampleRequest is the request body for POST /api/v1/validation/sample/download
 type SampleRequest struct {
 	StartDate  string `json:"start_date" description:"Start of date range (RFC3339, e.g. 2026-01-01T00:00:00Z)"`

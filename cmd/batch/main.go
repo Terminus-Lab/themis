@@ -33,6 +33,7 @@ var (
 
 	// Validate command flags
 	corrThreshold float64
+	saveToDb      bool
 )
 
 func main() {
@@ -106,7 +107,7 @@ Outputs JSON with all metrics for comprehensive judge evaluation.
 
 Examples:
   # Validate with default threshold (0.3)
-  themis-cli validate -i annotated.jsonl
+  themis-cli validate -i annotated.jsonl -s true
 
   # Custom threshold (stricter validation)
   themis-cli validate -i annotated.jsonl --correlation-threshold 0.5
@@ -135,12 +136,14 @@ func init() {
 	evaluateCmd.Flags().StringVarP(&output, "output", "o", "", "Output file path")
 	evaluateCmd.Flags().StringVarP(&format, "format", "f", "jsonl", "Output format: jsonl, summary")
 	evaluateCmd.Flags().StringVarP(&summary, "summary", "s", "", "Optional separate summary file")
+	evaluateCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
 
 	_ = evaluateCmd.MarkFlagRequired("input")
 
 	// Validate command flags
 	validateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
 	validateCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
+	validateCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
 
 	_ = validateCmd.MarkFlagRequired("input")
 
@@ -163,6 +166,17 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	cfg := setup.LoadConfig()
+	if !saveToDb {
+		cfg.InMemoryDB = true
+	} else {
+		if cfg.InMemoryDB {
+			log.Fatal().Msg("--save-to-db requires IN_MEMORY_DB=false in your .env")
+		}
+		if cfg.DBConnectionString == "" {
+			log.Fatal().Msg("--save-to-db requires THEMIS_DB_URL to be set in your .env")
+		}
+	}
+
 	deps, err := setup.Wire(ctx, cfg, &log.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to wire dependencies: %w", err)
@@ -256,6 +270,17 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	cfg := setup.LoadConfig()
+	if !saveToDb {
+		cfg.InMemoryDB = true
+	} else {
+		if cfg.InMemoryDB {
+			log.Fatal().Msg("--save-to-db requires IN_MEMORY_DB=false in your .env")
+		}
+		if cfg.DBConnectionString == "" {
+			log.Fatal().Msg("--save-to-db requires THEMIS_DB_URL to be set in your .env")
+		}
+	}
+
 	deps, err := setup.Wire(ctx, cfg, &log.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to wire dependencies: %w", err)

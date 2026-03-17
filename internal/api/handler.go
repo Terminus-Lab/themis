@@ -460,7 +460,17 @@ func (h *Handler) DownloadSample(req *restful.Request, resp *restful.Response) {
 
 	encoder := json.NewEncoder(resp.ResponseWriter)
 	for _, e := range evaluations {
-		if err := encoder.Encode(toEvaluationDTO(e)); err != nil {
+		record := SampleRecord{
+			EventID:        e.EventID,
+			ConversationID: e.ConversationID,
+		}
+		record.Agent.Name = e.AgentName
+		record.Agent.Version = e.AgentVersion
+		record.Interaction.UserQuery = e.UserQuery
+		record.Interaction.Context = e.Context
+		record.Interaction.Answer = e.Answer
+
+		if err := encoder.Encode(record); err != nil {
 			h.logger.Error().Err(err).Msg("Failed to encode evaluation to JSONL")
 			return
 		}
