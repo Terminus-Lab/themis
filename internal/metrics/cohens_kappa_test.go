@@ -74,6 +74,24 @@ func TestComputeCohensKappa_ImbalancedData(t *testing.T) {
 	}
 }
 
+func TestComputeCohensKappa_SingleClass(t *testing.T) {
+	// All samples are the same class — happens when validating a homogeneous sample
+	// (e.g. all "pass" evaluations with all "pass" annotations).
+	// Expected: kappa = 1.0 (perfect agreement by convention, not 0/0 error).
+	actual := []Label{LabelPass, LabelPass, LabelPass, LabelPass}
+	predicted := []Label{LabelPass, LabelPass, LabelPass, LabelPass}
+
+	cm, _ := Build(actual, predicted)
+	kappa, err := ComputeCohensKappa(cm)
+
+	if err != nil {
+		t.Fatalf("expected no error for single-class input, got %v", err)
+	}
+	if kappa != 1.0 {
+		t.Errorf("single-class perfect agreement should give κ = 1.0, got %.3f", kappa)
+	}
+}
+
 func TestComputeCohensKappa_EmptyMatrix(t *testing.T) {
 	cm, _ := Build([]Label{}, []Label{})
 	_, err := ComputeCohensKappa(cm)

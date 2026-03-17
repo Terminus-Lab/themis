@@ -20,9 +20,11 @@ func ComputeCohensKappa(cm *ConfusionMatrix) (float64, error) {
 		expectedAgreement += pActual * pPredicted
 	}
 
-	// Handle edge case: perfect expected agreement (denominator = 0)
+	// Handle edge case: all samples fall into one class (expected agreement = 1.0).
+	// When this happens, observed agreement is also 1.0 (perfect agreement by
+	// definition), so kappa = 1.0 by convention rather than 0/0.
 	if expectedAgreement >= 1.0 {
-		return 0, fmt.Errorf("expected agreement = 1.0 (cannot compute kappa)")
+		return 1.0, nil
 	}
 
 	kappa := (observedAgreement - expectedAgreement) / (1.0 - expectedAgreement)

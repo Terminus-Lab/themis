@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: Get started with Themis in 5 minutes
+description: End-to-end walkthrough to verify Themis before release
 version: 1.0.0
 tags: [quick-start, tutorial, getting-started, examples]
 related:
@@ -12,321 +12,263 @@ related:
 
 # Quick Start
 
-Get Themis running and evaluate your first AI response in 5 minutes.
+End-to-end walkthrough that covers the full Themis workflow: CLI batch processing, judge validation, API server, dashboard, and sampling.
 
-## Step 1: Download and Extract
+## Prerequisites
+
+Build the binaries and configure credentials:
 
 ```bash
-# Download latest release (choose your platform)
-# macOS Apple Silicon (M1/M2/M3):
-curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_arm64.tar.gz
-tar -xzf themis_1.0.0_darwin_arm64.tar.gz
-cd themis_1.0.0_darwin_arm64
+go build -o bin/themis-api cmd/api/main.go
+go build -o bin/themis-cli cmd/batch/main.go
 
-# macOS Intel:
-# curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_amd64.tar.gz
-
-# Linux:
-# curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_linux_amd64.tar.gz
-
-# Windows PowerShell:
-# Invoke-WebRequest -Uri "https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_windows_amd64.zip" -OutFile "themis_1.0.0_windows_amd64.zip"
-# Expand-Archive themis_1.0.0_windows_amd64.zip
-
-# Set up environment (OpenAI - simplest option)
 cp .env.example .env
+# Add your LLM key — simplest option:
 echo "OPEN_AI_KEY=sk-proj-YOUR_KEY_HERE" >> .env
 ```
 
-## Step 2: Start the Server
+---
+
+## Step 1 — CLI: Batch Evaluate a Dataset
+
+Run the batch evaluator against the sample dataset to verify the full pipeline works end-to-end from the command line.
 
 ```bash
-./themis-api
-
-# Windows:
-# .\themis-api.exe
+./bin/themis-cli evaluate \
+  -i resources/dataset.jsonl \
+  -o results.jsonl
 ```
 
-Expected output:
+**Expected output:**
+```
+INFO Input file parsed records=10
+INFO Starting worker pool workers=5
+INFO Processing complete total=10 pass=7 review=2 fail=1
+```
+
+Inspect the results:
+
+```bash
+# Verdict distribution
+jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' results.jsonl
+
+# Average confidence
+jq -s 'map(.confidence) | add/length' results.jsonl
+```
+
+**Verify:**
+- `results.jsonl` has one line per input record
+- Each line has `verdict`, `confidence`, and `stage_scores`
+- No errors in logs
+
+---
+
+## Step 2 — CLI: Validate Judge Accuracy
+
+Run the validation command against the annotated dataset to confirm the judges agree with human annotations (Kendall's τ ≥ 0.3 required).
+
+```bash
+./bin/themis-cli validate \
+  -i resources/validation_success_dataset.jsonl \
+  -c 0.3
+```
+
+**Expected output:**
+```
+INFO Starting validation records=150 threshold=0.3
+INFO Validation complete kendall_tau=0.63 status=PASSED
+INFO LLM judge validated against human annotations
+```
+
+**Verify:**
+- `status=PASSED`
+- `kendall_tau` ≥ 0.3
+- Exit code 0
+
+> If this fails, do not proceed to release. Review and tune `configs/judges.yaml`.
+
+---
+
+## Step 3 — API: Start the Server
+
+```bash
+./bin/themis-api
+```
+
+**Expected startup logs:**
 ```
 INFO judge created successfully judge=relevance
 INFO judge created successfully judge=faithfulness
+INFO judge created successfully judge=coherence
+INFO judge created successfully judge=completeness
+INFO judge created successfully judge=instruction
 INFO judge pool built successfully total_judges=5
 INFO Starting Themis Server address=:18082
 ```
 
-## Step 3: Evaluate Your First Response
-
+**Verify health:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
+curl -s http://localhost:18082/api/v1/health | jq .
+# {"status":"ok","version":"1.0.0"}
+```
+
+---
+
+## Step 4 — API: Seed Evaluation Data
+
+Send a few evaluations to populate the database, including a multi-turn conversation.
+
+**Single evaluation (good answer):**
+```bash
+curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "test-001",
+    "event_id": "qs-001",
     "event_type": "agent_response",
-    "agent": {
-      "name": "my-agent",
-      "version": "1.0"
-    },
+    "agent": {"name": "my-agent", "version": "1.0"},
     "interaction": {
       "user_query": "What is the capital of France?",
-      "context": "France is a country in Western Europe. Paris is its capital city.",
+      "context": "France is a country in Western Europe. Paris is its capital.",
       "answer": "The capital of France is Paris."
     }
-  }'
+  }' | jq '{verdict, confidence}'
 ```
 
-### Response Breakdown
-
-```json
-{
-  "id": "test-001",
-  "stages": [
-    {"name": "length-checker", "score": 1.0},
-    {"name": "overlap-checker", "score": 0.85},
-    {"name": "format-checker", "score": 1.0},
-    {"name": "relevance-judge", "score": 0.95},
-    {"name": "faithfulness-judge", "score": 1.0},
-    {"name": "coherence-judge", "score": 1.0},
-    {"name": "completeness-judge", "score": 1.0},
-    {"name": "instruction-judge", "score": 1.0}
-  ],
-  "confidence": 0.92,
-  "verdict": "pass",
-  "metrics": {
-    "stage1_avg": 0.95,
-    "stage2_weighted_avg": 0.99,
-    "stage2_harmonic_mean": 0.98,
-    "stage2_median": 1.0,
-    "stage2_weighted_product": 0.98,
-    "aggregation_method": "weighted_average"
-  }
-}
-```
-
-**Understanding the response:**
-- **8 stages**: 3 prechecks (fast heuristics) + 5 LLM judges (parallel evaluation)
-- **confidence**: Final aggregated score (0.92 = 92% confident the answer is good)
-- **verdict**: `pass` (threshold > 0.8), `review` (0.5-0.8), or `fail` (< 0.5)
-- **metrics**: All 4 aggregation methods computed for transparency
-
-## Step 4: View Results in Dashboard
-
-Open your browser to `http://localhost:18082`
-
-The dashboard shows:
-- Real-time evaluation results
-- Filters by agent, verdict, pagination
-- Expandable rows with detailed stage scores
-- Auto-refresh every 10 seconds
-
-## Common Use Cases
-
-### Use Case 1: Check Answer Quality
-
-Evaluate if an AI answer is high-quality:
-
+**Multi-turn conversation:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
+for turn in 1 2 3; do
+  curl -s -X POST http://localhost:18082/api/v1/evaluate \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"event_id\": \"conv-turn-$turn\",
+      \"conversation_id\": \"conv-qs-001\",
+      \"event_type\": \"agent_response\",
+      \"agent\": {\"name\": \"my-agent\", \"version\": \"1.0\"},
+      \"interaction\": {
+        \"user_query\": \"Question $turn\",
+        \"context\": \"Some context.\",
+        \"answer\": \"Answer $turn with relevant information.\"
+      }
+    }" | jq '{verdict, confidence}'
+done
+```
+
+**Failing evaluation (hallucination):**
+```bash
+curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "quality-check",
-    "agent": {"name": "my-agent"},
-    "interaction": {
-      "user_query": "Explain quantum computing",
-      "answer": "Yes."
-    }
-  }'
-```
-
-Expected: `verdict: "fail"`, early exit (only 3 precheck stages, no expensive LLM calls)
-
-### Use Case 2: Detect Hallucinations
-
-Check if answer contains facts not in context:
-
-```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "hallucination-check",
-    "agent": {"name": "my-agent"},
+    "event_id": "qs-002",
+    "event_type": "agent_response",
+    "agent": {"name": "my-agent", "version": "1.0"},
     "interaction": {
       "user_query": "What is the population of Tokyo?",
       "context": "Tokyo is the capital of Japan.",
       "answer": "Tokyo has 50 million people and is the largest city in China."
     }
-  }'
+  }' | jq '{verdict, confidence}'
 ```
 
-Expected: Low faithfulness and coherence scores (catches hallucination about China)
+Expected: `verdict: "fail"` (catches hallucination about China).
 
-### Use Case 3: Validate Against Ground Truth
+---
 
-Compare answer with expected output:
+## Step 5 — API: Download a 25% Sample
+
+Sample the evaluation results for human annotation review:
 
 ```bash
-# First, enable correctness judge in configs/judges.yaml
-# Set correctness.enabled: true
-
-curl -X POST http://localhost:18082/api/v1/evaluate \
+curl -s -X POST http://localhost:18082/api/v1/validation/sample/download \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "correctness-check",
-    "agent": {"name": "my-agent"},
-    "interaction": {
-      "user_query": "What is 2+2?",
-      "answer": "The answer is four",
-      "expected_output": "4"
-    }
-  }'
+    "start_date": "2020-01-01T00:00:00Z",
+    "end_date": "2099-01-01T00:00:00Z",
+    "percentage": 25
+  }' -o sample.jsonl
+
+echo "Sampled $(wc -l < sample.jsonl) records"
+head -1 sample.jsonl | jq '{event_id, verdict, confidence}'
 ```
 
-Expected: Correctness judge scores ~0.9 (semantic match despite different format)
+**Verify:**
+- Status 200
+- `Content-Type: application/x-ndjson`
+- Each line is valid JSON with `event_id`, `verdict`, `confidence`, `stage_scores`
 
-### Use Case 4: Evaluate Single Quality Dimension
+---
 
-Test only one specific judge (faster):
+## Step 6 — Dashboard: Verify the UI
+
+Open `http://localhost:18082` in your browser and check each tab:
+
+**Results tab:**
+- [ ] Evaluation rows load with verdict badges
+- [ ] Filter by `agent_name=my-agent` returns only matching rows
+- [ ] Click a row to expand stage scores
+
+**Conversations tab:**
+- [ ] `conv-qs-001` appears with 3 turns
+- [ ] Click the conversation to see turn-by-turn detail
+
+**Monitoring tab:**
+- [ ] Metrics table loads with `total_evaluations`, `avg_confidence`, `avg_judge_disagreement`
+- [ ] Switch window to `24h` — values update
+- [ ] Disagreement is shown as a decimal (not a percentage)
+
+---
+
+## Step 7 — API: Run a Live Evaluation
+
+Verify the full pipeline returns a correct response:
 
 ```bash
-curl -X POST http://localhost:18082/api/v1/evaluate/judge/relevance \
+curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "relevance-only",
-    "agent": {"name": "my-agent"},
+    "event_id": "qs-live-001",
+    "event_type": "agent_response",
+    "agent": {"name": "my-agent", "version": "1.0"},
     "interaction": {
-      "user_query": "What is machine learning?",
-      "answer": "Machine learning allows computers to learn from data."
+      "user_query": "Explain what machine learning is.",
+      "context": "Machine learning is a subset of AI that enables systems to learn from data.",
+      "answer": "Machine learning allows computers to improve their performance on tasks by learning patterns from data, without being explicitly programmed for each scenario."
     }
-  }'
+  }' | jq '{verdict, confidence, stage_count: (.stage_scores | length)}'
 ```
 
-Expected: Only 1 stage (relevance-judge), response time ~1-2 seconds
-
-### Use Case 5: Query Past Results
-
-Retrieve previous evaluation results:
-
-```bash
-# Get all results for specific agent
-curl "http://localhost:18082/api/v1/results?agent_name=my-agent&limit=10"
-
-# Filter by verdict
-curl "http://localhost:18082/api/v1/results?verdict=fail&limit=20"
-
-# Get specific result by ID
-curl "http://localhost:18082/api/v1/results/test-001"
+**Expected:**
+```json
+{
+  "verdict": "pass",
+  "confidence": 0.89,
+  "stage_count": 8
+}
 ```
+
+- 8 stages = 3 prechecks + 5 LLM judges
+- `confidence` > 0.8 → `verdict: "pass"`
+
+---
+
+## Release Checklist
+
+| Step | What to verify | Pass? |
+|------|---------------|-------|
+| 1 — CLI evaluate | results.jsonl produced, no errors | |
+| 2 — CLI validate | Kendall's τ ≥ 0.3, status=PASSED | |
+| 3 — API start | All judges initialized, health returns `ok` | |
+| 4 — Seed data | Evaluations stored, conversation created | |
+| 5 — Sample download | JSONL response, correct record count | |
+| 6 — Dashboard | All 3 tabs load and display correct data | |
+| 7 — Live evaluation | 8 stages, pass verdict, correct confidence | |
+
+All steps must pass before tagging a release.
+
+---
 
 ## Next Steps
 
-### Deploy Different Modes
-
-- **[API Mode](../deployment/api-mode.md)** - HTTP API for synchronous evaluation
-- **See CLAUDE.md** for batch, MCP, and streaming mode documentation
-
-### Customize Configuration
-
-- **[Configuration Guide](configuration.md)** - Environment variables and thresholds
-- **See CLAUDE.md** for adding judges and aggregation methods
-
-### Run Tests
-
-- **[API Tests](../testing/api-tests.md)** - HTTP endpoint test cases
-- **[Batch Tests](../testing/batch-tests.md)** - CLI batch processing tests
-- **[MCP Tests](../testing/mcp-tests.md)** - MCP integration tests
-- **[Streaming Tests](../testing/streaming-tests.md)** - Redis consumer tests
-
-## Common Issues
-
-### "judge not found" Error
-
-Ensure `configs/judges.yaml` exists and is properly formatted. Check logs for:
-```
-INFO judge created successfully judge=relevance
-```
-
-### Low Confidence on Good Answers
-
-Adjust verdict thresholds in `.env`:
-```env
-VERDICT_PASS_THRESHOLD=0.7  # Lower from default 0.8
-VERDICT_REVIEW_THRESHOLD=0.4  # Lower from default 0.5
-```
-
-### Slow Response Times
-
-Check if early exit is working:
-```bash
-# Test with obviously bad answer
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -d '{"interaction":{"user_query":"Long question here","answer":"No"}}'
-
-# Should return quickly with only 3 stages
-```
-
-### Dashboard Not Loading
-
-Verify API server is running:
-```bash
-curl http://localhost:18082/
-# Should return HTML
-```
-
-Check browser console for errors and ensure no CORS issues.
-
-## Performance Tips
-
-1. **Enable Early Exit** - Bad answers skip expensive LLM calls:
-   ```env
-   ENABLE_PRECHECK=true  # Default
-   EARLY_EXIT_THRESHOLD=0.2
-   ```
-
-2. **Disable Unused Judges** - Edit `configs/judges.yaml`:
-   ```yaml
-   - name: instruction
-     enabled: false  # Skip if not needed
-   ```
-
-3. **Use Lighter Models** - Faster, cheaper evaluation:
-   ```yaml
-   default_model:
-     modelFamily: "openai_platform"
-     modelID: gpt-4o-mini  # Fast and cheap
-   ```
-
-4. **Horizontal Scaling (Streaming)** - Multiple consumers:
-   ```bash
-   # Consumer 1
-   STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 ./themis-api
-
-   # Consumer 2
-   STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 ./themis-api
-   ```
-
-## Building from Source (Development)
-
-If you want to contribute or modify Themis:
-
-```bash
-# Clone repository
-git clone https://github.com/Terminus-Lab/themis.git
-cd themis
-
-# Install dependencies
-go mod download
-
-# Build binaries
-go build -o bin/themis-api cmd/api/main.go
-go build -o bin/themis-mcp cmd/mcp/main.go
-go build -o bin/themis-cli cmd/batch/main.go
-
-# Run from source
-go run cmd/api/main.go
-```
-
-## Getting Help
-
-- **Documentation**: See [CLAUDE.md](../../CLAUDE.md) for complete documentation
-- **Test Cases**: See [API Tests](../testing/api-tests.md) for comprehensive test scenarios
-- **Issues**: Report bugs at https://github.com/Terminus-Lab/themis/issues
+- **[Configuration Guide](configuration.md)** — Tune thresholds and judge weights
+- **[API Mode Deployment](../deployment/api-mode.md)** — Production deployment guide
+- **[API Tests](../testing/api-tests.md)** — Full API test case reference
+- **[Batch Tests](../testing/batch-tests.md)** — CLI and validation test cases
