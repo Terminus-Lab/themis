@@ -1,314 +1,147 @@
----
-title: Installation
-description: Prerequisites and setup instructions for Themis
-version: 1.0.0
-tags: [installation, setup, prerequisites, getting-started]
-related:
-  - getting-started/quick-start.md
-  - getting-started/configuration.md
----
-
 # Installation
 
 ## Prerequisites
 
-### Required
-- **LLM Provider Access** - At least one of:
-  - OpenAI Platform API key (recommended - simplest setup)
-  - AWS Bedrock access (for Claude models)
-  - Azure OpenAI access (for Azure-hosted GPT models)
+**Required — at least one LLM provider:**
+- OpenAI Platform API key (simplest setup)
+- AWS Bedrock access (for Claude models)
+- Azure OpenAI (for Azure-hosted GPT)
 
-### Optional
-- **Redis** - For streaming mode (`STREAMING_ENABLED=true`)
-- **PostgreSQL** - For production persistent storage (SQLite used by default)
-- **Docker** - For containerized MCP deployment
-- **Go 1.21+** - Only needed if building from source (see bottom of page)
-
-## Installation Methods
-
-### Method 1: Pre-Built Binaries (Recommended)
-
-Download the latest release from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases/latest).
-
-#### 1. Download for Your Platform
-
-**macOS (Apple Silicon - M1/M2/M3)**:
-```bash
-curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_arm64.tar.gz
-tar -xzf themis_1.0.0_darwin_arm64.tar.gz
-cd themis_1.0.0_darwin_arm64
-```
-
-**macOS (Intel)**:
-```bash
-curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_darwin_amd64.tar.gz
-tar -xzf themis_1.0.0_darwin_amd64.tar.gz
-cd themis_1.0.0_darwin_amd64
-```
-
-**Linux (x64)**:
-```bash
-curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_linux_amd64.tar.gz
-tar -xzf themis_1.0.0_linux_amd64.tar.gz
-cd themis_1.0.0_linux_amd64
-```
-
-**Linux (ARM)**:
-```bash
-curl -LO https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_linux_arm64.tar.gz
-tar -xzf themis_1.0.0_linux_arm64.tar.gz
-cd themis_1.0.0_linux_arm64
-```
-
-**Windows (PowerShell)**:
-```powershell
-Invoke-WebRequest -Uri "https://github.com/Terminus-Lab/themis/releases/download/v1.0.0/themis_1.0.0_windows_amd64.zip" -OutFile "themis_1.0.0_windows_amd64.zip"
-Expand-Archive themis_1.0.0_windows_amd64.zip
-cd themis_1.0.0_windows_amd64
-```
-
-#### 2. Configure Environment
-
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your credentials (see [Configuration Guide](configuration.md) for details):
-
-**Simplest Setup (OpenAI Platform)**:
-```env
-OPEN_AI_KEY=sk-proj-...  # Your OpenAI API key
-```
-
-**AWS Bedrock (for Claude)**:
-```env
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-```
-
-**Azure OpenAI**:
-```env
-OPEN_AI_KEY=your_azure_key
-AZURE_OPENAI_ENDPOINT=https://...openai.azure.com/...
-```
-
-#### 3. Verify Installation
-
-Run a quick test:
-
-```bash
-# Start API server
-./themis-api
-
-# Windows:
-# .\themis-api.exe
-
-# In another terminal, test the endpoint
-curl http://localhost:18082/
-```
-
-You should see the dashboard UI load successfully.
+**Optional:**
+- Redis — for streaming mode (`STREAMING_ENABLED=true`)
+- PostgreSQL — for persistent storage (SQLite is used by default)
+- Docker — for containerized MCP deployment
+- Go 1.24+ — only needed if building from source
 
 ---
 
-### Method 2: Build from Source (Development)
+## Method 1: Pre-Built Binaries (Recommended)
 
-For contributors or those who want to modify Themis:
+Download the latest release from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases/latest) and extract it.
 
-#### 1. Clone Repository
+```bash
+# macOS (Apple Silicon)
+tar -xzf themis_*_darwin_arm64.tar.gz && cd themis_*_darwin_arm64
+
+# macOS (Intel)
+tar -xzf themis_*_darwin_amd64.tar.gz && cd themis_*_darwin_amd64
+
+# Linux (x64)
+tar -xzf themis_*_linux_amd64.tar.gz && cd themis_*_linux_amd64
+
+# Linux (ARM)
+tar -xzf themis_*_linux_arm64.tar.gz && cd themis_*_linux_arm64
+
+# Windows (PowerShell)
+Expand-Archive themis_*_windows_amd64.zip && cd themis_*_windows_amd64
+```
+
+**⚠️ Always run binaries from the extracted directory** — `configs/judges.yaml` must be present alongside the binary.
+
+Configure credentials:
+```bash
+cp .env.example .env
+# Edit .env — minimum required: one LLM provider key
+```
+
+---
+
+## Method 2: Build from Source
 
 ```bash
 git clone https://github.com/Terminus-Lab/themis.git
 cd themis
-```
-
-#### 2. Install Dependencies
-
-```bash
 go mod download
-```
 
-#### 3. Build Binaries
-
-```bash
 go build -o bin/themis-api cmd/api/main.go
 go build -o bin/themis-mcp cmd/mcp/main.go
 go build -o bin/themis-cli cmd/batch/main.go
-```
 
-#### 4. Configure Environment
-
-```bash
 cp .env.example .env
-# Edit .env with your LLM credentials
-```
-
-#### 5. Run from Source (Development Mode)
-
-```bash
-# Run without building
-go run cmd/api/main.go
-
-# Or use built binary
-./bin/themis-api
 ```
 
 ---
 
 ## Database Setup
 
-### SQLite (Default - Recommended for Development)
+### SQLite (Default)
 
-**Zero configuration required** - SQLite runs in-memory by default:
-
+Zero configuration. Set in `.env`:
 ```env
-IN_MEMORY_DB=true  # Default setting
+IN_MEMORY_DB=true  # default
 ```
 
-Evaluation results are stored during service runtime. No migration needed.
+Data is held in memory for the duration of the service run.
 
 ### PostgreSQL (Production)
 
-For persistent storage in production:
-
 ```bash
-# 1. Set up PostgreSQL
-export THEMIS_DB_DATABASE=themis
-export THEMIS_DB_USER=themis
-export THEMIS_DB_PASSWORD=themis
-export THEMIS_DB_HOST=localhost
-export THEMIS_DB_PORT=5432
-export THEMIS_DB_SSL_MODE=disable
-export THEMIS_DB_URL=postgresql://${THEMIS_DB_USER}:${THEMIS_DB_PASSWORD}@${THEMIS_DB_HOST}:${THEMIS_DB_PORT}/${THEMIS_DB_DATABASE}?sslmode=${THEMIS_DB_SSL_MODE}
+export THEMIS_DB_URL=postgresql://user:pass@localhost:5432/themis?sslmode=disable
 
-# 2. Start PostgreSQL (using Docker Compose)
+# Start PostgreSQL
 docker compose up --build themis-db -d
 
-# 3. Install migration tool
+# Run migrations
 brew install golang-migrate
-
-# 4. Run migrations
 migrate -path ./migrations -database "$THEMIS_DB_URL" up
 
-# 5. Update .env
+# Update .env
 echo "IN_MEMORY_DB=false" >> .env
 echo "THEMIS_DB_URL=$THEMIS_DB_URL" >> .env
 ```
 
-## Building Binaries
+---
 
-### API Server
-
-```bash
-go build -o bin/themis-api cmd/api/main.go
-./bin/themis-api
-```
-
-### Batch CLI
-
-```bash
-go build -o bin/themis-cli cmd/batch/main.go
-./bin/themis-cli evaluate -input dataset.jsonl -output results.jsonl
-```
-
-### MCP Server
-
-```bash
-go build -o bin/themis-mcp cmd/mcp/main.go
-./bin/themis-mcp
-```
-
-## Docker Setup (MCP Mode)
-
-Build Docker image for MCP integration:
+## Docker (MCP Mode)
 
 ```bash
 docker build -t themis-mcp .
 docker run --env-file .env themis-mcp
-```
 
-For Claude Code integration:
-
-```bash
+# Add to Claude Code
 claude mcp add --transport stdio --scope project themis \
-  --env AWS_REGION=us-east-1 \
-  --env AWS_ACCESS_KEY_ID=your-key \
-  --env AWS_SECRET_ACCESS_KEY=your-secret \
   -- docker run -i --rm --env-file .env themis-mcp
 ```
 
-## Verification
+---
 
-### Test API Endpoint
+## Verify Installation
 
 ```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "test-001",
-    "event_type": "agent_response",
-    "agent": {"name": "test-agent", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is 2+2?",
-      "answer": "4"
-    }
-  }'
+# Start the API server
+./bin/themis-api
+
+# In another terminal
+curl -s http://localhost:18082/api/v1/health | jq .
+# {"status":"ok","version":"1.0.0"}
 ```
 
-Expected response:
-```json
-{
-  "id": "test-001",
-  "confidence": 0.85,
-  "verdict": "pass",
-  "stages": [...]
-}
-```
-
-### Access Dashboard
-
-Open browser to `http://localhost:18082` - you should see the evaluation dashboard.
+---
 
 ## Troubleshooting
 
-### Port Already in Use
-
-Change the API port in `.env`:
-
+**Port in use:**
 ```env
 EVAL_AGENT_API_PORT=18083
 ```
 
-### AWS Credentials Error
-
-Verify your AWS credentials have Bedrock access:
-
+**AWS credentials error:**
 ```bash
 aws bedrock list-foundation-models --region us-east-1
 ```
 
-### OpenAI API Key Issues
-
-Test your API key:
-
+**OpenAI key issues:**
 ```bash
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer $OPEN_AI_KEY"
+curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPEN_AI_KEY"
 ```
 
-### Judge Configuration Not Found
+**judges.yaml not found** — ensure the file exists at one of:
+1. Path in `JUDGES_CONFIG_PATH` env var
+2. `./configs/judges.yaml` (relative to binary)
 
-Ensure `judges.yaml` exists in one of:
-1. Path specified by `JUDGES_CONFIG_PATH` env var
-2. `./judges.yaml` (next to binary)
-3. `./config/judges.yaml`
+---
 
 ## Next Steps
 
-- [Quick Start Guide](quick-start.md) - Run your first evaluation
-- [Configuration Reference](configuration.md) - Detailed configuration options
-- [API Mode](../deployment/api-mode.md) - Deploy HTTP API server
-- [CLAUDE.md](../../CLAUDE.md) - Complete project documentation
+- [Quick Start](quick-start.md) — Run your first evaluation
+- [Configuration](configuration.md) — Tune judges and thresholds

@@ -1,37 +1,20 @@
----
-title: Quick Start
-description: End-to-end walkthrough to verify Themis before release
-version: 1.0.0
-tags: [quick-start, tutorial, getting-started, examples]
-related:
-  - getting-started/installation.md
-  - getting-started/configuration.md
-  - deployment/api-mode.md
-  - testing/api-tests.md
----
-
 # Quick Start
 
-End-to-end walkthrough that covers the full Themis workflow: CLI batch processing, judge validation, API server, dashboard, and sampling.
+End-to-end walkthrough covering CLI batch evaluation, judge validation, API server, dashboard, and sampling. Use this as a release verification checklist.
 
 ## Prerequisites
-
-Build the binaries and configure credentials:
 
 ```bash
 go build -o bin/themis-api cmd/api/main.go
 go build -o bin/themis-cli cmd/batch/main.go
 
 cp .env.example .env
-# Add your LLM key — simplest option:
 echo "OPEN_AI_KEY=sk-proj-YOUR_KEY_HERE" >> .env
 ```
 
 ---
 
-## Step 1 — CLI: Batch Evaluate a Dataset
-
-Run the batch evaluator against the sample dataset to verify the full pipeline works end-to-end from the command line.
+## Step 1 — CLI: Batch Evaluate
 
 ```bash
 ./bin/themis-cli evaluate \
@@ -39,45 +22,24 @@ Run the batch evaluator against the sample dataset to verify the full pipeline w
   -o results.jsonl
 ```
 
-**Expected output:**
-```
-INFO Input file parsed records=10
-INFO Starting worker pool workers=5
-INFO Processing complete total=10 pass=7 review=2 fail=1
-```
-
-Inspect the results:
-
-```bash
-# Verdict distribution
-jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' results.jsonl
-
-# Average confidence
-jq -s 'map(.confidence) | add/length' results.jsonl
-```
-
 **Verify:**
 - `results.jsonl` has one line per input record
 - Each line has `verdict`, `confidence`, and `stage_scores`
 - No errors in logs
 
+```bash
+# Verdict distribution
+jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' results.jsonl
+```
+
 ---
 
 ## Step 2 — CLI: Validate Judge Accuracy
-
-Run the validation command against the annotated dataset to confirm the judges agree with human annotations (Kendall's τ ≥ 0.3 required).
 
 ```bash
 ./bin/themis-cli validate \
   -i resources/validation_success_dataset.jsonl \
   -c 0.3
-```
-
-**Expected output:**
-```
-INFO Starting validation records=150 threshold=0.3
-INFO Validation complete kendall_tau=0.63 status=PASSED
-INFO LLM judge validated against human annotations
 ```
 
 **Verify:**
@@ -89,21 +51,10 @@ INFO LLM judge validated against human annotations
 
 ---
 
-## Step 3 — API: Start the Server
+## Step 3 — API: Start Server
 
 ```bash
 ./bin/themis-api
-```
-
-**Expected startup logs:**
-```
-INFO judge created successfully judge=relevance
-INFO judge created successfully judge=faithfulness
-INFO judge created successfully judge=coherence
-INFO judge created successfully judge=completeness
-INFO judge created successfully judge=instruction
-INFO judge pool built successfully total_judges=5
-INFO Starting Themis Server address=:18082
 ```
 
 **Verify health:**
@@ -116,9 +67,7 @@ curl -s http://localhost:18082/api/v1/health | jq .
 
 ## Step 4 — API: Seed Evaluation Data
 
-Send a few evaluations to populate the database, including a multi-turn conversation.
-
-**Single evaluation (good answer):**
+**Good answer:**
 ```bash
 curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
@@ -153,7 +102,7 @@ for turn in 1 2 3; do
 done
 ```
 
-**Failing evaluation (hallucination):**
+**Hallucination (should fail):**
 ```bash
 curl -s -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
@@ -169,13 +118,11 @@ curl -s -X POST http://localhost:18082/api/v1/evaluate \
   }' | jq '{verdict, confidence}'
 ```
 
-Expected: `verdict: "fail"` (catches hallucination about China).
+Expected: `verdict: "fail"`.
 
 ---
 
 ## Step 5 — API: Download a 25% Sample
-
-Sample the evaluation results for human annotation review:
 
 ```bash
 curl -s -X POST http://localhost:18082/api/v1/validation/sample/download \
@@ -187,39 +134,36 @@ curl -s -X POST http://localhost:18082/api/v1/validation/sample/download \
   }' -o sample.jsonl
 
 echo "Sampled $(wc -l < sample.jsonl) records"
-head -1 sample.jsonl | jq '{event_id, verdict, confidence}'
+head -1 sample.jsonl | jq .
 ```
 
 **Verify:**
 - Status 200
 - `Content-Type: application/x-ndjson`
-- Each line is valid JSON with `event_id`, `verdict`, `confidence`, `stage_scores`
+- Each line contains `event_id`, `agent`, `interaction` fields — no evaluation scores (by design, to avoid biasing human annotators)
 
 ---
 
 ## Step 6 — Dashboard: Verify the UI
 
-Open `http://localhost:18082` in your browser and check each tab:
+Open `http://localhost:18082` and check:
 
 **Results tab:**
-- [ ] Evaluation rows load with verdict badges
-- [ ] Filter by `agent_name=my-agent` returns only matching rows
+- [ ] Rows load with verdict badges
+- [ ] Filter by `agent_name=my-agent` works
 - [ ] Click a row to expand stage scores
 
 **Conversations tab:**
 - [ ] `conv-qs-001` appears with 3 turns
-- [ ] Click the conversation to see turn-by-turn detail
+- [ ] Click conversation to see turn detail
 
 **Monitoring tab:**
-- [ ] Metrics table loads with `total_evaluations`, `avg_confidence`, `avg_judge_disagreement`
-- [ ] Switch window to `24h` — values update
-- [ ] Disagreement is shown as a decimal (not a percentage)
+- [ ] Metrics table loads (`total_evaluations`, `avg_confidence`, `avg_judge_disagreement`)
+- [ ] Window switcher (7d / 24h) updates values
 
 ---
 
-## Step 7 — API: Run a Live Evaluation
-
-Verify the full pipeline returns a correct response:
+## Step 7 — API: Live Evaluation
 
 ```bash
 curl -s -X POST http://localhost:18082/api/v1/evaluate \
@@ -237,30 +181,23 @@ curl -s -X POST http://localhost:18082/api/v1/evaluate \
 ```
 
 **Expected:**
-```json
-{
-  "verdict": "pass",
-  "confidence": 0.89,
-  "stage_count": 8
-}
-```
-
-- 8 stages = 3 prechecks + 5 LLM judges
-- `confidence` > 0.8 → `verdict: "pass"`
+- `verdict: "pass"`
+- `confidence` > 0.8
+- `stage_count` = 8 (3 prechecks + 5 LLM judges)
 
 ---
 
 ## Release Checklist
 
 | Step | What to verify | Pass? |
-|------|---------------|-------|
-| 1 — CLI evaluate | results.jsonl produced, no errors | |
-| 2 — CLI validate | Kendall's τ ≥ 0.3, status=PASSED | |
+|------|----------------|-------|
+| 1 — CLI evaluate | `results.jsonl` produced, no errors | |
+| 2 — CLI validate | Kendall's τ ≥ 0.3, `status=PASSED` | |
 | 3 — API start | All judges initialized, health returns `ok` | |
 | 4 — Seed data | Evaluations stored, conversation created | |
-| 5 — Sample download | JSONL response, correct record count | |
+| 5 — Sample download | JSONL response, interaction-only fields | |
 | 6 — Dashboard | All 3 tabs load and display correct data | |
-| 7 — Live evaluation | 8 stages, pass verdict, correct confidence | |
+| 7 — Live evaluation | 8 stages, pass verdict | |
 
 All steps must pass before tagging a release.
 
@@ -268,7 +205,7 @@ All steps must pass before tagging a release.
 
 ## Next Steps
 
-- **[Configuration Guide](configuration.md)** — Tune thresholds and judge weights
-- **[API Mode Deployment](../deployment/api-mode.md)** — Production deployment guide
-- **[API Tests](../testing/api-tests.md)** — Full API test case reference
-- **[Batch Tests](../testing/batch-tests.md)** — CLI and validation test cases
+- [Configuration](configuration.md) — Tune thresholds and judge weights
+- [API Mode](../deployment/api-mode.md) — Production deployment
+- [API Tests](../testing/api-tests.md) — Full API test reference
+- [Batch Tests](../testing/batch-tests.md) — CLI and validation test cases

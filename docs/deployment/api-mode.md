@@ -1,82 +1,32 @@
----
-title: API Mode
-description: Deploy Themis as an HTTP API server for synchronous evaluation
-version: 1.0.0
-tags: [deployment, api, http, rest, synchronous]
-related:
-  - getting-started/quick-start.md
-  - getting-started/configuration.md
-  - testing/api-tests.md
-  - testing/streaming-tests.md
----
-
 # API Mode
 
-Deploy Themis as an HTTP REST API server for synchronous, on-demand evaluation.
+HTTP REST server for synchronous, on-demand evaluation.
 
-## Overview
-
-**API Mode** provides HTTP endpoints for:
-- Real-time evaluation of AI responses
-- Single judge evaluation
-- Result querying and filtering
-- Web dashboard for visualization
-- Prometheus metrics
-
-**Best for**:
-- Interactive applications
-- Real-time quality checks
-- Development and testing
-- Manual evaluation via dashboard
-
-## Quick Start
-
-### 1. Configure Environment
+## Start
 
 ```bash
-# Minimal .env configuration
-OPEN_AI_KEY=sk-proj-...
-EVAL_AGENT_API_PORT=18082
+./bin/themis-api
+# Expected: "INFO Starting Themis Server address=:18082"
+
+# With Redis streaming:
+STREAMING_ENABLED=true ./bin/themis-api
 ```
 
-### 2. Start Server
+---
 
-```bash
-./themis-api
-```
+## Endpoints
 
-**Expected output**:
-```
-INFO judge pool built successfully total_judges=5
-INFO Starting Themis Server address=:18082 streaming_enabled=false
-```
+### POST `/api/v1/evaluate`
 
-### 3. Test Endpoint
+Full two-stage pipeline evaluation.
 
-```bash
-curl http://localhost:18082/
-# Should return dashboard HTML
-```
-
-## Available Endpoints
-
-### 1. Full Pipeline Evaluation
-
-**POST** `/api/v1/evaluate`
-
-Runs complete two-stage evaluation pipeline.
-
-**Request**:
 ```bash
 curl -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "eval-001",
     "event_type": "agent_response",
-    "agent": {
-      "name": "my-agent",
-      "version": "1.0"
-    },
+    "agent": {"name": "my-agent", "version": "1.0"},
     "interaction": {
       "user_query": "What is the capital of France?",
       "context": "France is a country in Europe...",
@@ -85,17 +35,13 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
   }'
 ```
 
-**Response**:
+Response:
 ```json
 {
   "id": "eval-001",
-  "stages": [
-    {"name": "length-checker", "score": 1.0},
-    {"name": "relevance-judge", "score": 0.95},
-    ...
-  ],
   "confidence": 0.92,
   "verdict": "pass",
+  "stage_scores": [...],
   "metrics": {
     "stage1_avg": 0.95,
     "stage2_weighted_avg": 0.92,
@@ -104,127 +50,52 @@ curl -X POST http://localhost:18082/api/v1/evaluate \
 }
 ```
 
-### 2. Single Judge Evaluation
+### POST `/api/v1/evaluate/judge/{name}`
 
-**POST** `/api/v1/evaluate/judge/{name}`
+Single judge evaluation (faster). Available names: `relevance`, `faithfulness`, `coherence`, `completeness`, `instruction`, `correctness`.
 
-Run only one specific judge (faster).
-
-**Available judges**: relevance, faithfulness, coherence, completeness, instruction, correctness
-
-**Request**:
 ```bash
 curl -X POST "http://localhost:18082/api/v1/evaluate/judge/relevance?threshold=0.8" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "eval-002",
     "agent": {"name": "my-agent"},
-    "interaction": {
-      "user_query": "What is AI?",
-      "answer": "AI is artificial intelligence."
-    }
+    "interaction": {"user_query": "What is AI?", "answer": "Artificial intelligence."}
   }'
 ```
 
-**Query parameters**:
-- `threshold` (optional) - Custom pass/fail threshold (default: 0.7)
+Query param: `threshold` — custom pass/fail threshold (default: 0.7).
 
-**Response**:
-```json
-{
-  "id": "eval-002",
-  "stages": [
-    {"name": "relevance-judge", "score": 0.95, "reason": "Answer directly addresses query"}
-  ],
-  "confidence": 0.95,
-  "verdict": "pass"
-}
-```
+### GET `/api/v1/results`
 
-### 3. Query Results
+Query past evaluations.
 
-**GET** `/api/v1/results`
+Query params:
+- `agent_name` — exact match
+- `verdict` — `pass`, `review`, or `fail`
+- `limit` — results per page (default: 50)
+- `offset` — pagination offset (default: 0)
 
-Retrieve past evaluation results with filters.
-
-**Query parameters**:
-- `agent_name` - Filter by agent name (exact match)
-- `verdict` - Filter by verdict: `pass`, `review`, or `fail`
-- `limit` - Results per page (default: 50, max: 100)
-- `offset` - Pagination offset (default: 0)
-
-**Request**:
 ```bash
-# All results for agent
-curl "http://localhost:18082/api/v1/results?agent_name=my-agent&limit=10"
-
-# Failed evaluations only
-curl "http://localhost:18082/api/v1/results?verdict=fail&limit=20"
-
-# Pagination
-curl "http://localhost:18082/api/v1/results?limit=50&offset=100"
+curl "http://localhost:18082/api/v1/results?agent_name=my-agent&verdict=fail&limit=20"
 ```
 
-**Response**:
-```json
-{
-  "results": [
-    {
-      "event_id": "eval-001",
-      "agent_name": "my-agent",
-      "agent_version": "1.0",
-      "user_query": "What is the capital of France?",
-      "answer": "Paris",
-      "context": "France is...",
-      "confidence": 0.92,
-      "verdict": "pass",
-      "stage_scores": [...],
-      "created_at": "2024-03-10T10:00:00Z"
-    }
-  ],
-  "total": 150,
-  "count": 10,
-  "limit": 10,
-  "offset": 0,
-  "has_more": true
-}
-```
+### GET `/api/v1/results/{event_id}`
 
-### 4. Get Single Result
+Single evaluation by ID.
 
-**GET** `/api/v1/results/{event_id}`
+### GET `/api/v1/conversations`
 
-Retrieve specific evaluation by ID.
+List all conversations with summary metrics (turn count, avg confidence, verdict distribution).
 
-**Request**:
-```bash
-curl "http://localhost:18082/api/v1/results/eval-001"
-```
+### GET `/api/v1/conversations/{id}`
 
-**Response**: Single evaluation result object.
+All turns for a conversation with detailed evaluations.
 
-### 5. Dashboard
+### POST `/api/v1/validation/sample/download`
 
-**GET** `/`
+Sample a percentage of stored evaluations for human annotation. Returns JSONL with **interaction data only** — no Themis scores, so annotators are unbiased.
 
-Web dashboard for visualizing results.
-
-**Access**: Open `http://localhost:18082` in browser
-
-**Features**:
-- Real-time results table
-- Filter by agent, verdict
-- Expandable rows for details
-- Auto-refresh every 10s
-- Dark terminal theme
-
-### 6. Validation Sample Download
-
-**POST** `/api/v1/validation/sample/download`
-
-Sample a percentage of evaluation results from a date range and download as JSONL for human annotation. Used in the periodic revalidation workflow to measure Kendall τ against production data.
-
-**Request**:
 ```bash
 curl -X POST http://localhost:18082/api/v1/validation/sample/download \
   -H "Content-Type: application/json" \
@@ -234,241 +105,115 @@ curl -X POST http://localhost:18082/api/v1/validation/sample/download \
     "percentage": 25,
     "min_size": 100,
     "max_size": 2500
-  }' \
-  -o quarterly_sample.jsonl
+  }' -o sample.jsonl
 ```
 
-**Request fields**:
-- `start_date` (required) — RFC3339 start of date range
-- `end_date` (required) — RFC3339 end of date range
-- `percentage` (optional) — Percentage to sample, 1–100 (default: 25)
-- `min_size` (optional) — Minimum sample size; bumps up if percentage gives fewer (default: 0)
-- `max_size` (optional) — Maximum sample size cap (default: 0 = no cap)
+Fields:
+- `start_date`, `end_date` (required) — RFC3339 date range
+- `percentage` — 1–100, default 25
+- `min_size`, `max_size` — clamp sample size (0 = no limit)
 
-**Response**: `application/x-ndjson` stream — one JSON evaluation object per line.
-
+Response: `application/x-ndjson`, one record per line:
 ```json
-{"event_id":"evt-001","agent_name":"my-agent","user_query":"...","answer":"...","confidence":0.85,"verdict":"pass","stage_scores":[...]}
-{"event_id":"evt-002","agent_name":"my-agent","user_query":"...","answer":"...","confidence":0.62,"verdict":"review","stage_scores":[...]}
+{"event_id":"evt-001","conversation_id":"...","agent":{"name":"my-agent","version":"1.0"},"interaction":{"user_query":"...","answer":"...","context":"..."}}
 ```
 
-**Workflow**:
+**Annotation workflow:**
 ```bash
-# 1. Sample 25% of Q1 production data
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
-  -H "Content-Type: application/json" \
-  -d '{"start_date":"2026-01-01T00:00:00Z","end_date":"2026-03-31T23:59:59Z","percentage":25}' \
-  -o quarterly_sample.jsonl
+# 1. Download sample
+curl -X POST .../api/v1/validation/sample/download \
+  -d '{"start_date":"...","end_date":"...","percentage":25}' \
+  -o sample.jsonl
 
-# 2. Send to annotation team (Label Studio, Scale AI, etc.)
-# 3. Annotators add human_score field to each line
-# 4. Run validation against annotated sample
-go run cmd/batch/main.go validate -input quarterly_annotated.jsonl --threshold 0.3
+# 2. Annotators add "human_annotation": "pass|review|fail" to each line
+
+# 3. Validate
+./bin/themis-cli validate -i annotated_sample.jsonl -c 0.3
 ```
 
-### 7. Health Check
+### GET `/api/v1/metrics/health`
 
-**GET** `/health`
+Production health metrics.
 
-Server health status.
-
-**Request**:
 ```bash
-curl http://localhost:18082/health
+curl "http://localhost:18082/api/v1/metrics/health?window=7d"
 ```
 
-**Response**:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-03-10T10:00:00Z"
-}
-```
+### GET `/api/v1/health`
 
-### 7. Metrics (Prometheus)
+Server health check.
 
-**GET** `/metrics`
-
-Prometheus-compatible metrics endpoint.
-
-**Request**:
 ```bash
-curl http://localhost:18082/metrics
+curl http://localhost:18082/api/v1/health
+# {"status":"ok","version":"1.0.0"}
 ```
 
-**Available metrics**:
-- `themis_evaluations_total` - Total evaluations by verdict
-- `themis_evaluation_duration_seconds` - Evaluation latency
-- `themis_judge_scores` - Judge score distributions
-- `themis_early_exits_total` - Early exit count
+### GET `/metrics`
 
-## Configuration
+Prometheus metrics endpoint.
 
-### Environment Variables
+Key metrics:
+- `themis_evaluations_total` — by verdict
+- `themis_evaluation_duration_seconds` — latency histogram
+- `themis_judge_scores` — score distributions
+- `themis_early_exits_total` — early exit count
 
-```env
-# Server Configuration
-EVAL_AGENT_API_PORT=18082          # HTTP port (default: 18082)
+### GET `/`
 
-# Pipeline Settings
-ENABLE_PRECHECK=true               # Enable Stage 1 (default: true)
-EARLY_EXIT_THRESHOLD=0.2           # Precheck early exit (default: 0.2)
+Web dashboard at `http://localhost:18082`.
 
-# Aggregation
-PRECHECK_WEIGHT=0.3                # Stage 1 weight (default: 0.3)
-LLM_JUDGE_WEIGHT=0.7               # Stage 2 weight (default: 0.7)
-JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2 method
-
-# Verdict Thresholds
-VERDICT_PASS_THRESHOLD=0.8         # Pass threshold (default: 0.8)
-VERDICT_REVIEW_THRESHOLD=0.5       # Review threshold (default: 0.5)
-
-# Database
-IN_MEMORY_DB=true                  # SQLite in-memory (default)
-THEMIS_DB_URL=                     # PostgreSQL URL (if IN_MEMORY_DB=false)
-
-# LLM Providers
-OPEN_AI_KEY=sk-proj-...            # OpenAI Platform
-# OR
-AWS_REGION=us-east-1               # AWS Bedrock
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-# OR
-AZURE_OPENAI_ENDPOINT=...          # Azure OpenAI
-OPEN_AI_KEY=...
-```
+---
 
 ## Deployment Patterns
 
-### Pattern 1: Single Instance (Development)
-
-Simple standalone deployment:
-
+### Single Instance (Development)
 ```bash
-./themis-api
+./bin/themis-api
 ```
 
-**Use case**: Local development, testing, demos
-
-### Pattern 2: Docker Container
-
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o themis-api cmd/api/main.go
-
-FROM alpine:latest
-COPY --from=builder /app/themis-api /usr/local/bin/
-COPY --from=builder /app/configs /configs
-COPY --from=builder /app/static /static
-CMD ["themis-api"]
-```
-
+### Docker
 ```bash
 docker build -t themis-api .
 docker run -p 18082:18082 --env-file .env themis-api
 ```
 
-**Use case**: Containerized deployments, Kubernetes
-
-### Pattern 3: Load Balanced (High Availability)
-
-Multiple API instances behind load balancer:
-
+### Load Balanced
 ```bash
-# Instance 1
-EVAL_AGENT_API_PORT=18082 ./themis-api
-
-# Instance 2
-EVAL_AGENT_API_PORT=18083 ./themis-api
-
-# Instance 3
-EVAL_AGENT_API_PORT=18084 ./themis-api
-
-# Nginx/HAProxy load balancer
-# Round-robin to 18082, 18083, 18084
+EVAL_AGENT_API_PORT=18082 ./bin/themis-api &
+EVAL_AGENT_API_PORT=18083 ./bin/themis-api &
+EVAL_AGENT_API_PORT=18084 ./bin/themis-api &
+# Configure Nginx/HAProxy → round-robin to 18082–18084
 ```
 
-**Use case**: High traffic, fault tolerance
-
-### Pattern 4: Unified API + Streaming
-
-Single service running both API and streaming consumer:
-
+### Unified API + Streaming
 ```bash
-STREAMING_ENABLED=true ./themis-api
+STREAMING_ENABLED=true ./bin/themis-api
 ```
+One process handles both HTTP requests and Redis stream consumption.
 
-**Benefits**:
-- HTTP API for manual testing
-- Redis consumer for async evaluation
-- Single deployment
-- Unified metrics endpoint
+---
 
-See [CLAUDE.md](../../CLAUDE.md) and [Streaming Tests](../testing/streaming-tests.md) for details.
+## Performance
 
-## Performance Optimization
-
-### 1. Enable Early Exit
-
-Skip expensive LLM calls for obviously bad answers:
-
+**Enable early exit** — skips LLM calls for obviously low-quality responses:
 ```env
 ENABLE_PRECHECK=true
-EARLY_EXIT_THRESHOLD=0.2  # Default, increase to 0.3 for more exits
+EARLY_EXIT_THRESHOLD=0.2   # ~80% cost savings on bad answers
 ```
 
-**Impact**: ~80% cost savings on low-quality responses
+**Use lighter models** — `gpt-4o-mini` is significantly faster than `claude-3-5-sonnet` with comparable results for most use cases.
 
-### 2. Parallel Judge Execution
-
-Judges run concurrently by default. Ensure sufficient resources:
-
-```bash
-# Check concurrent LLM calls
-# 5 judges = 5 concurrent API calls to LLM providers
-```
-
-**Response time**: ~3-4 seconds (limited by slowest judge)
-
-### 3. Use Lighter Models
-
-Configure fast, cheap models in `judges.yaml`:
-
-```yaml
-default_model:
-  modelFamily: "openai_platform"
-  modelID: gpt-4o-mini  # Fast and cheap
-```
-
-**Trade-off**: Lower accuracy for faster response
-
-### 4. Disable Unused Judges
-
-Edit `judges.yaml`:
-
+**Disable unused judges** in `configs/judges.yaml`:
 ```yaml
 - name: instruction
-  enabled: false  # Skip if not needed
+  enabled: false
 ```
 
-**Impact**: Fewer LLM calls, faster evaluation
+Response time is bounded by the slowest judge (~3–4s for 5 parallel judges).
 
-### 5. Connection Pooling
+---
 
-Go HTTP client pools connections automatically. Configure limits:
-
-```go
-// In internal/llm/client.go
-http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
-```
-
-## Monitoring
-
-### Prometheus Integration
-
-Scrape metrics endpoint:
+## Prometheus Setup
 
 ```yaml
 # prometheus.yml
@@ -479,111 +224,31 @@ scrape_configs:
     metrics_path: '/metrics'
 ```
 
-### Key Metrics to Track
-
-1. **Evaluation throughput**: `rate(themis_evaluations_total[5m])`
-2. **P95 latency**: `histogram_quantile(0.95, themis_evaluation_duration_seconds)`
-3. **Verdict distribution**: `themis_evaluations_total` by verdict label
-4. **Early exit rate**: `rate(themis_early_exits_total[5m])`
-5. **Judge scores**: `themis_judge_scores` histogram
-
-### Grafana Dashboard
-
-Sample queries:
-
+Key PromQL queries:
 ```promql
-# Evaluation rate
 rate(themis_evaluations_total[5m])
-
-# Average confidence by verdict
-avg(themis_confidence_score) by (verdict)
-
-# Early exit savings
+histogram_quantile(0.95, themis_evaluation_duration_seconds)
 rate(themis_early_exits_total[5m]) / rate(themis_evaluations_total[5m])
 ```
 
-## Troubleshooting
+---
 
-### Issue: Port Already in Use
+## Security
 
-```bash
-# Change port
-EVAL_AGENT_API_PORT=18083 ./themis-api
-```
-
-### Issue: Slow Response Times
-
-Check:
-1. Early exit working? (test with bad answer)
-2. Judge timeouts? (default: 15s per judge)
-3. LLM provider latency? (check provider status)
-
-### Issue: CORS Errors in Dashboard
-
-API enables CORS by default. If issues persist:
-
-```go
-// internal/api/server.go
-cors := restful.CrossOriginResourceSharing{
-    AllowedOrigins: []string{"*"},
-    AllowedMethods: []string{"GET", "POST"},
-    Container:      container,
-}
-container.Filter(cors.Filter)
-```
-
-### Issue: Database Connection Errors
-
-**SQLite (default)**: Should work out of the box
-
-**PostgreSQL**: Verify connection:
-```bash
-psql "$THEMIS_DB_URL"
-```
-
-Check migrations applied:
-```bash
-migrate -path ./migrations -database "$THEMIS_DB_URL" version
-```
-
-## Security Considerations
-
-### 1. Authentication
-
-API has **no authentication** by default (designed for internal use).
+API has **no authentication** by default — intended for internal/trusted network use.
 
 For production:
-- Deploy behind API gateway with auth
+- Deploy behind an API gateway with auth
 - Use network policies (VPC, security groups)
-- Add custom middleware:
+- See [SECURITY.md](../../SECURITY.md) for full guidance
 
-```go
-// Add API key middleware
-container.Filter(apiKeyAuth)
-```
+---
 
-### 2. Rate Limiting
+## Troubleshooting
 
-Add rate limiting middleware:
-
-```go
-import "golang.org/x/time/rate"
-
-limiter := rate.NewLimiter(10, 20)  // 10 req/s, burst 20
-container.Filter(rateLimitFilter(limiter))
-```
-
-### 3. Input Validation
-
-API validates required fields. For additional validation:
-- Max query/answer length
-- Content filtering
-- Schema validation
-
-## Next Steps
-
-- [API Tests](../testing/api-tests.md) - Comprehensive test cases
-- [Streaming Tests](../testing/streaming-tests.md) - Async evaluation with Redis
-- [Batch Tests](../testing/batch-tests.md) - Offline evaluation
-- [Configuration](../getting-started/configuration.md) - Tune your setup
-- [CLAUDE.md](../../CLAUDE.md) - Complete documentation
+| Issue | Fix |
+|-------|-----|
+| Port in use | Set `EVAL_AGENT_API_PORT=18083` in `.env` |
+| Slow response | Check early exit is working; verify LLM provider latency |
+| Database errors (SQLite) | Should work out of the box; check `IN_MEMORY_DB=true` |
+| Database errors (PostgreSQL) | Run `psql "$THEMIS_DB_URL"` to verify; check migrations with `migrate ... version` |
