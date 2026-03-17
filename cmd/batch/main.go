@@ -201,18 +201,24 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 
 	log.Info().Int("total", len(records)).Msg("Input file parsed")
 
-	// Require output flag
-	if output == "" {
+	// For jsonl format, output file is required. For summary, default to stdout.
+	if output == "" && format != "summary" {
 		return fmt.Errorf("required flag \"output\" not set")
 	}
 
-	// Open output file
-	outFile, err := os.Create(output)
-	if err != nil {
-		return fmt.Errorf("failed to create output file %q: %w", output, err)
+	// Open output file (or use stdout for summary format with no -o)
+	var outFile io.WriteCloser
+	if output == "" {
+		outFile = os.Stdout
+	} else {
+		f, err := os.Create(output)
+		if err != nil {
+			return fmt.Errorf("failed to create output file %q: %w", output, err)
+		}
+		defer closeFile(f)
+		outFile = f
+		log.Info().Str("file", output).Msg("Writing to output file")
 	}
-	defer closeFile(outFile)
-	log.Info().Str("file", output).Msg("Writing to output file")
 
 	// Create writer
 	writer, err := batch.NewWriter(outFile, format, deps.Logger)

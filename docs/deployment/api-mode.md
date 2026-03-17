@@ -148,16 +148,6 @@ curl http://localhost:18082/api/v1/health
 # {"status":"ok","version":"1.0.0"}
 ```
 
-### GET `/metrics`
-
-Prometheus metrics endpoint.
-
-Key metrics:
-- `themis_evaluations_total` — by verdict
-- `themis_evaluation_duration_seconds` — latency histogram
-- `themis_judge_scores` — score distributions
-- `themis_early_exits_total` — early exit count
-
 ### GET `/`
 
 Web dashboard at `http://localhost:18082`.
@@ -210,26 +200,6 @@ EARLY_EXIT_THRESHOLD=0.2   # ~80% cost savings on bad answers
 ```
 
 Response time is bounded by the slowest judge (~3–4s for 5 parallel judges).
-
----
-
-## Prometheus Setup
-
-```yaml
-# prometheus.yml
-scrape_configs:
-  - job_name: 'themis'
-    static_configs:
-      - targets: ['localhost:18082']
-    metrics_path: '/metrics'
-```
-
-Key PromQL queries:
-```promql
-rate(themis_evaluations_total[5m])
-histogram_quantile(0.95, themis_evaluation_duration_seconds)
-rate(themis_early_exits_total[5m]) / rate(themis_evaluations_total[5m])
-```
 
 ---
 

@@ -42,7 +42,7 @@ Judges are configured in `configs/judges.yaml`. The system dynamically creates L
 
 ```bash
 cd themis
-./themis-api
+./bin/themis-api
 ```
 
 Server runs on `http://localhost:18082`

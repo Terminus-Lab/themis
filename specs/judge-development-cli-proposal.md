@@ -368,7 +368,6 @@ STREAMING_ENABLED=true go run cmd/api/main.go
 
 # Step 5: Monitor in production
 # Dashboard: http://localhost:18082
-# Prometheus: http://localhost:18082/metrics
 
 # Query results
 curl "http://localhost:18082/api/v1/results?agent_name=support-agent&limit=100"

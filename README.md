@@ -18,6 +18,9 @@ go build -o bin/themis-mcp cmd/mcp/main.go
 
 # CLI (batch processing)
 go build -o bin/themis-cli cmd/batch/main.go
+
+# Redis producer (test data generation for streaming mode)
+go build -o bin/themis-producer cmd/producer/main.go
 ```
 
 ## Purpose
@@ -42,9 +45,9 @@ For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployme
 - **Multi-Provider LLM Support**: Mix AWS Bedrock, Azure OpenAI, and OpenAI Platform models in same pipeline
 - **YAML-Driven Configuration**: Edit judge prompts and models without code changes
 - **Multiple Deployment Options**: HTTP API, MCP server, CLI batch processor, Redis streaming consumer
+- **Validation Sampling API**: Download random samples as JSONL (`POST /api/v1/validation/sample/download`) for human annotation workflows
 - **Query & Storage**: SQLite (default) or PostgreSQL with filtering by agent, verdict, timestamp
 - **Web Dashboard**: Real-time visualization with dark terminal theme
-- **Production-Ready**: Prometheus metrics, structured logging, graceful shutdown, horizontal scaling
 
 ## Getting Started
 
@@ -109,7 +112,6 @@ The API server provides both a web dashboard and REST endpoints for evaluation a
 - `GET /api/v1/conversations/{id}` - Get all turns for a conversation
 - `GET /api/v1/metrics/health?window=7d` - Production health metrics (confidence, disagreement rate)
 - `POST /api/v1/validation/sample/download` - Download a random sample as JSONL for human annotation
-- `GET /metrics` - Prometheus metrics
 
 For detailed API examples and test cases, see [API Mode Documentation](docs/deployment/api-mode.md) and [API Test Cases](docs/testing/api-tests.md).
 
@@ -127,7 +129,7 @@ All evaluation tools accept optional `conversation_id`, `agent_name`, and `agent
 
 **Installation:**
 ```bash
-# Build MCP server
+# Run MCP server
 ./bin/themis-mcp
 
 # Add to Claude Code
@@ -162,9 +164,9 @@ Process datasets offline with concurrent workers and validate judge accuracy aga
 
 **Basic evaluation:**
 ```bash
-./bin/themis-cli evaluate -i dataset.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 # scale workers via env var
-THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -output results.jsonl
+THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 ```
 
 **Validation mode** (Kendall's τ):

@@ -63,10 +63,16 @@ OPEN_AI_KEY=sk-proj-...
 EVAL_AGENT_API_PORT=18082
 ```
 
+### Build the Producer
+
+```bash
+go build -o bin/themis-producer cmd/producer/main.go
+```
+
 ### Start the Consumer
 
 ```bash
-STREAMING_ENABLED=true ./themis-api
+STREAMING_ENABLED=true ./bin/themis-api
 ```
 
 **Expected output:**
@@ -83,7 +89,7 @@ INFO Starting Themis Server address=:18082 streaming_enabled=true
 **Send message using CLI producer:**
 
 ```bash
-./themis-producer -d '{
+./bin/themis-producer -d '{
   "event_id": "test-001",
   "event_type": "agent_response",
   "agent": {
@@ -119,7 +125,7 @@ redis-cli XPENDING eval-events eval-group - + 10
 **Send message:**
 
 ```bash
-./themis-producer -d '{
+./bin/themis-producer -d '{
   "event_id": "test-002",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
@@ -143,7 +149,7 @@ INFO Evaluation complete verdict=pass confidence=0.95
 **Send message:**
 
 ```bash
-./themis-producer -d '{
+./bin/themis-producer -d '{
   "event_id": "test-003",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
@@ -170,7 +176,7 @@ INFO Evaluation complete verdict=fail confidence=0.15 duration=<fast>
 **Send message:**
 
 ```bash
-./themis-producer -d '{
+./bin/themis-producer -d '{
   "event_id": "test-004",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
@@ -197,7 +203,7 @@ INFO Stages: faithfulness=0.1 coherence=0.2
 
 ```bash
 for i in {1..10}; do
-  ./themis-producer -d "{
+  ./bin/themis-producer -d "{
     \"event_id\": \"concurrent-$i\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -247,7 +253,7 @@ INFO Message acknowledged (parse error)
 **Send incomplete message:**
 
 ```bash
-./themis-producer -d '{
+./bin/themis-producer -d '{
   "event_id": "test-incomplete",
   "interaction": {
     "user_query": "Test"
@@ -330,7 +336,7 @@ STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-3 EVAL_AGENT_API_PORT=18084 ./
 
 ```bash
 for i in {1..30}; do
-  ./themis-producer -d "{
+  ./bin/themis-producer -d "{
     \"event_id\": \"scale-$i\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -449,7 +455,7 @@ INFO Resuming stream processing
 ```bash
 LARGE_CONTEXT=$(python3 -c "print('Context word. ' * 2000)")
 
-./themis-producer -d "{
+./bin/themis-producer -d "{
   \"event_id\": \"large-payload\",
   \"event_type\": \"agent_response\",
   \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -495,7 +501,7 @@ redis-cli XPENDING eval-events eval-group - + 10
 
 ```bash
 time for i in {1..1000}; do
-  ./themis-producer -d "{
+  ./bin/themis-producer -d "{
     \"event_id\": \"perf-$i\",
     \"event_type\": \"agent_response\",
     \"agent\": {\"name\": \"test-agent\", \"version\": \"1.0\"},
@@ -532,7 +538,7 @@ redis-cli XPENDING eval-events eval-group
 
 ```bash
 START=$(date +%s%N)
-./themis-producer -d '{
+./bin/themis-producer -d '{
   "event_id": "latency-test",
   "event_type": "agent_response",
   "agent": {"name": "test-agent", "version": "1.0"},
