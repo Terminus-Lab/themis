@@ -8,9 +8,8 @@ import (
 
 // HealthMetricsData holds aggregated metrics for the health endpoint
 type HealthMetricsData struct {
-	TotalEvaluations    int
-	AvgConfidence       float64
-	AvgDisagreementRate float64 // average std-dev of judge scores per evaluation
+	TotalEvaluations int
+	AvgConfidence    float64
 }
 
 // SampleFilters defines the parameters for sampling evaluation results

@@ -352,10 +352,9 @@ func (h *Handler) HealthMetrics(req *restful.Request, resp *restful.Response) {
 	}
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, HealthMetricsResponse{
-		Window:              window,
-		TotalEvaluations:    data.TotalEvaluations,
-		AvgConfidence:       data.AvgConfidence,
-		AvgDisagreementRate: data.AvgDisagreementRate,
+		Window:           window,
+		TotalEvaluations: data.TotalEvaluations,
+		AvgConfidence:    data.AvgConfidence,
 	})
 }
 

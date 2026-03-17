@@ -77,10 +77,9 @@ type ConversationListResponse struct {
 
 // HealthMetricsResponse is the response for GET /api/v1/metrics/health
 type HealthMetricsResponse struct {
-	Window              string  `json:"window"`
-	TotalEvaluations    int     `json:"total_evaluations"`
-	AvgConfidence       float64 `json:"avg_confidence"`
-	AvgDisagreementRate float64 `json:"avg_disagreement_rate"`
+	Window           string  `json:"window"`
+	TotalEvaluations int     `json:"total_evaluations"`
+	AvgConfidence    float64 `json:"avg_confidence"`
 }
 
 // SampleRecord is the JSONL record format for the sample download.

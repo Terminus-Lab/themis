@@ -323,51 +323,6 @@ func (e *EvalRepository) HealthMetrics(ctx context.Context, since time.Time) (st
 		return data, fmt.Errorf("failed to query health metrics: %w", err)
 	}
 
-	if data.TotalEvaluations == 0 {
-		return data, nil
-	}
-
-	// Compute avg disagreement rate from stage_scores
-	rows, err := e.db.Pool.Query(ctx,
-		`SELECT stage_scores FROM eval_results WHERE created_at >= $1`, since)
-	if err != nil {
-		return data, fmt.Errorf("failed to query stage scores: %w", err)
-	}
-	defer rows.Close()
-
-	var totalDisagreement float64
-	var evalCount int
-
-	for rows.Next() {
-		var raw []byte
-		if err := rows.Scan(&raw); err != nil {
-			return data, fmt.Errorf("failed to scan stage_scores: %w", err)
-		}
-		var stages []models.StageResult
-		if err := json.Unmarshal(raw, &stages); err != nil {
-			continue
-		}
-
-		var scores []float64
-		for _, s := range stages {
-			if s.Score > 0 {
-				scores = append(scores, s.Score)
-			}
-		}
-
-		if len(scores) > 1 {
-			totalDisagreement += storage.PopulationStdDev(scores)
-			evalCount++
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return data, fmt.Errorf("error iterating stage_scores: %w", err)
-	}
-
-	if evalCount > 0 {
-		data.AvgDisagreementRate = totalDisagreement / float64(evalCount)
-	}
-
 	return data, nil
 }
 
