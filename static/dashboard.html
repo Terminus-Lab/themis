@@ -1269,8 +1269,7 @@
         }
 
         function renderHealthMetrics(data) {
-            const disagreement = (data.avg_disagreement_rate || 0).toFixed(3);
-            const confidence   = ((data.avg_confidence || 0) * 100).toFixed(1);
+            const confidence = ((data.avg_confidence || 0) * 100).toFixed(1);
 
             document.getElementById('monitoringContent').innerHTML = `
                 <div class="metric-section">
@@ -1289,15 +1288,10 @@
                                 <td style="padding:10px 12px; color:var(--accent-color); font-weight:bold;">${data.total_evaluations}</td>
                                 <td style="padding:10px 12px; color:var(--text-secondary);">Number of evaluations in the selected window</td>
                             </tr>
-                            <tr style="border-bottom:1px solid var(--border-color);">
+                            <tr>
                                 <td style="padding:10px 12px;">Avg Confidence</td>
                                 <td style="padding:10px 12px; color:var(--accent-color); font-weight:bold;">${confidence}%</td>
                                 <td style="padding:10px 12px; color:var(--text-secondary);">Mean final confidence score across all evaluations (higher = better)</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:10px 12px;">Avg Judge Disagreement</td>
-                                <td style="padding:10px 12px; color:var(--accent-color); font-weight:bold;">${disagreement}</td>
-                                <td style="padding:10px 12px; color:var(--text-secondary);">Avg std-dev of individual judge scores per evaluation (0 = full agreement, ~0.5 = max spread)</td>
                             </tr>
                         </tbody>
                     </table>
