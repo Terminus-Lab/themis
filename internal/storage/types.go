@@ -6,6 +6,22 @@ import (
 	"github.com/Terminus-Lab/themis/internal/models"
 )
 
+// HealthMetricsData holds aggregated metrics for the health endpoint
+type HealthMetricsData struct {
+	TotalEvaluations    int
+	AvgConfidence       float64
+	AvgDisagreementRate float64 // average std-dev of judge scores per evaluation
+}
+
+// SampleFilters defines the parameters for sampling evaluation results
+type SampleFilters struct {
+	StartDate  time.Time
+	EndDate    time.Time
+	Percentage int // 1-100
+	MinSize    int // minimum sample size (0 = no minimum)
+	MaxSize    int // maximum sample size (0 = no maximum)
+}
+
 type Evaluation struct {
 	EventID        string
 	ConversationID string

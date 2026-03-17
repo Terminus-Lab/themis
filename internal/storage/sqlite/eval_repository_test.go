@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -560,6 +561,112 @@ func TestGetConversation_GetConversations(t *testing.T) {
 
 	if len(results) != 2 {
 		t.Errorf("Expected 2 conversations, got %d", len(results))
+	}
+}
+
+func seedEvaluations(t *testing.T, repo *sqlite.EvalRepository, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		eval := &storage.Evaluation{
+			EventID:      fmt.Sprintf("evt-%d", i),
+			AgentName:    "agent",
+			AgentVersion: "v1",
+			UserQuery:    fmt.Sprintf("query %d", i),
+			Answer:       fmt.Sprintf("answer %d", i),
+			Confidence:   0.8,
+			Verdict:      "pass",
+			StageScores:  []models.StageResult{},
+		}
+		if err := repo.Store(context.Background(), eval); err != nil {
+			t.Fatalf("Failed to seed evaluation %d: %v", i, err)
+		}
+	}
+}
+
+func TestEvalRepository_Sample_ReturnsPercentage(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	seedEvaluations(t, repo, 10)
+
+	results, err := repo.Sample(context.Background(), storage.SampleFilters{
+		StartDate:  time.Now().Add(-1 * time.Hour),
+		EndDate:    time.Now().Add(1 * time.Hour),
+		Percentage: 50,
+	})
+
+	if err != nil {
+		t.Fatalf("Sample failed: %v", err)
+	}
+	if len(results) != 5 {
+		t.Errorf("Expected 5 (50%% of 10), got %d", len(results))
+	}
+}
+
+func TestEvalRepository_Sample_EmptyDateRange(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	seedEvaluations(t, repo, 5)
+
+	// Date range in the past — no records match
+	results, err := repo.Sample(context.Background(), storage.SampleFilters{
+		StartDate:  time.Now().Add(-48 * time.Hour),
+		EndDate:    time.Now().Add(-24 * time.Hour),
+		Percentage: 100,
+	})
+
+	if err != nil {
+		t.Fatalf("Sample failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results outside date range, got %d", len(results))
+	}
+}
+
+func TestEvalRepository_Sample_MaxSizeConstraint(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	seedEvaluations(t, repo, 20)
+
+	results, err := repo.Sample(context.Background(), storage.SampleFilters{
+		StartDate:  time.Now().Add(-1 * time.Hour),
+		EndDate:    time.Now().Add(1 * time.Hour),
+		Percentage: 50, // 50% of 20 = 10, but MaxSize caps at 6
+		MaxSize:    6,
+	})
+
+	if err != nil {
+		t.Fatalf("Sample failed: %v", err)
+	}
+	if len(results) != 6 {
+		t.Errorf("Expected 6 (capped by MaxSize), got %d", len(results))
+	}
+}
+
+func TestEvalRepository_Sample_MinSizeConstraint(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	seedEvaluations(t, repo, 10)
+
+	results, err := repo.Sample(context.Background(), storage.SampleFilters{
+		StartDate:  time.Now().Add(-1 * time.Hour),
+		EndDate:    time.Now().Add(1 * time.Hour),
+		Percentage: 10, // 10% of 10 = 1, but MinSize bumps to 4
+		MinSize:    4,
+	})
+
+	if err != nil {
+		t.Fatalf("Sample failed: %v", err)
+	}
+	if len(results) != 4 {
+		t.Errorf("Expected 4 (bumped by MinSize), got %d", len(results))
 	}
 }
 

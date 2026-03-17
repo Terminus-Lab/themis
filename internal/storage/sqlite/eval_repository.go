@@ -244,6 +244,152 @@ func (e *EvalRepository) GetConversation(ctx context.Context, conversationID str
 	return evaluations, nil
 }
 
+func (e *EvalRepository) Sample(ctx context.Context, filters storage.SampleFilters) ([]storage.Evaluation, error) {
+	const sqliteFormat = "2006-01-02 15:04:05"
+	start := filters.StartDate.UTC().Format(sqliteFormat)
+	end := filters.EndDate.UTC().Format(sqliteFormat)
+
+	// Count total records in date range
+	countQuery := `SELECT COUNT(*) FROM eval_results WHERE created_at >= ? AND created_at <= ?`
+	var total int
+	if err := e.db.client.QueryRowContext(ctx, countQuery, start, end).Scan(&total); err != nil {
+		return nil, fmt.Errorf("failed to count records: %w", err)
+	}
+
+	if total == 0 {
+		return []storage.Evaluation{}, nil
+	}
+
+	// Compute sample size
+	sampleSize := total * filters.Percentage / 100
+	if filters.MinSize > 0 && sampleSize < filters.MinSize {
+		sampleSize = filters.MinSize
+	}
+	if filters.MaxSize > 0 && sampleSize > filters.MaxSize {
+		sampleSize = filters.MaxSize
+	}
+	if sampleSize > total {
+		sampleSize = total
+	}
+
+	query := `
+		SELECT event_id, conversation_id, agent_name, agent_version, user_query, answer, context, confidence, verdict, stage_scores
+		FROM eval_results
+		WHERE created_at >= ? AND created_at <= ?
+		ORDER BY RANDOM()
+		LIMIT ?
+	`
+
+	rows, err := e.db.client.QueryContext(ctx, query, start, end, sampleSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sample records: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			e.logger.Error().Err(err).Msg("Failed to close database rows")
+		}
+	}()
+
+	var evaluations []storage.Evaluation
+	var stageScoreJSON string
+
+	for rows.Next() {
+		var evaluation storage.Evaluation
+		if err := rows.Scan(
+			&evaluation.EventID,
+			&evaluation.ConversationID,
+			&evaluation.AgentName,
+			&evaluation.AgentVersion,
+			&evaluation.UserQuery,
+			&evaluation.Answer,
+			&evaluation.Context,
+			&evaluation.Confidence,
+			&evaluation.Verdict,
+			&stageScoreJSON,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		if err := json.Unmarshal([]byte(stageScoreJSON), &evaluation.StageScores); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal stage_scores: %w", err)
+		}
+
+		evaluations = append(evaluations, evaluation)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return evaluations, nil
+}
+
+func (e *EvalRepository) HealthMetrics(ctx context.Context, since time.Time) (storage.HealthMetricsData, error) {
+	const sqliteFormat = "2006-01-02 15:04:05"
+	sinceStr := since.UTC().Format(sqliteFormat)
+
+	row := e.db.client.QueryRowContext(ctx, `
+		SELECT COUNT(*), COALESCE(AVG(confidence), 0)
+		FROM eval_results
+		WHERE created_at >= ?`, sinceStr)
+
+	var data storage.HealthMetricsData
+	if err := row.Scan(&data.TotalEvaluations, &data.AvgConfidence); err != nil {
+		return data, fmt.Errorf("failed to query health metrics: %w", err)
+	}
+
+	if data.TotalEvaluations == 0 {
+		return data, nil
+	}
+
+	// Compute avg disagreement rate from stage_scores
+	rows, err := e.db.client.QueryContext(ctx,
+		`SELECT stage_scores FROM eval_results WHERE created_at >= ?`, sinceStr)
+	if err != nil {
+		return data, fmt.Errorf("failed to query stage scores: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			e.logger.Error().Err(err).Msg("Failed to close rows")
+		}
+	}()
+
+	var totalDisagreement float64
+	var evalCount int
+
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return data, fmt.Errorf("failed to scan stage_scores: %w", err)
+		}
+		var stages []models.StageResult
+		if err := json.Unmarshal([]byte(raw), &stages); err != nil {
+			continue
+		}
+
+		var scores []float64
+		for _, s := range stages {
+			if s.Score > 0 {
+				scores = append(scores, s.Score)
+			}
+		}
+
+		if len(scores) > 1 {
+			totalDisagreement += storage.PopulationStdDev(scores)
+			evalCount++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return data, fmt.Errorf("error iterating stage_scores: %w", err)
+	}
+
+	if evalCount > 0 {
+		data.AvgDisagreementRate = totalDisagreement / float64(evalCount)
+	}
+
+	return data, nil
+}
+
 func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.ConversationSummary, error) {
 	query := `
           SELECT

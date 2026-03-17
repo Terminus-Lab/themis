@@ -21,6 +21,7 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/prechecks"
+	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/joho/godotenv"
@@ -1294,4 +1295,125 @@ func TestAPI_ConversationIsolation(t *testing.T) {
 	}
 
 	t.Logf("Conversation isolation: conv-a has %d turns, conv-b has %d turns", responseA.TurnCount, responseB.TurnCount)
+}
+
+// setupSamplingContainer builds a minimal API container backed by an in-memory SQLite repo.
+// No LLM clients needed — used for validation/sampling endpoint tests only.
+func setupSamplingContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
+	t.Helper()
+	logger := zerolog.Nop()
+	repo := setupTestRepository(t, &logger)
+	handler := api.NewHandler(nil, nil, repo, &logger)
+	container := restful.NewContainer()
+	api.RegisterRoutes(container, handler)
+	return container, repo
+}
+
+func seedSamplingData(t *testing.T, repo *sqlite.EvalRepository, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		eval := &storage.Evaluation{
+			EventID:      fmt.Sprintf("sample-evt-%d", i),
+			AgentName:    "sample-agent",
+			AgentVersion: "v1",
+			UserQuery:    fmt.Sprintf("query %d", i),
+			Answer:       fmt.Sprintf("answer %d", i),
+			Confidence:   0.8,
+			Verdict:      "pass",
+			StageScores:  []models.StageResult{},
+		}
+		if err := repo.Store(context.Background(), eval); err != nil {
+			t.Fatalf("Failed to seed evaluation %d: %v", i, err)
+		}
+	}
+}
+
+/*
+TEST: Download Sample - returns JSONL with seeded records
+*/
+func TestAPI_DownloadSample_ReturnsJSONL(t *testing.T) {
+	container, repo := setupSamplingContainer(t)
+	seedSamplingData(t, repo, 10)
+
+	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":100}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/x-ndjson" {
+		t.Errorf("Expected Content-Type application/x-ndjson, got %s", ct)
+	}
+
+	// Count JSONL lines — each line is one evaluation
+	lines := 0
+	for _, line := range bytes.Split(rec.Body.Bytes(), []byte("\n")) {
+		if len(bytes.TrimSpace(line)) > 0 {
+			lines++
+		}
+	}
+	if lines != 10 {
+		t.Errorf("Expected 10 JSONL lines, got %d", lines)
+	}
+}
+
+/*
+TEST: Download Sample - empty DB returns 200 with no lines
+*/
+func TestAPI_DownloadSample_EmptyDB(t *testing.T) {
+	container, _ := setupSamplingContainer(t)
+
+	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":25}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("Expected empty body for empty DB, got: %s", rec.Body.String())
+	}
+}
+
+/*
+TEST: Download Sample - missing dates returns 400
+*/
+func TestAPI_DownloadSample_MissingDates(t *testing.T) {
+	container, _ := setupSamplingContainer(t)
+
+	body := `{"percentage":25}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400, got %d", rec.Code)
+	}
+}
+
+/*
+TEST: Download Sample - invalid date format returns 400
+*/
+func TestAPI_DownloadSample_InvalidDate(t *testing.T) {
+	container, _ := setupSamplingContainer(t)
+
+	body := `{"start_date":"not-a-date","end_date":"2099-01-01T00:00:00Z","percentage":25}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400, got %d", rec.Code)
+	}
 }
