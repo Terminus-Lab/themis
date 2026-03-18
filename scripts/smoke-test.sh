@@ -22,7 +22,7 @@ echo "✓ Health OK"
 echo "=== 5. Evaluate (pass case) ==="
 RESULT=$(curl -sf -X POST http://localhost:18082/api/v1/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"event_id":"smoke-1","event_type":"agent_response","agent":{"name":"smoke","type":"rag","version":"1"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"2 plus 2 equals 4."}}')
+  -d '{"event_id":"smoke-1","conversation_id":"conv-smoke-1","event_type":"agent_response","agent":{"name":"smoke","type":"rag","version":"1"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"2 plus 2 equals 4."}}')
 echo "$RESULT" | jq -e '.verdict' > /dev/null
 echo "✓ Evaluate OK: $(echo $RESULT | jq -r '{verdict,confidence}')"
 
