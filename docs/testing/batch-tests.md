@@ -43,12 +43,13 @@ EARLY_EXIT_THRESHOLD=0.2
 
 ## Command Line Flags
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `-input` | string | **required** | Input JSONL file path |
-| `-output` | string | **required** | Output file path |
-| `-format` | string | "jsonl" | Output format: "jsonl" or "summary" |
-| `-summary` | string | "" | Optional separate summary file |
+| Flag | Shorthand | Type | Default | Description |
+|------|-----------|------|---------|-------------|
+| `--input` | `-i` | string | **required** | Input JSONL file path |
+| `--output` | `-o` | string | **required** | Output file path |
+| `--format` | `-f` | string | "jsonl" | Output format: "jsonl" or "summary" |
+| `--summary` | `-s` | string | "" | Optional separate summary file |
+| `--save-to-db` | `-d` | bool | false | Save results to database |
 
 **Environment Variables:**
 | Variable | Type | Default | Description |
@@ -60,6 +61,7 @@ EARLY_EXIT_THRESHOLD=0.2
 |------|-----------|------|---------|-------------|
 | `--input` | `-i` | string | **required** | Input file path with human annotations |
 | `--correlation-threshold` | `-c` | float | 0.3 | Kendall's tau threshold for validation |
+| `--save-to-db` | `-d` | bool | false | Save results to database |
 
 ## Input Format (JSONL)
 
@@ -124,7 +126,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-cli evaluate -input test-valid.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i test-valid.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -144,7 +146,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./themis-cli evaluate -input test-invalid.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i test-invalid.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -154,9 +156,16 @@ Aggregate statistics in JSON format:
 
 ### Test Case 3: Summary Format
 
-**Command:**
+When `-f summary` is used without `-o`, results are printed to stdout. With `-o`, they're written to the specified file.
+
+**Command (stdout):**
 ```bash
-./themis-cli evaluate -input test-valid.jsonl -format summary
+./bin/themis-cli evaluate -i test-valid.jsonl -f summary
+```
+
+**Command (file):**
+```bash
+./bin/themis-cli evaluate -i test-valid.jsonl -f summary -o summary.json
 ```
 
 **Expected Output:**
@@ -175,7 +184,7 @@ Aggregate statistics in JSON format:
 **Command:**
 ```bash
 # Start processing large file
-./themis-cli evaluate -input large-dataset.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i large-dataset.jsonl -o results.jsonl
 
 # Press Ctrl+C after 2 seconds
 ```
@@ -191,7 +200,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output results.jsonl
+THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -204,7 +213,7 @@ THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output r
 
 **Command:**
 ```bash
-./themis-cli evaluate -input test.jsonl -format csv
+./bin/themis-cli evaluate -i test.jsonl -f csv
 ```
 
 **Expected Output:**
@@ -222,9 +231,9 @@ THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output r
 
 **Command:**
 ```bash
-./themis-cli validate -i resources/annotated_sample.jsonl -c 0.3
+./bin/themis-cli validate -i resources/annotated_sample.jsonl -c 0.3
 # or with long flags:
-./themis-cli validate --input resources/annotated_sample.jsonl --correlation-threshold 0.3
+./bin/themis-cli validate --input resources/annotated_sample.jsonl --correlation-threshold 0.3
 ```
 
 **Expected Output (if correlation passes):**
@@ -287,12 +296,12 @@ INFO Safe to evaluate full dataset with these judge prompts
 # Create test file with missing human_annotation
 echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
 
-./themis-cli evaluate -input test-no-annotation.jsonl -validate
+./bin/themis-cli validate -i test-no-annotation.jsonl
 ```
 
 **Expected:**
 - Exit code: 1
-- Error: "Validation mode requires all records to have 'human_annotation' field"
+- Error: "validation requires all records to have 'human_annotation' field"
 - Lists records missing annotations
 
 ---
@@ -306,8 +315,8 @@ This dataset tests a well-calibrated judge with clear category boundaries and st
 **Command:**
 ```bash
 go run cmd/batch/main.go validate \
-  -input resources/validation_test_dataset.jsonl \
-  -correlation-threshold 0.3
+  -i resources/validation_test_dataset.jsonl \
+  -c 0.3
 ```
 
 **Expected Output:**
@@ -370,8 +379,8 @@ This dataset contains:
 **Command:**
 ```bash
 go run cmd/batch/main.go validate \
-  -input resources/validation_failed_dataset.jsonl \
-  -correlation-threshold 0.3
+  -i resources/validation_failed_dataset.jsonl \
+  -c 0.3
 ```
 
 **Expected Output (with poorly calibrated judge):**
@@ -423,10 +432,10 @@ For comprehensive guidance on interpreting validation results:
 
 **Command:**
 ```bash
-./themis-cli \
-  -input resources/dataset.jsonl \
-  -output resources/results.jsonl \
-  -summary resources/summary.json
+./bin/themis-cli evaluate \
+  -i resources/dataset.jsonl \
+  -o resources/results.jsonl \
+  -s resources/summary.json
 ```
 
 **Expected:**
@@ -442,9 +451,9 @@ For comprehensive guidance on interpreting validation results:
 
 **Command:**
 ```bash
-time THEMIS_BATCH_WORKERS=10 ./themis-cli \
-  -input dataset-1000.jsonl \
-  -output results-1000.jsonl
+time THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate \
+  -i dataset-1000.jsonl \
+  -o results-1000.jsonl
 ```
 
 **Expected:**
@@ -464,7 +473,7 @@ time THEMIS_BATCH_WORKERS=10 ./themis-cli \
 
 **Command:**
 ```bash
-./themis-cli evaluate -input conversation-dataset.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i conversation-dataset.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -490,13 +499,13 @@ Test with different worker counts:
 
 ```bash
 # 1 worker (sequential)
-time THEMIS_BATCH_WORKERS=1 ./themis-cli evaluate -input dataset-100.jsonl -output /dev/null
+time THEMIS_BATCH_WORKERS=1 ./bin/themis-cli evaluate -i dataset-100.jsonl -o /dev/null
 
 # 5 workers (default)
-time ./themis-cli evaluate -input dataset-100.jsonl -output /dev/null
+time ./bin/themis-cli evaluate -i dataset-100.jsonl -o /dev/null
 
 # 20 workers (high concurrency)
-time THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -output /dev/null
+time THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o /dev/null
 ```
 
 **Expected:**
@@ -510,7 +519,7 @@ time THEMIS_BATCH_WORKERS=20 ./themis-cli evaluate -input dataset-100.jsonl -out
 
 ```bash
 # Run evaluation first
-./themis-cli evaluate -input dataset.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 
 # Then analyze results
 jq 'select(.verdict=="fail")' results.jsonl
@@ -520,7 +529,7 @@ jq 'select(.verdict=="fail")' results.jsonl
 
 ```bash
 # Run evaluation first
-./themis-cli evaluate -input dataset.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 
 # Calculate average confidence
 jq -s 'map(.confidence) | add/length' results.jsonl
@@ -544,10 +553,10 @@ print(fails[['id', 'confidence', 'verdict']])
 
 ### Issue: "required flag -input not provided"
 
-**Solution:** Ensure you specify `-input` flag with a valid file path.
+**Solution:** Ensure you specify `-i` (or `--input`) flag with a valid file path.
 
 ```bash
-./themis-cli evaluate -input dataset.jsonl
+./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 ```
 
 ### Issue: "Failed to open input file"
@@ -577,7 +586,7 @@ split -l 10000 large-dataset.jsonl batch-
 **Solution:** Reduce worker count to stay within rate limits.
 
 ```bash
-THEMIS_BATCH_WORKERS=3 ./themis-cli evaluate -input dataset.jsonl -output results.jsonl
+THEMIS_BATCH_WORKERS=3 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 ```
 
 ## Validation Mode Details

@@ -1,51 +1,51 @@
 {
   "passed": true,
-  "total_records": 150,
+  "total_records": 20,
   "threshold": 0.3,
   "correlation_metrics": {
-    "kendalls_tau": 0.5413870246085011,
-    "interpretation": "Moderate to strong agreement",
+    "kendalls_tau": 0.45789473684210524,
+    "interpretation": "Moderate agreement",
     "passed_threshold": true
   },
   "agreement_metrics": {
-    "cohens_kappa": 0.71,
-    "interpretation": "Substantial"
+    "cohens_kappa": 0.5348837209302325,
+    "interpretation": "Moderate"
   },
   "confusion_matrix": {
     "fail": {
-      "fail": 50,
+      "fail": 2,
       "pass": 0,
-      "review": 0
+      "review": 3
     },
     "pass": {
       "fail": 0,
-      "pass": 50,
-      "review": 0
+      "pass": 7,
+      "review": 2
     },
     "review": {
-      "fail": 10,
-      "pass": 19,
-      "review": 21
+      "fail": 0,
+      "pass": 1,
+      "review": 5
     }
   },
   "per_class_metrics": {
     "fail": {
-      "precision": 0.8333333333333334,
-      "recall": 1,
-      "f1": 0.9090909090909091,
-      "support": 50
+      "precision": 1,
+      "recall": 0.4,
+      "f1": 0.5714285714285715,
+      "support": 5
     },
     "pass": {
-      "precision": 0.7246376811594203,
-      "recall": 1,
-      "f1": 0.8403361344537814,
-      "support": 50
+      "precision": 0.875,
+      "recall": 0.7777777777777778,
+      "f1": 0.823529411764706,
+      "support": 9
     },
     "review": {
-      "precision": 1,
-      "recall": 0.42,
-      "f1": 0.5915492957746479,
-      "support": 50
+      "precision": 0.5,
+      "recall": 0.8333333333333334,
+      "f1": 0.625,
+      "support": 6
     }
   }
 }

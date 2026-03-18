@@ -128,7 +128,6 @@ Four entry points sharing core evaluation logic:
      - **API + Streaming** (`STREAMING_ENABLED=true`): HTTP + Redis consumer in same process
    - **Unified mode benefits:**
      - Single deployment for both HTTP and streaming
-     - Prometheus `/metrics` endpoint for both modes
      - Manual testing via API while streaming runs
      - Graceful shutdown handles both HTTP and streaming
      - Horizontal scaling with multiple consumer instances
