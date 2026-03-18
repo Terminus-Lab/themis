@@ -113,7 +113,7 @@ Look for: common topics, response length/tone, confidence scores clustered near 
 ## Validation Output
 
 ```bash
-./bin/themis-cli validate -i validation_set.jsonl
+./bin/themis-cli validate-events -i validation_set.jsonl
 ```
 
 ```

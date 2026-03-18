@@ -612,7 +612,7 @@ curl "http://localhost:18082/api/v1/metrics/health?window=abc"
 
 **Request:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{
     "start_date": "2020-01-01T00:00:00Z",
@@ -633,7 +633,7 @@ curl -X POST http://localhost:18082/api/v1/validation/sample/download \
 
 **Request:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{
     "start_date": "2020-01-01T00:00:00Z",
@@ -654,7 +654,7 @@ curl -X POST http://localhost:18082/api/v1/validation/sample/download \
 
 **Request:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{"percentage": 25}'
 ```
@@ -667,7 +667,7 @@ curl -X POST http://localhost:18082/api/v1/validation/sample/download \
 
 **Request:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{"start_date": "2026-01-01", "end_date": "2026-03-31", "percentage": 25}'
 ```
@@ -679,7 +679,7 @@ curl -X POST http://localhost:18082/api/v1/validation/sample/download \
 
 **Request:**
 ```bash
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{
     "start_date": "2000-01-01T00:00:00Z",

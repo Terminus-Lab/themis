@@ -379,87 +379,31 @@ func parseWindow(s string) (time.Duration, error) {
 	}
 }
 
-// POST /api/v1/validation/sample/download
-// Samples a percentage of evaluation results from a date range and returns them as JSONL.
-func (h *Handler) DownloadSample(req *restful.Request, resp *restful.Response) {
-	var sampleReq SampleRequest
-	if err := req.ReadEntity(&sampleReq); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to parse sample request body")
-		middleware.HandleError(resp, err, http.StatusBadRequest)
+// POST /api/v1/validation/sample/events/download
+// Samples a percentage of individual event evaluations from a date range and returns them as JSONL.
+func (h *Handler) DownloadEventsSample(req *restful.Request, resp *restful.Response) {
+	filters, ok := h.parseSampleRequest(req, resp)
+	if !ok {
 		return
 	}
-
-	if sampleReq.StartDate == "" || sampleReq.EndDate == "" {
-		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
-			"error": "start_date and end_date are required",
-		})
-		return
-	}
-
-	startDate, err := time.Parse(time.RFC3339, sampleReq.StartDate)
-	if err != nil {
-		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("invalid start_date: %s", err.Error()),
-		})
-		return
-	}
-
-	endDate, err := time.Parse(time.RFC3339, sampleReq.EndDate)
-	if err != nil {
-		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("invalid end_date: %s", err.Error()),
-		})
-		return
-	}
-
-	if endDate.Before(startDate) {
-		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{
-			"error": "end_date must be after start_date",
-		})
-		return
-	}
-
-	percentage := sampleReq.Percentage
-	if percentage <= 0 {
-		percentage = 25
-	}
-	if percentage > 100 {
-		percentage = 100
-	}
-
-	filters := storage.SampleFilters{
-		StartDate:  startDate,
-		EndDate:    endDate,
-		Percentage: percentage,
-		MinSize:    sampleReq.MinSize,
-		MaxSize:    sampleReq.MaxSize,
-	}
-
-	h.logger.Info().
-		Str("start_date", sampleReq.StartDate).
-		Str("end_date", sampleReq.EndDate).
-		Int("percentage", percentage).
-		Msg("Sampling evaluation results")
 
 	ctx := req.Request.Context()
 	evaluations, err := h.repository.Sample(ctx, filters)
 	if err != nil {
-		h.logger.Error().Err(err).Msg("Failed to sample evaluations")
+		h.logger.Error().Err(err).Msg("Failed to sample events")
 		middleware.HandleError(resp, err, http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Info().
-		Int("sampled_count", len(evaluations)).
-		Msg("Sample complete, streaming JSONL")
+	h.logger.Info().Int("sampled_count", len(evaluations)).Msg("Events sample complete, streaming JSONL")
 
 	resp.Header().Set("Content-Type", "application/x-ndjson")
-	resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"sample-%s.jsonl\"", time.Now().Format("20060102-150405")))
+	resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"events-sample-%s.jsonl\"", time.Now().Format("20060102-150405")))
 	resp.WriteHeader(http.StatusOK)
 
 	encoder := json.NewEncoder(resp.ResponseWriter)
 	for _, e := range evaluations {
-		record := SampleRecord{
+		record := EventSampleRecord{
 			EventID:        e.EventID,
 			ConversationID: e.ConversationID,
 		}
@@ -470,10 +414,111 @@ func (h *Handler) DownloadSample(req *restful.Request, resp *restful.Response) {
 		record.Interaction.Answer = e.Answer
 
 		if err := encoder.Encode(record); err != nil {
-			h.logger.Error().Err(err).Msg("Failed to encode evaluation to JSONL")
+			h.logger.Error().Err(err).Msg("Failed to encode event record to JSONL")
 			return
 		}
 	}
+}
+
+// POST /api/v1/validation/sample/conversations/download
+// Samples a percentage of whole conversations from a date range and returns them as JSONL.
+// Each line is a full conversation (all turns grouped), suitable for conversation-level annotation.
+func (h *Handler) DownloadConversationsSample(req *restful.Request, resp *restful.Response) {
+	filters, ok := h.parseSampleRequest(req, resp)
+	if !ok {
+		return
+	}
+
+	ctx := req.Request.Context()
+	conversations, err := h.repository.SampleConversations(ctx, filters)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to sample conversations")
+		middleware.HandleError(resp, err, http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info().Int("sampled_count", len(conversations)).Msg("Conversations sample complete, streaming JSONL")
+
+	resp.Header().Set("Content-Type", "application/x-ndjson")
+	resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"conversations-sample-%s.jsonl\"", time.Now().Format("20060102-150405")))
+	resp.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(resp.ResponseWriter)
+	for _, conv := range conversations {
+		turns := make([]ConversationSampleTurn, len(conv.Turns))
+		for i, t := range conv.Turns {
+			turns[i] = ConversationSampleTurn{
+				TurnIndex: t.TurnIndex,
+				UserQuery: t.UserQuery,
+				Answer:    t.Answer,
+				Context:   t.Context,
+			}
+		}
+		record := ConversationSampleRecord{Turns: turns}
+		record.ConversationID = conv.ConversationID
+		record.Agent.Name = conv.AgentName
+		record.Agent.Version = conv.AgentVersion
+
+		if err := encoder.Encode(record); err != nil {
+			h.logger.Error().Err(err).Msg("Failed to encode conversation record to JSONL")
+			return
+		}
+	}
+}
+
+// parseSampleRequest parses and validates the shared SampleRequest body.
+// Returns (filters, true) on success or writes the error response and returns (_, false).
+func (h *Handler) parseSampleRequest(req *restful.Request, resp *restful.Response) (storage.SampleFilters, bool) {
+	var sampleReq SampleRequest
+	if err := req.ReadEntity(&sampleReq); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to parse sample request body")
+		middleware.HandleError(resp, err, http.StatusBadRequest)
+		return storage.SampleFilters{}, false
+	}
+
+	if sampleReq.StartDate == "" || sampleReq.EndDate == "" {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{"error": "start_date and end_date are required"})
+		return storage.SampleFilters{}, false
+	}
+
+	startDate, err := time.Parse(time.RFC3339, sampleReq.StartDate)
+	if err != nil {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("invalid start_date: %s", err.Error())})
+		return storage.SampleFilters{}, false
+	}
+
+	endDate, err := time.Parse(time.RFC3339, sampleReq.EndDate)
+	if err != nil {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("invalid end_date: %s", err.Error())})
+		return storage.SampleFilters{}, false
+	}
+
+	if endDate.Before(startDate) {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{"error": "end_date must be after start_date"})
+		return storage.SampleFilters{}, false
+	}
+
+	percentage := sampleReq.Percentage
+	if percentage <= 0 {
+		percentage = 25
+	}
+	if percentage > 100 {
+		percentage = 100
+	}
+
+	h.logger.Info().
+		Str("start_date", sampleReq.StartDate).
+		Str("end_date", sampleReq.EndDate).
+		Int("percentage", percentage).
+		Msg("Sampling request parsed")
+
+	return storage.SampleFilters{
+		StartDate:  startDate,
+		EndDate:    endDate,
+		Percentage: percentage,
+		MinSize:    sampleReq.MinSize,
+		MaxSize:    sampleReq.MaxSize,
+	}, true
 }
 
 // Health handler GET API /api/v1/health

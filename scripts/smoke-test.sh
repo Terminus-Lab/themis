@@ -43,9 +43,9 @@ echo "=== 9. CLI summary ==="
 ./bin/themis-cli evaluate -i resources/dataset.jsonl -f summary
 echo "✓ CLI summary OK"
 
-echo "=== 10. CLI validate ==="
-./bin/themis-cli validate -i resources/annotated_sample.jsonl -c 0.3
-echo "✓ CLI validate OK"
+echo "=== 10. CLI validate-events ==="
+./bin/themis-cli validate-events -i resources/annotated_sample.jsonl -c 0.3
+echo "✓ CLI validate-events OK"
 
 echo ""
 echo "All smoke tests passed ✓"

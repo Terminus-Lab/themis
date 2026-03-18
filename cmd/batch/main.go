@@ -89,33 +89,47 @@ Examples:
 	RunE:         runEvaluate,
 }
 
-// validateCmd represents the validation command
-var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Validate judge accuracy against human annotations",
-	Long: `Validate LLM judge accuracy using comprehensive metrics.
+// validateEventsCmd validates event-level (single-turn) judge accuracy against human annotations.
+var validateEventsCmd = &cobra.Command{
+	Use:   "validate-events",
+	Short: "Validate event-level judge accuracy against human annotations",
+	Long: `Validate LLM judge accuracy on individual events using comprehensive metrics.
 
 Computes 3 core metrics:
   1. Kendall's tau (PRIMARY) - Pass/fail decision based on rank correlation
   2. Cohen's Kappa (REPORT) - Categorical agreement accounting for chance
   3. Confusion Matrix (DEBUG) - Per-class precision/recall/F1 scores
 
-Requires input file with 'human_annotation' field for each record.
-Pass/fail decision based on Kendall's tau threshold (default: 0.3).
-
-Outputs JSON with all metrics for comprehensive judge evaluation.
+Input file must have 'human_annotation' field on each record (use
+POST /api/v1/validation/sample/events/download to generate the input).
 
 Examples:
   # Validate with default threshold (0.3)
-  themis-cli validate -i annotated.jsonl -s true
+  themis-cli validate-events -i annotated-events.jsonl
 
   # Custom threshold (stricter validation)
-  themis-cli validate -i annotated.jsonl --correlation-threshold 0.5
+  themis-cli validate-events -i annotated-events.jsonl --correlation-threshold 0.5
 
-  # Save validation report to file
-  themis-cli validate -i annotated.jsonl > validation-report.json`,
+  # Redirect report to file
+  themis-cli validate-events -i annotated-events.jsonl > validation-report.json`,
 	SilenceUsage: true,
-	RunE:         runValidate,
+	RunE:         runValidateEvents,
+}
+
+// validateConversationsCmd validates conversation-level judge accuracy against human annotations.
+var validateConversationsCmd = &cobra.Command{
+	Use:   "validate-conversations",
+	Short: "Validate conversation-level judge accuracy against human annotations",
+	Long: `Validate LLM judge accuracy on full conversations using comprehensive metrics.
+
+Input file must contain full conversations with 'human_annotation' field per conversation
+(use POST /api/v1/validation/sample/conversations/download to generate the input).
+
+Note: requires conversation-scoped judges configured in configs/judges.yaml.`,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return fmt.Errorf("conversation evaluation not yet implemented — coming in next release")
+	},
 }
 
 // versionCmd represents the version command
@@ -140,16 +154,23 @@ func init() {
 
 	_ = evaluateCmd.MarkFlagRequired("input")
 
-	// Validate command flags
-	validateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
-	validateCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
-	validateCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
+	// validate-events command flags
+	validateEventsCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
+	validateEventsCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
+	validateEventsCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
 
-	_ = validateCmd.MarkFlagRequired("input")
+	_ = validateEventsCmd.MarkFlagRequired("input")
+
+	// validate-conversations command flags
+	validateConversationsCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
+	validateConversationsCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
+
+	_ = validateConversationsCmd.MarkFlagRequired("input")
 
 	// Add commands to root
 	rootCmd.AddCommand(evaluateCmd)
-	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(validateEventsCmd)
+	rootCmd.AddCommand(validateConversationsCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
@@ -267,7 +288,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runValidate(cmd *cobra.Command, args []string) error {
+func runValidateEvents(cmd *cobra.Command, args []string) error {
 	log.Info().
 		Float64("threshold", corrThreshold).
 		Msg("Validation mode enabled")

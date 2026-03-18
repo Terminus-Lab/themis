@@ -92,12 +92,12 @@ List all conversations with summary metrics (turn count, avg confidence, verdict
 
 All turns for a conversation with detailed evaluations.
 
-### POST `/api/v1/validation/sample/download`
+### POST `/api/v1/validation/sample/events/download`
 
-Sample a percentage of stored evaluations for human annotation. Returns JSONL with **interaction data only** — no Themis scores, so annotators are unbiased.
+Sample a percentage of individual event evaluations for human annotation. Returns JSONL with **interaction data only** — no Themis scores, so annotators are unbiased.
 
 ```bash
-curl -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{
     "start_date": "2026-01-01T00:00:00Z",
@@ -105,30 +105,59 @@ curl -X POST http://localhost:18082/api/v1/validation/sample/download \
     "percentage": 25,
     "min_size": 100,
     "max_size": 2500
-  }' -o sample.jsonl
+  }' -o events-sample.jsonl
 ```
 
-Fields:
-- `start_date`, `end_date` (required) — RFC3339 date range
-- `percentage` — 1–100, default 25
-- `min_size`, `max_size` — clamp sample size (0 = no limit)
-
-Response: `application/x-ndjson`, one record per line:
+Response: `application/x-ndjson`, one event per line:
 ```json
-{"event_id":"evt-001","conversation_id":"...","agent":{"name":"my-agent","version":"1.0"},"interaction":{"user_query":"...","answer":"...","context":"..."}}
+{"event_id":"evt-001","conversation_id":"conv-abc","agent":{"name":"my-agent","version":"1.0"},"interaction":{"user_query":"...","answer":"...","context":"..."}}
 ```
 
 **Annotation workflow:**
 ```bash
 # 1. Download sample
-curl -X POST .../api/v1/validation/sample/download \
+curl -X POST .../api/v1/validation/sample/events/download \
   -d '{"start_date":"...","end_date":"...","percentage":25}' \
-  -o sample.jsonl
+  -o events-sample.jsonl
 
 # 2. Annotators add "human_annotation": "pass|review|fail" to each line
 
-# 3. Validate
-./bin/themis-cli validate -i annotated_sample.jsonl -c 0.3
+# 3. Validate event-level judges
+./bin/themis-cli validate-events -i annotated-events.jsonl -c 0.3
+```
+
+### POST `/api/v1/validation/sample/conversations/download`
+
+Sample a percentage of whole conversations for conversation-level human annotation. Picks N distinct `conversation_id`s and returns all their turns grouped — never returns a partial conversation.
+
+```bash
+curl -X POST http://localhost:18082/api/v1/validation/sample/conversations/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2026-01-01T00:00:00Z",
+    "end_date": "2026-03-31T23:59:59Z",
+    "percentage": 25
+  }' -o conversations-sample.jsonl
+```
+
+Response: `application/x-ndjson`, one conversation per line:
+```json
+{"conversation_id":"conv-abc","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"...","answer":"..."},{"turn_index":2,"user_query":"...","answer":"..."}]}
+```
+
+Fields: same as events endpoint (`start_date`, `end_date`, `percentage`, `min_size`, `max_size`). Here `percentage` and `min/max_size` apply to the number of **conversations**, not individual events.
+
+**Annotation workflow:**
+```bash
+# 1. Download conversation sample
+curl -X POST .../api/v1/validation/sample/conversations/download \
+  -d '{"start_date":"...","end_date":"...","percentage":25}' \
+  -o conversations-sample.jsonl
+
+# 2. Annotators add "human_annotation": "pass|review|fail" per conversation line
+
+# 3. Validate conversation-level judges (coming soon)
+./bin/themis-cli validate-conversations -i annotated-conversations.jsonl -c 0.3
 ```
 
 ### GET `/api/v1/metrics/health`

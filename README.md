@@ -45,7 +45,7 @@ For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployme
 - **Multi-Provider LLM Support**: Mix AWS Bedrock, Azure OpenAI, and OpenAI Platform models in same pipeline
 - **YAML-Driven Configuration**: Edit judge prompts and models without code changes
 - **Multiple Deployment Options**: HTTP API, MCP server, CLI batch processor, Redis streaming consumer
-- **Validation Sampling API**: Download random samples as JSONL (`POST /api/v1/validation/sample/download`) for human annotation workflows
+- **Validation Sampling APIs**: Sample events (`POST /api/v1/validation/sample/events/download`) or whole conversations (`POST /api/v1/validation/sample/conversations/download`) as JSONL for human annotation workflows
 - **Query & Storage**: SQLite (default) or PostgreSQL with filtering by agent, verdict, timestamp
 - **Web Dashboard**: Real-time visualization with dark terminal theme
 
@@ -111,7 +111,8 @@ The API server provides both a web dashboard and REST endpoints for evaluation a
 - `GET /api/v1/conversations` - List all conversations with summary metrics
 - `GET /api/v1/conversations/{id}` - Get all turns for a conversation
 - `GET /api/v1/metrics/health?window=7d` - Production health metrics (confidence, disagreement rate)
-- `POST /api/v1/validation/sample/download` - Download a random sample as JSONL for human annotation
+- `POST /api/v1/validation/sample/events/download` - Sample individual events as JSONL for human annotation
+- `POST /api/v1/validation/sample/conversations/download` - Sample whole conversations as JSONL for conversation-level annotation
 
 For detailed API examples and test cases, see [API Mode Documentation](docs/deployment/api-mode.md) and [API Test Cases](docs/testing/api-tests.md).
 
@@ -171,9 +172,9 @@ THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -o results.js
 
 **Validation mode** (Kendall's τ):
 ```bash
-./bin/themis-cli validate -i annotated.jsonl -c 0.3
+./bin/themis-cli validate-events -i annotated.jsonl -c 0.3
 # or with long flags:
-./bin/themis-cli validate --input annotated.jsonl --correlation-threshold 0.3
+./bin/themis-cli validate-events --input annotated.jsonl --correlation-threshold 0.3
 ```
 
 Input format: JSONL with `event_id`, `agent`, `interaction`, and optional `human_annotation` fields. For detailed examples and validation workflows, see [Batch Test Cases](docs/testing/batch-tests.md).

@@ -20,5 +20,6 @@ type Repository interface {
 	ListConversations(ctx context.Context) ([]ConversationSummary, error)
 
 	Sample(ctx context.Context, filters SampleFilters) ([]Evaluation, error)
+	SampleConversations(ctx context.Context, filters SampleFilters) ([]ConversationSample, error)
 	HealthMetrics(ctx context.Context, since time.Time) (HealthMetricsData, error)
 }

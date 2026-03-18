@@ -324,6 +324,144 @@ func (e *EvalRepository) Sample(ctx context.Context, filters storage.SampleFilte
 	return evaluations, nil
 }
 
+func (e *EvalRepository) SampleConversations(ctx context.Context, filters storage.SampleFilters) ([]storage.ConversationSample, error) {
+	const sqliteFormat = "2006-01-02 15:04:05"
+	start := filters.StartDate.UTC().Format(sqliteFormat)
+	end := filters.EndDate.UTC().Format(sqliteFormat)
+
+	// Count distinct conversations in date range
+	countQuery := `SELECT COUNT(DISTINCT conversation_id) FROM eval_results WHERE created_at >= ? AND created_at <= ?`
+	var total int
+	if err := e.db.client.QueryRowContext(ctx, countQuery, start, end).Scan(&total); err != nil {
+		return nil, fmt.Errorf("failed to count conversations: %w", err)
+	}
+
+	if total == 0 {
+		return []storage.ConversationSample{}, nil
+	}
+
+	// Compute sample size
+	sampleSize := total * filters.Percentage / 100
+	if filters.MinSize > 0 && sampleSize < filters.MinSize {
+		sampleSize = filters.MinSize
+	}
+	if filters.MaxSize > 0 && sampleSize > filters.MaxSize {
+		sampleSize = filters.MaxSize
+	}
+	if sampleSize > total {
+		sampleSize = total
+	}
+	if sampleSize == 0 {
+		sampleSize = 1
+	}
+
+	// Sample N random conversation_ids
+	convQuery := `
+		SELECT DISTINCT conversation_id
+		FROM eval_results
+		WHERE created_at >= ? AND created_at <= ?
+		ORDER BY RANDOM()
+		LIMIT ?
+	`
+	convRows, err := e.db.client.QueryContext(ctx, convQuery, start, end, sampleSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sample conversation IDs: %w", err)
+	}
+	defer func() {
+		if err := convRows.Close(); err != nil {
+			e.logger.Error().Err(err).Msg("Failed to close conversation rows")
+		}
+	}()
+
+	var convIDs []string
+	for convRows.Next() {
+		var id string
+		if err := convRows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan conversation_id: %w", err)
+		}
+		convIDs = append(convIDs, id)
+	}
+	if err := convRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating conversation IDs: %w", err)
+	}
+
+	if len(convIDs) == 0 {
+		return []storage.ConversationSample{}, nil
+	}
+
+	// Build IN clause placeholders
+	placeholders := make([]string, len(convIDs))
+	args := make([]interface{}, len(convIDs))
+	for i, id := range convIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	turnsQuery := fmt.Sprintf(`
+		SELECT conversation_id, agent_name, agent_version, event_id, user_query, answer, context
+		FROM eval_results
+		WHERE conversation_id IN (%s)
+		ORDER BY conversation_id, created_at ASC
+	`, joinStrings(placeholders, ","))
+
+	rows, err := e.db.client.QueryContext(ctx, turnsQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch conversation turns: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			e.logger.Error().Err(err).Msg("Failed to close turns rows")
+		}
+	}()
+
+	convMap := make(map[string]*storage.ConversationSample)
+	turnIndex := make(map[string]int)
+
+	for rows.Next() {
+		var convID, agentName, agentVersion, eventID, userQuery, answer, context string
+		if err := rows.Scan(&convID, &agentName, &agentVersion, &eventID, &userQuery, &answer, &context); err != nil {
+			return nil, fmt.Errorf("failed to scan turn row: %w", err)
+		}
+		if _, exists := convMap[convID]; !exists {
+			convMap[convID] = &storage.ConversationSample{
+				ConversationID: convID,
+				AgentName:      agentName,
+				AgentVersion:   agentVersion,
+			}
+		}
+		turnIndex[convID]++
+		convMap[convID].Turns = append(convMap[convID].Turns, storage.TurnSample{
+			TurnIndex: turnIndex[convID],
+			EventID:   eventID,
+			UserQuery: userQuery,
+			Answer:    answer,
+			Context:   context,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating turn rows: %w", err)
+	}
+
+	result := make([]storage.ConversationSample, 0, len(convIDs))
+	for _, id := range convIDs {
+		if conv, ok := convMap[id]; ok {
+			result = append(result, *conv)
+		}
+	}
+	return result, nil
+}
+
+func joinStrings(ss []string, sep string) string {
+	result := ""
+	for i, s := range ss {
+		if i > 0 {
+			result += sep
+		}
+		result += s
+	}
+	return result
+}
+
 func (e *EvalRepository) HealthMetrics(ctx context.Context, since time.Time) (storage.HealthMetricsData, error) {
 	const sqliteFormat = "2006-01-02 15:04:05"
 	sinceStr := since.UTC().Format(sqliteFormat)

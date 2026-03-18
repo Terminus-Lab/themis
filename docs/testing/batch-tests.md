@@ -233,9 +233,9 @@ THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o result
 
 **Command:**
 ```bash
-./bin/themis-cli validate -i resources/annotated_sample.jsonl -c 0.3
+./bin/themis-cli validate-events -i resources/annotated_sample.jsonl -c 0.3
 # or with long flags:
-./bin/themis-cli validate --input resources/annotated_sample.jsonl --correlation-threshold 0.3
+./bin/themis-cli validate-events --input resources/annotated_sample.jsonl --correlation-threshold 0.3
 ```
 
 **Expected Output (if correlation passes):**
@@ -298,7 +298,7 @@ INFO Safe to evaluate full dataset with these judge prompts
 # Create test file with missing human_annotation
 echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
 
-./bin/themis-cli validate -i test-no-annotation.jsonl
+./bin/themis-cli validate-events -i test-no-annotation.jsonl
 ```
 
 **Expected:**

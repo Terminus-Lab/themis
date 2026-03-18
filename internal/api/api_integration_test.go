@@ -1336,7 +1336,7 @@ func TestAPI_DownloadSample_ReturnsJSONL(t *testing.T) {
 	seedSamplingData(t, repo, 10)
 
 	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":100}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1368,7 +1368,7 @@ func TestAPI_DownloadSample_EmptyDB(t *testing.T) {
 	container, _ := setupSamplingContainer(t)
 
 	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1389,7 +1389,7 @@ func TestAPI_DownloadSample_MissingDates(t *testing.T) {
 	container, _ := setupSamplingContainer(t)
 
 	body := `{"percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1407,7 +1407,7 @@ func TestAPI_DownloadSample_InvalidDate(t *testing.T) {
 	container, _ := setupSamplingContainer(t)
 
 	body := `{"start_date":"not-a-date","end_date":"2099-01-01T00:00:00Z","percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 

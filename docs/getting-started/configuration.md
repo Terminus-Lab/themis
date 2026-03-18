@@ -179,7 +179,7 @@ evaluators:
 
 **Validate before deploying judge changes:**
 ```bash
-./bin/themis-cli validate -i annotated_sample.jsonl -c 0.3
+./bin/themis-cli validate-events -i annotated_sample.jsonl -c 0.3
 # Deploy only if Kendall's τ ≥ 0.3
 ```
 

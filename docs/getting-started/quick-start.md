@@ -37,7 +37,7 @@ jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' results
 ## Step 2 — CLI: Validate Judge Accuracy
 
 ```bash
-./bin/themis-cli validate \
+./bin/themis-cli validate-events \
   -i resources/validation_success_dataset.jsonl \
   -c 0.3
 ```
@@ -127,7 +127,7 @@ Expected: `verdict: "fail"`.
 ## Step 5 — API: Download a 25% Sample
 
 ```bash
-curl -s -X POST http://localhost:18082/api/v1/validation/sample/download \
+curl -s -X POST http://localhost:18082/api/v1/validation/sample/events/download \
   -H "Content-Type: application/json" \
   -d '{
     "start_date": "2020-01-01T00:00:00Z",
