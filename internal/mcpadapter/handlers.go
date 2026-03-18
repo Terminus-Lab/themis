@@ -26,6 +26,9 @@ func EvaluateResponse(
 	req *mcp.CallToolRequest,
 	input EvaluateInput,
 ) (*mcp.CallToolResult, models.EvaluationResult, error) {
+	if input.ConversationID == "" {
+		return nil, models.EvaluationResult{}, fmt.Errorf("conversation_id is required")
+	}
 	evalCtx := models.EvaluationContext{
 		RequestID:      input.EventID,
 		ConversationID: input.ConversationID,
@@ -57,6 +60,9 @@ func EvaluateSingleJudge(
 	req *mcp.CallToolRequest,
 	input EvaluateSingleJudgeInput,
 ) (*mcp.CallToolResult, models.EvaluationResult, error) {
+	if input.ConversationID == "" {
+		return nil, models.EvaluationResult{}, fmt.Errorf("conversation_id is required")
+	}
 	evalCtx := models.EvaluationContext{
 		RequestID:      input.EventID,
 		ConversationID: input.ConversationID,

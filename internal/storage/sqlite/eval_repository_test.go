@@ -670,22 +670,22 @@ func TestEvalRepository_Sample_MinSizeConstraint(t *testing.T) {
 	}
 }
 
-func TestGetConversation_GetEmptyConversations(t *testing.T) {
+func TestGetConversation_ListMultipleConversations(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 
-	// Store evaluations for multiple conversations
+	// Store evaluations across two distinct conversations (conversation_id is required)
 	evals := []storage.Evaluation{
 		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
 			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
 		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
 			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-03", ConversationID: "", AgentName: "agent", AgentVersion: "v1",
+		{EventID: "evt-03", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
 			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-04", ConversationID: "", AgentName: "agent", AgentVersion: "v1",
+		{EventID: "evt-04", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
 			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
 	}
 
@@ -695,13 +695,12 @@ func TestGetConversation_GetEmptyConversations(t *testing.T) {
 		}
 	}
 
-	// Query conv-A, should only get 2 results
 	results, err := repo.ListConversations(ctx)
 	if err != nil {
-		t.Fatalf("GetConversation failed: %v", err)
+		t.Fatalf("ListConversations failed: %v", err)
 	}
 
-	if len(results) != 1 {
-		t.Errorf("Expected 1 conversations, got %d", len(results))
+	if len(results) != 2 {
+		t.Errorf("Expected 2 conversations, got %d", len(results))
 	}
 }

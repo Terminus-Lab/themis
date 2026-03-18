@@ -3,7 +3,7 @@ package mcpadapter
 // EvaluateInput is the MCP tool input schema for full pipeline evaluation.
 type EvaluateInput struct {
 	EventID        string `json:"event_id" jsonschema:"unique event identifier"`
-	ConversationID string `json:"conversation_id,omitempty" jsonschema:"optional conversation identifier to group multi-turn interactions"`
+	ConversationID string `json:"conversation_id" jsonschema:"required conversation identifier to group multi-turn interactions"`
 	AgentName      string `json:"agent_name,omitempty" jsonschema:"optional name of the agent being evaluated"`
 	AgentVersion   string `json:"agent_version,omitempty" jsonschema:"optional version of the agent being evaluated"`
 	Query          string `json:"user_query" jsonschema:"user's original query"`
@@ -15,7 +15,7 @@ type EvaluateInput struct {
 // EvaluateSingleJudgeInput is the MCP tool input schema for single judge evaluation.
 type EvaluateSingleJudgeInput struct {
 	EventID        string  `json:"event_id" jsonschema:"unique event identifier"`
-	ConversationID string  `json:"conversation_id,omitempty" jsonschema:"optional conversation identifier to group multi-turn interactions"`
+	ConversationID string  `json:"conversation_id" jsonschema:"required conversation identifier to group multi-turn interactions"`
 	AgentName      string  `json:"agent_name,omitempty" jsonschema:"optional name of the agent being evaluated"`
 	AgentVersion   string  `json:"agent_version,omitempty" jsonschema:"optional version of the agent being evaluated"`
 	Query          string  `json:"user_query" jsonschema:"user's original query"`
