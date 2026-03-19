@@ -4,38 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Themis - Evaluation Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><style>circle,line{stroke:%23ececec;stroke-width:1.75;stroke-linecap:round}@media(prefers-color-scheme:light){circle,line{stroke:%230d0d0d}}</style><circle cx='12' cy='12' r='10'/><line x1='7' y1='9' x2='17' y2='9'/><line x1='12' y1='9' x2='12' y2='17'/></svg>">
     <style>
         :root {
-            /* Dark theme (default) */
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #242424;
-            --bg-tertiary: #2a2a2a;
-            --border-color: #333;
-            --text-primary: #e0e0e0;
-            --text-secondary: #888;
-            --text-tertiary: #666;
-            --text-muted: #aaa;
-            --accent-color: #00d4aa;
-            --accent-hover: #00e6bb;
-            --accent-active: #00c299;
-            --input-bg: #1a1a1a;
-            --input-border: #444;
+            --sidebar-bg: #171717;
+            --sidebar-hover: #212121;
+            --sidebar-active: #2a2a2a;
+            --main-bg: #212121;
+            --surface: #2f2f2f;
+            --surface-hover: #383838;
+            --border: #383838;
+            --text-primary: #ececec;
+            --text-secondary: #8e8ea0;
+            --text-muted: #6e6e80;
+            --accent: #10a37f;
+            --accent-hover: #1ab893;
+            --accent-active: #0d8f6e;
+            --input-bg: #2f2f2f;
+            --input-border: #4a4a4a;
+            --verdict-pass-bg: #10a37f22;
+            --verdict-pass-fg: #10a37f;
+            --verdict-review-bg: #f5a62322;
+            --verdict-review-fg: #f5a623;
+            --verdict-fail-bg: #ef444422;
+            --verdict-fail-fg: #ef4444;
         }
 
         [data-theme="light"] {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f5f5f5;
-            --bg-tertiary: #e8e8e8;
-            --border-color: #ddd;
-            --text-primary: #1a1a1a;
-            --text-secondary: #666;
-            --text-tertiary: #999;
-            --text-muted: #555;
-            --accent-color: #00a886;
-            --accent-hover: #00b894;
-            --accent-active: #009977;
+            --sidebar-bg: #f0f0f0;
+            --sidebar-hover: #e4e4e4;
+            --sidebar-active: #d9d9d9;
+            --main-bg: #ffffff;
+            --surface: #f9f9f9;
+            --surface-hover: #f0f0f0;
+            --border: #e5e5e5;
+            --text-primary: #0d0d0d;
+            --text-secondary: #6e6e80;
+            --text-muted: #8e8ea0;
+            --accent: #10a37f;
+            --accent-hover: #0d8f6e;
+            --accent-active: #0a7a5e;
             --input-bg: #ffffff;
-            --input-border: #ccc;
+            --input-border: #d9d9d9;
+            --verdict-pass-bg: #10a37f18;
+            --verdict-pass-fg: #0d8f6e;
+            --verdict-review-bg: #f5a62318;
+            --verdict-review-fg: #c47d00;
+            --verdict-fail-bg: #ef444418;
+            --verdict-fail-fg: #dc2626;
         }
 
         * {
@@ -45,95 +61,214 @@
         }
 
         body {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-            background: var(--bg-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background: var(--main-bg);
             color: var(--text-primary);
             line-height: 1.6;
             font-size: 14px;
-            transition: background 0.3s, color 0.3s;
+            height: 100vh;
+            overflow: hidden;
+            transition: background 0.2s, color 0.2s;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+        /* ── App shell ── */
+        .app-shell {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            height: 100vh;
         }
 
-        .header-content {
-            flex: 1;
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            transition: background 0.2s;
         }
 
-        h1 {
-            color: var(--accent-color);
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 8px;
+        .sidebar-brand {
+            padding: 20px 16px 16px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .subtitle {
+        .sidebar-brand-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .sidebar-brand-sub {
+            font-size: 12px;
             color: var(--text-secondary);
-            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 8px;
+            overflow-y: auto;
+        }
+
+        .sidebar-section-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 8px 8px 4px;
+            margin-bottom: 2px;
+        }
+
+        /* Reuse .tab class so JS's classList.add('active') still works */
+        .tab {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s, color 0.15s;
+            margin-bottom: 2px;
+        }
+
+        .tab:hover {
+            background: var(--sidebar-hover);
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            background: var(--sidebar-active);
+            color: var(--text-primary);
+        }
+
+        .tab-icon {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            opacity: 0.7;
+        }
+
+        .tab.active .tab-icon,
+        .tab:hover .tab-icon {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            padding: 12px;
+            border-top: 1px solid var(--border);
         }
 
         .theme-toggle {
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 8px 16px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
+            width: 100%;
+            padding: 10px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.15s;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 13px;
         }
 
         .theme-toggle:hover {
-            background: var(--bg-tertiary);
+            background: var(--sidebar-hover);
+            color: var(--text-primary);
         }
 
         .theme-toggle-label {
-            color: var(--text-secondary);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            flex: 1;
+            text-align: left;
         }
 
+        /* ── Main content ── */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .top-bar {
+            padding: 16px 28px;
+            border-bottom: 1px solid var(--border);
+            background: var(--main-bg);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-height: 60px;
+            transition: background 0.2s;
+        }
+
+        .top-bar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .top-bar-sub {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+        }
+
+        /* ── Tabs content panes ── */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ── Filters ── */
         .filters {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 20px;
             margin-bottom: 20px;
         }
 
         .filter-row {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             flex-wrap: wrap;
             align-items: flex-end;
         }
 
         .filter-group {
             flex: 1;
-            min-width: 200px;
+            min-width: 180px;
         }
 
         label {
             display: block;
             color: var(--text-secondary);
             font-size: 12px;
+            font-weight: 500;
             margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         input, select {
@@ -141,29 +276,30 @@
             background: var(--input-bg);
             border: 1px solid var(--input-border);
             color: var(--text-primary);
-            padding: 10px 12px;
-            border-radius: 6px;
+            padding: 9px 12px;
+            border-radius: 8px;
             font-family: inherit;
-            font-size: 13px;
-            transition: border-color 0.2s;
+            font-size: 14px;
+            transition: border-color 0.15s;
+            outline: none;
         }
 
         input:focus, select:focus {
-            outline: none;
-            border-color: var(--accent-color);
+            border-color: var(--accent);
         }
 
         button {
-            background: var(--accent-color);
-            color: var(--bg-primary);
+            background: var(--accent);
+            color: #fff;
             border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: 9px 18px;
+            border-radius: 8px;
             font-family: inherit;
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.15s;
+            white-space: nowrap;
         }
 
         button:hover {
@@ -175,50 +311,51 @@
         }
 
         .btn-secondary {
-            background: var(--bg-tertiary);
+            background: var(--surface);
             color: var(--text-primary);
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border);
         }
 
         .btn-secondary:hover {
-            background: var(--border-color);
+            background: var(--surface-hover);
         }
 
+        /* ── Stats row ── */
         .stats {
             display: flex;
-            gap: 15px;
+            gap: 14px;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
         .stat-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
             flex: 1;
-            min-width: 150px;
-            transition: background 0.3s, border-color 0.3s;
+            min-width: 130px;
         }
 
         .stat-label {
             color: var(--text-secondary);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 6px;
         }
 
         .stat-value {
-            color: var(--accent-color);
-            font-size: 24px;
-            font-weight: 600;
+            color: var(--accent);
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
 
+        /* ── Table ── */
         .results-table {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
             overflow: hidden;
         }
 
@@ -228,79 +365,87 @@
         }
 
         thead {
-            background: var(--bg-tertiary);
-            border-bottom: 1px solid var(--border-color);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
         }
 
         th {
             text-align: left;
-            padding: 15px;
+            padding: 13px 16px;
             color: var(--text-secondary);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 12px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
         }
 
         tbody tr {
-            border-bottom: 1px solid var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.15s;
+        }
+
+        tbody tr:last-child {
+            border-bottom: none;
         }
 
         tbody tr:hover {
-            background: var(--bg-tertiary);
+            background: var(--surface-hover);
         }
 
         tbody tr.expanded {
-            background: var(--bg-tertiary);
+            background: var(--surface-hover);
         }
 
         td {
-            padding: 15px;
+            padding: 13px 16px;
             color: var(--text-primary);
+            font-size: 14px;
         }
 
+        /* ── Verdict badges ── */
         .verdict {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .verdict-pass {
-            background: #00d4aa33;
-            color: #00d4aa;
+            background: var(--verdict-pass-bg);
+            color: var(--verdict-pass-fg);
         }
 
         .verdict-review {
-            background: #ffa50033;
-            color: #ffa500;
+            background: var(--verdict-review-bg);
+            color: var(--verdict-review-fg);
         }
 
         .verdict-fail {
-            background: #ff4d4d33;
-            color: #ff4d4d;
+            background: var(--verdict-fail-bg);
+            color: var(--verdict-fail-fg);
         }
 
         .confidence {
-            color: var(--accent-color);
+            color: var(--accent);
             font-weight: 600;
         }
 
         .query-preview {
-            max-width: 400px;
+            max-width: 380px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            color: var(--text-muted);
+            color: var(--text-secondary);
         }
 
+        /* ── Detail row ── */
         .detail-row {
             display: none;
-            background: var(--bg-primary);
+            background: var(--main-bg);
         }
 
         .detail-row.visible {
@@ -308,11 +453,11 @@
         }
 
         .detail-content {
-            padding: 20px;
+            padding: 20px 16px;
         }
 
         .detail-section {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .detail-section:last-child {
@@ -320,59 +465,64 @@
         }
 
         .detail-title {
-            color: var(--accent-color);
-            font-size: 12px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .detail-text {
             color: var(--text-primary);
-            line-height: 1.8;
-            padding: 12px;
-            background: var(--bg-secondary);
-            border-radius: 6px;
-            border-left: 3px solid var(--accent-color);
+            line-height: 1.7;
+            padding: 12px 14px;
+            background: var(--surface);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent);
+            font-size: 14px;
         }
 
         .stages-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
             gap: 10px;
         }
 
         .stage-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
         }
 
         .stage-name {
             color: var(--text-secondary);
-            font-size: 11px;
-            margin-bottom: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
         }
 
         .stage-score {
-            color: var(--accent-color);
-            font-size: 18px;
-            font-weight: 600;
+            color: var(--accent);
+            font-size: 20px;
+            font-weight: 700;
         }
 
         .stage-reason {
             color: var(--text-muted);
-            font-size: 11px;
-            margin-top: 5px;
+            font-size: 12px;
+            margin-top: 6px;
+            line-height: 1.5;
         }
 
+        /* ── Pagination ── */
         .pagination {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px;
-            border-top: 1px solid var(--border-color);
+            padding: 16px 16px;
+            border-top: 1px solid var(--border);
         }
 
         .pagination-info {
@@ -382,12 +532,13 @@
 
         .pagination-controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
 
+        /* ── Utility ── */
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 48px;
             color: var(--text-secondary);
         }
 
@@ -398,34 +549,36 @@
         }
 
         .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-            opacity: 0.3;
+            font-size: 40px;
+            margin-bottom: 14px;
+            opacity: 0.4;
         }
 
         .error {
-            background: #ff4d4d33;
-            border: 1px solid #ff4d4d;
-            border-radius: 8px;
-            padding: 15px;
-            color: #ff4d4d;
-            margin-bottom: 20px;
+            background: var(--verdict-fail-bg);
+            border: 1px solid var(--verdict-fail-fg);
+            border-radius: 10px;
+            padding: 14px 16px;
+            color: var(--verdict-fail-fg);
+            margin-bottom: 18px;
+            font-size: 14px;
         }
 
         .timestamp {
-            color: var(--text-tertiary);
+            color: var(--text-muted);
             font-size: 12px;
         }
 
+        /* ── Refresh controls ── */
         .refresh-controls {
             display: flex;
             gap: 10px;
             align-items: center;
-            margin-bottom: 20px;
-            padding: 15px 20px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            margin-bottom: 18px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
         }
 
         .refresh-status {
@@ -435,24 +588,26 @@
         }
 
         .refresh-status.active {
-            color: var(--accent-color);
+            color: var(--accent);
         }
 
         .refresh-controls button {
-            padding: 8px 16px;
+            padding: 7px 14px;
+            font-size: 13px;
         }
 
         .refresh-controls button:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
 
+        /* ── Toggle switch ── */
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 48px;
-            height: 24px;
-            margin: 0 10px;
+            width: 44px;
+            height: 22px;
+            margin: 0 8px;
         }
 
         .toggle-switch input {
@@ -464,86 +619,46 @@
         .toggle-slider {
             position: absolute;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--border-color);
-            transition: 0.3s;
-            border-radius: 24px;
+            inset: 0;
+            background: var(--border);
+            border-radius: 22px;
+            transition: 0.25s;
         }
 
         .toggle-slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
+            height: 16px;
+            width: 16px;
             left: 3px;
             bottom: 3px;
-            background-color: var(--bg-primary);
-            transition: 0.3s;
+            background: var(--main-bg);
             border-radius: 50%;
+            transition: 0.25s;
         }
 
         input:checked + .toggle-slider {
-            background-color: var(--accent-color);
+            background: var(--accent);
         }
 
         input:checked + .toggle-slider:before {
-            transform: translateX(24px);
+            transform: translateX(22px);
         }
 
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .tab {
-            background: transparent;
-            color: var(--text-secondary);
-            border: none;
-            border-bottom: 2px solid transparent;
-            padding: 12px 24px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .tab:hover {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-
-        .tab.active {
-            color: var(--accent-color);
-            border-bottom-color: var(--accent-color);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
+        /* ── Conversations ── */
         .conversation-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px 20px;
-            margin-bottom: 15px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 12px;
             cursor: pointer;
-            transition: background 0.2s, border-color 0.2s;
+            transition: background 0.15s, border-color 0.15s;
         }
 
         .conversation-card:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--accent-color);
+            background: var(--surface-hover);
+            border-color: var(--accent);
         }
 
         .conversation-header {
@@ -554,7 +669,7 @@
         }
 
         .conversation-id {
-            color: var(--accent-color);
+            color: var(--accent);
             font-size: 14px;
             font-weight: 600;
         }
@@ -562,25 +677,29 @@
         .conversation-turns {
             color: var(--text-secondary);
             font-size: 12px;
+            background: var(--surface-hover);
+            padding: 2px 8px;
+            border-radius: 20px;
         }
 
         .conversation-meta {
             display: flex;
             gap: 20px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .conversation-meta-item {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
         }
 
         .conversation-meta-label {
-            color: var(--text-secondary);
+            color: var(--text-muted);
             font-size: 11px;
+            font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
         }
 
         .conversation-meta-value {
@@ -590,59 +709,49 @@
 
         .conversation-verdicts {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
         }
 
         .conversation-verdict-badge {
             display: flex;
             align-items: center;
-            gap: 5px;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 11px;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
         }
 
         .conversation-verdict-badge.pass {
-            background: #00d4aa33;
-            color: #00d4aa;
+            background: var(--verdict-pass-bg);
+            color: var(--verdict-pass-fg);
         }
 
         .conversation-verdict-badge.review {
-            background: #ffa50033;
-            color: #ffa500;
+            background: var(--verdict-review-bg);
+            color: var(--verdict-review-fg);
         }
 
         .conversation-verdict-badge.fail {
-            background: #ff4d4d33;
-            color: #ff4d4d;
+            background: var(--verdict-fail-bg);
+            color: var(--verdict-fail-fg);
         }
 
-        .turns-list {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border-color);
-            display: none;
-        }
-
-        .turns-list.visible {
-            display: block;
-        }
-
+        /* ── Turn items ── */
         .turn-item {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 12px;
+            background: var(--main-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
             margin-bottom: 10px;
             cursor: pointer;
-            transition: background 0.2s, border-color 0.2s;
+            transition: background 0.15s, border-color 0.15s;
         }
 
         .turn-item:hover {
-            background: var(--bg-secondary);
-            border-color: var(--accent-color);
+            background: var(--surface);
+            border-color: var(--accent);
         }
 
         .turn-header {
@@ -655,283 +764,328 @@
         .turn-event-id {
             color: var(--text-muted);
             font-size: 11px;
+            margin-bottom: 4px;
         }
 
         .turn-query {
             color: var(--text-primary);
-            margin-bottom: 8px;
-            font-size: 13px;
+            margin-bottom: 6px;
+            font-size: 14px;
         }
 
         .turn-answer {
-            color: var(--text-muted);
-            font-size: 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
             line-height: 1.6;
         }
 
         .turn-footer {
             display: flex;
-            gap: 15px;
-            margin-top: 8px;
+            gap: 12px;
+            margin-top: 10px;
             padding-top: 8px;
-            border-top: 1px solid var(--bg-tertiary);
-            font-size: 11px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
         }
 
         .back-button {
-            background: var(--bg-tertiary);
+            background: var(--surface);
             color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            padding: 8px 16px;
-            border-radius: 6px;
+            border: 1px solid var(--border);
+            padding: 8px 14px;
+            border-radius: 8px;
             font-size: 13px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.15s;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 15px;
+            gap: 6px;
+            margin-bottom: 16px;
         }
 
         .back-button:hover {
-            background: var(--border-color);
+            background: var(--surface-hover);
         }
 
-        /* Monitoring tab */
-        .monitoring-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .metric-section {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-        }
-
-        .metric-section-title {
-            color: var(--accent-color);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 16px;
-            font-weight: 600;
-        }
-
-        .metric-big {
-            font-size: 32px;
-            font-weight: 600;
-            color: var(--accent-color);
-        }
-
-        .metric-sub {
-            color: var(--text-secondary);
-            font-size: 12px;
-            margin-top: 4px;
-        }
-
+        /* ── Monitoring ── */
         .monitoring-controls {
             display: flex;
             gap: 10px;
             align-items: center;
-            margin-bottom: 20px;
-            padding: 15px 20px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            margin-bottom: 18px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
         }
 
         .monitoring-controls label {
             display: inline;
             margin: 0;
             color: var(--text-secondary);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 13px;
+            font-weight: 500;
         }
 
         .monitoring-controls select {
             width: auto;
         }
+
+        .metric-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .metric-section-title {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .turns-list {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+            display: none;
+        }
+
+        .turns-list.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="header-content">
-                <h1>⚖️ Themis Evaluation Dashboard</h1>
-                <div class="subtitle">Real-time AI agent response evaluation results</div>
-            </div>
-            <div class="theme-toggle" onclick="toggleTheme()">
-                <span class="theme-toggle-label" id="themeLabel">Dark Mode</span>
-                <span id="themeIcon">🌙</span>
-            </div>
-        </header>
+    <div class="app-shell">
 
-        <div class="tabs">
-            <button class="tab active" id="resultsTabBtn" onclick="showTab('results')">Results</button>
-            <button class="tab" id="conversationsTabBtn" onclick="showTab('conversations')">Conversations</button>
-            <button class="tab" id="monitoringTabBtn" onclick="showTab('monitoring')">Monitoring</button>
-        </div>
-
-        <!-- Results Tab -->
-        <div id="resultsTab" class="tab-content active">
-        <div class="filters">
-            <div class="filter-row">
-                <div class="filter-group">
-                    <label>Agent Name</label>
-                    <input type="text" id="agentFilter" placeholder="Filter by agent name...">
+        <!-- ── Sidebar ── -->
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-name">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-5px;margin-right:8px;">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="7" y1="9" x2="17" y2="9"/>
+                        <line x1="12" y1="9" x2="12" y2="17"/>
+                    </svg>Themis
                 </div>
-                <div class="filter-group">
-                    <label>Verdict</label>
-                    <select id="verdictFilter">
-                        <option value="">All verdicts</option>
-                        <option value="pass">Pass</option>
-                        <option value="review">Review</option>
-                        <option value="fail">Fail</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Results per page</label>
-                    <select id="limitFilter">
-                        <option value="10">10</option>
-                        <option value="25" selected>25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <button onclick="applyFilters()">Apply Filters</button>
-                </div>
-                <div class="filter-group">
-                    <button class="btn-secondary" onclick="resetFilters()">Reset</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-label">Total Results</div>
-                <div class="stat-value" id="totalCount">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Current Page</div>
-                <div class="stat-value" id="currentPage">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Showing</div>
-                <div class="stat-value" id="showingCount">-</div>
-            </div>
-        </div>
-
-        <div id="errorContainer"></div>
-
-        <div class="refresh-controls">
-            <div class="refresh-status" id="refreshStatus">Auto-refresh: OFF</div>
-            <label class="toggle-switch">
-                <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-
-        <div class="results-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Event ID</th>
-                        <th>Agent</th>
-                        <th>Query</th>
-                        <th>Verdict</th>
-                        <th>Confidence</th>
-                        <th>Stages</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsBody">
-                    <tr>
-                        <td colspan="6" class="loading">Loading results...</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="pagination">
-                <div class="pagination-info" id="paginationInfo">-</div>
-                <div class="pagination-controls">
-                    <button id="prevBtn" onclick="previousPage()" disabled>← Previous</button>
-                    <button id="nextBtn" onclick="nextPage()" disabled>Next →</button>
-                </div>
-            </div>
-        </div>
-        </div>
-        <!-- End Results Tab -->
-
-        <!-- Conversations Tab -->
-        <div id="conversationsTab" class="tab-content">
-            <div class="refresh-controls">
-                <div class="refresh-status" id="convRefreshStatus">Loading conversations...</div>
-                <button onclick="fetchConversations()">Refresh Conversations</button>
+                <div class="sidebar-brand-sub">AI Evaluation Dashboard</div>
             </div>
 
-            <div id="conversationErrorContainer"></div>
-
-            <div id="conversationsListView">
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-label">Total Conversations</div>
-                        <div class="stat-value" id="totalConversations">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Avg Turns/Conv</div>
-                        <div class="stat-value" id="avgTurns">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Avg Confidence</div>
-                        <div class="stat-value" id="avgConfidence">-</div>
-                    </div>
-                </div>
-
-                <div id="conversationsList">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">💬</div>
-                        <div>Loading conversations...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="conversationDetailView" style="display: none;">
-                <button class="back-button" onclick="backToConversationsList()">
-                    ← Back to Conversations
+            <div class="sidebar-nav">
+                <div class="sidebar-section-label">Views</div>
+                <button class="tab active" id="resultsTabBtn" onclick="showTab('results')">
+                    <span class="tab-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <line x1="3" y1="9" x2="21" y2="9"/>
+                            <line x1="3" y1="15" x2="21" y2="15"/>
+                            <line x1="9" y1="9" x2="9" y2="21"/>
+                        </svg>
+                    </span>
+                    Results
                 </button>
-                <div id="conversationDetail"></div>
+                <button class="tab" id="conversationsTabBtn" onclick="showTab('conversations')">
+                    <span class="tab-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </span>
+                    Conversations
+                </button>
+                <button class="tab" id="monitoringTabBtn" onclick="showTab('monitoring')">
+                    <span class="tab-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                            <line x1="2" y1="20" x2="22" y2="20"/>
+                        </svg>
+                    </span>
+                    Monitoring
+                </button>
             </div>
-        </div>
-        <!-- End Conversations Tab -->
 
-        <!-- Monitoring Tab -->
-        <div id="monitoringTab" class="tab-content">
-            <div class="monitoring-controls">
-                <label>Window</label>
-                <select id="monitoringWindow" onchange="fetchHealthMetrics()">
-                    <option value="24h">Last 24 hours</option>
-                    <option value="7d" selected>Last 7 days</option>
-                    <option value="30d">Last 30 days</option>
-                    <option value="90d">Last 90 days</option>
-                </select>
-                <button onclick="fetchHealthMetrics()" style="margin-left: auto;">Refresh</button>
+            <div class="sidebar-footer">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span>
+                    <span class="theme-toggle-label" id="themeLabel">Dark mode</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- ── Main content ── -->
+        <div class="main-content">
+            <div class="top-bar">
+                <div class="top-bar-title" id="topBarTitle">Results</div>
+                <div class="top-bar-sub">Real-time AI agent response evaluations</div>
             </div>
 
-            <div id="monitoringError"></div>
+            <div class="content-area">
 
-            <div id="monitoringContent">
-                <div class="empty-state">
-                    <div class="empty-state-icon">📡</div>
-                    <div>Loading metrics...</div>
+                <!-- Results Tab -->
+                <div id="resultsTab" class="tab-content active">
+                    <div class="filters">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>Agent Name</label>
+                                <input type="text" id="agentFilter" placeholder="Filter by agent name...">
+                            </div>
+                            <div class="filter-group">
+                                <label>Verdict</label>
+                                <select id="verdictFilter">
+                                    <option value="">All verdicts</option>
+                                    <option value="pass">Pass</option>
+                                    <option value="review">Review</option>
+                                    <option value="fail">Fail</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Results per page</label>
+                                <select id="limitFilter">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <button onclick="applyFilters()">Apply</button>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn-secondary" onclick="resetFilters()">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Results</div>
+                            <div class="stat-value" id="totalCount">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Current Page</div>
+                            <div class="stat-value" id="currentPage">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Showing</div>
+                            <div class="stat-value" id="showingCount">-</div>
+                        </div>
+                    </div>
+
+                    <div id="errorContainer"></div>
+
+                    <div class="refresh-controls">
+                        <div class="refresh-status" id="refreshStatus">Auto-refresh: OFF</div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="results-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Event ID</th>
+                                    <th>Agent</th>
+                                    <th>Query</th>
+                                    <th>Verdict</th>
+                                    <th>Confidence</th>
+                                    <th>Stages</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody">
+                                <tr>
+                                    <td colspan="6" class="loading">Loading results...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="pagination">
+                            <div class="pagination-info" id="paginationInfo">-</div>
+                            <div class="pagination-controls">
+                                <button id="prevBtn" onclick="previousPage()" disabled>← Previous</button>
+                                <button id="nextBtn" onclick="nextPage()" disabled>Next →</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <!-- End Monitoring Tab -->
-    </div>
+                <!-- End Results Tab -->
+
+                <!-- Conversations Tab -->
+                <div id="conversationsTab" class="tab-content">
+                    <div class="refresh-controls">
+                        <div class="refresh-status" id="convRefreshStatus">Loading conversations...</div>
+                        <button onclick="fetchConversations()">Refresh</button>
+                    </div>
+
+                    <div id="conversationErrorContainer"></div>
+
+                    <div id="conversationsListView">
+                        <div class="stats">
+                            <div class="stat-card">
+                                <div class="stat-label">Total Conversations</div>
+                                <div class="stat-value" id="totalConversations">-</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Avg Turns / Conv</div>
+                                <div class="stat-value" id="avgTurns">-</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Avg Confidence</div>
+                                <div class="stat-value" id="avgConfidence">-</div>
+                            </div>
+                        </div>
+
+                        <div id="conversationsList">
+                            <div class="empty-state">
+                                <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+                                <div>Loading conversations...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="conversationDetailView" style="display: none;">
+                        <button class="back-button" onclick="backToConversationsList()">
+                            ← Back to Conversations
+                        </button>
+                        <div id="conversationDetail"></div>
+                    </div>
+                </div>
+                <!-- End Conversations Tab -->
+
+                <!-- Monitoring Tab -->
+                <div id="monitoringTab" class="tab-content">
+                    <div class="monitoring-controls">
+                        <label>Window</label>
+                        <select id="monitoringWindow" onchange="fetchHealthMetrics()">
+                            <option value="24h">Last 24 hours</option>
+                            <option value="7d" selected>Last 7 days</option>
+                            <option value="30d">Last 30 days</option>
+                            <option value="90d">Last 90 days</option>
+                        </select>
+                        <button onclick="fetchHealthMetrics()" style="margin-left: auto;">Refresh</button>
+                    </div>
+
+                    <div id="monitoringError"></div>
+
+                    <div id="monitoringContent">
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div>
+                            <div>Loading metrics...</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Monitoring Tab -->
+
+            </div><!-- end content-area -->
+        </div><!-- end main-content -->
+    </div><!-- end app-shell -->
 
     <script>
         const API_BASE = window.location.origin;
@@ -976,7 +1130,7 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="6" class="empty-state">
-                            <div class="empty-state-icon">📊</div>
+                            <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg></div>
                             <div>No evaluation results found</div>
                             <div style="margin-top: 10px; font-size: 12px;">Try adjusting your filters or run some evaluations</div>
                         </td>
@@ -1060,10 +1214,12 @@
                 expandedRows.delete(eventId);
                 row.classList.remove('expanded');
                 detailRow.classList.remove('visible');
+                console.log('[result] collapsed', eventId);
             } else {
                 expandedRows.add(eventId);
                 row.classList.add('expanded');
                 detailRow.classList.add('visible');
+                console.log('[result] expanded', eventId);
             }
         }
 
@@ -1093,6 +1249,9 @@
             currentOffset = 0;
             currentLimit = parseInt(document.getElementById('limitFilter').value);
             expandedRows.clear();
+            const agent = document.getElementById('agentFilter').value;
+            const verdict = document.getElementById('verdictFilter').value;
+            console.log('[filters] applied', { agent: agent || '*', verdict: verdict || '*', limit: currentLimit });
             fetchResults();
         }
 
@@ -1100,6 +1259,7 @@
             document.getElementById('agentFilter').value = '';
             document.getElementById('verdictFilter').value = '';
             document.getElementById('limitFilter').value = '25';
+            console.log('[filters] reset');
             applyFilters();
         }
 
@@ -1107,6 +1267,7 @@
             if (hasMore) {
                 currentOffset += currentLimit;
                 expandedRows.clear();
+                console.log('[pagination] next →', { offset: currentOffset, limit: currentLimit, total: totalResults });
                 fetchResults();
             }
         }
@@ -1115,6 +1276,7 @@
             if (currentOffset > 0) {
                 currentOffset = Math.max(0, currentOffset - currentLimit);
                 expandedRows.clear();
+                console.log('[pagination] ← previous', { offset: currentOffset, limit: currentLimit, total: totalResults });
                 fetchResults();
             }
         }
@@ -1136,6 +1298,7 @@
 
         function toggleAutoRefresh() {
             autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            console.log('[auto-refresh]', autoRefreshEnabled ? 'enabled (10s interval)' : 'disabled');
 
             // Save preference to localStorage
             localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
@@ -1186,6 +1349,7 @@
             const html = document.documentElement;
             const currentTheme = html.getAttribute('data-theme') || 'dark';
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            console.log('[theme] switched to', newTheme);
 
             html.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
@@ -1197,10 +1361,10 @@
             const themeIcon = document.getElementById('themeIcon');
 
             if (theme === 'light') {
-                themeLabel.textContent = 'Light Mode';
+                themeLabel.textContent = 'Light mode';
                 themeIcon.textContent = '☀️';
             } else {
-                themeLabel.textContent = 'Dark Mode';
+                themeLabel.textContent = 'Dark mode';
                 themeIcon.textContent = '🌙';
             }
         }
@@ -1212,10 +1376,12 @@
         }
 
         // Tab Management
+        const TAB_TITLES = { results: 'Results', conversations: 'Conversations', monitoring: 'Monitoring' };
         let conversationsLoaded = false;
         let monitoringLoaded = false;
 
         function showTab(tabName) {
+            console.log('[tab] switched to', tabName);
             // Update URL hash
             window.location.hash = tabName;
 
@@ -1228,6 +1394,8 @@
             document.getElementById('resultsTab').classList.remove('active');
             document.getElementById('conversationsTab').classList.remove('active');
             document.getElementById('monitoringTab').classList.remove('active');
+
+            document.getElementById('topBarTitle').textContent = TAB_TITLES[tabName] || tabName;
 
             if (tabName === 'results') {
                 document.getElementById('resultsTabBtn').classList.add('active');
@@ -1250,6 +1418,7 @@
         async function fetchHealthMetrics() {
             const window_ = document.getElementById('monitoringWindow').value;
             const url = `${API_BASE}/api/v1/metrics/health?window=${window_}`;
+            console.log('[monitoring] fetching health metrics', { window: window_ });
             monitoringLoaded = true;
 
             document.getElementById('monitoringError').innerHTML = '';
@@ -1276,21 +1445,21 @@
                     <div class="metric-section-title">Overview — ${data.window}</div>
                     <table style="width:100%; border-collapse:collapse; margin-top:12px;">
                         <thead>
-                            <tr style="border-bottom:1px solid var(--border-color); color:var(--text-secondary); text-align:left;">
-                                <th style="padding:8px 12px; font-weight:normal;">Metric</th>
-                                <th style="padding:8px 12px; font-weight:normal;">Value</th>
-                                <th style="padding:8px 12px; font-weight:normal;">Description</th>
+                            <tr style="border-bottom:1px solid var(--border); color:var(--text-secondary); text-align:left;">
+                                <th style="padding:8px 12px; font-weight:600; font-size:12px;">Metric</th>
+                                <th style="padding:8px 12px; font-weight:600; font-size:12px;">Value</th>
+                                <th style="padding:8px 12px; font-weight:600; font-size:12px;">Description</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr style="border-bottom:1px solid var(--border-color);">
+                            <tr style="border-bottom:1px solid var(--border);">
                                 <td style="padding:10px 12px;">Total Evaluations</td>
-                                <td style="padding:10px 12px; color:var(--accent-color); font-weight:bold;">${data.total_evaluations}</td>
+                                <td style="padding:10px 12px; color:var(--accent); font-weight:700;">${data.total_evaluations}</td>
                                 <td style="padding:10px 12px; color:var(--text-secondary);">Number of evaluations in the selected window</td>
                             </tr>
                             <tr>
                                 <td style="padding:10px 12px;">Avg Confidence</td>
-                                <td style="padding:10px 12px; color:var(--accent-color); font-weight:bold;">${confidence}%</td>
+                                <td style="padding:10px 12px; color:var(--accent); font-weight:700;">${confidence}%</td>
                                 <td style="padding:10px 12px; color:var(--text-secondary);">Mean final confidence score across all evaluations (higher = better)</td>
                             </tr>
                         </tbody>
@@ -1355,6 +1524,7 @@
                 const eventId = hash.substring('results/'.length);
                 document.getElementById('resultsTabBtn').classList.add('active');
                 document.getElementById('resultsTab').classList.add('active');
+                document.getElementById('topBarTitle').textContent = 'Results';
                 // Expand the specific row
                 setTimeout(() => {
                     expandedRows.add(eventId);
@@ -1371,6 +1541,7 @@
                 const conversationId = hash.substring('conversations/'.length);
                 document.getElementById('conversationsTabBtn').classList.add('active');
                 document.getElementById('conversationsTab').classList.add('active');
+                document.getElementById('topBarTitle').textContent = 'Conversations';
                 if (!conversationsLoaded) {
                     fetchConversations().then(() => {
                         viewConversationDetails(conversationId, false);
@@ -1381,6 +1552,7 @@
             } else if (hash === 'conversations') {
                 document.getElementById('conversationsTabBtn').classList.add('active');
                 document.getElementById('conversationsTab').classList.add('active');
+                document.getElementById('topBarTitle').textContent = 'Conversations';
                 // Show list view if we're viewing detail
                 if (currentConversationId) {
                     document.getElementById('conversationsListView').style.display = 'block';
@@ -1393,10 +1565,12 @@
             } else if (hash === 'monitoring') {
                 document.getElementById('monitoringTabBtn').classList.add('active');
                 document.getElementById('monitoringTab').classList.add('active');
+                document.getElementById('topBarTitle').textContent = 'Monitoring';
                 if (!monitoringLoaded) fetchHealthMetrics();
             } else {
                 document.getElementById('resultsTabBtn').classList.add('active');
                 document.getElementById('resultsTab').classList.add('active');
+                document.getElementById('topBarTitle').textContent = 'Results';
             }
         });
 
@@ -1406,6 +1580,7 @@
 
         async function fetchConversations() {
             const url = `${API_BASE}/api/v1/conversations`;
+            console.log('[conversations] fetching list');
 
             try {
                 document.getElementById('convRefreshStatus').textContent = '🔄 Loading conversations...';
@@ -1423,6 +1598,7 @@
                 conversationsLoaded = true;
 
                 const count = conversationsData.length;
+                console.log('[conversations] loaded', count, 'conversations');
                 document.getElementById('convRefreshStatus').textContent = `Loaded ${count} conversation${count !== 1 ? 's' : ''}`;
             } catch (error) {
                 showConversationError(`Failed to fetch conversations: ${error.message}`);
@@ -1455,7 +1631,7 @@
 
                 card.innerHTML = `
                     <div class="conversation-header">
-                        <div class="conversation-id">💬 ${conv.conversation_id}</div>
+                        <div class="conversation-id">${conv.conversation_id}</div>
                         <div class="conversation-turns">${conv.turn_count} turns</div>
                     </div>
                     <div class="conversation-meta">
@@ -1497,6 +1673,7 @@
 
         async function viewConversationDetails(conversationId, updateHash = true) {
             currentConversationId = conversationId;
+            console.log('[conversation] viewing detail', conversationId);
             // Update URL hash to include conversation ID (unless called from hashchange)
             if (updateHash) {
                 window.location.hash = `conversations/${conversationId}`;
@@ -1534,7 +1711,7 @@
             let html = `
                 <div class="conversation-card" style="margin-bottom: 20px; cursor: default;">
                     <div class="conversation-header">
-                        <div class="conversation-id">💬 ${data.conversation_id}</div>
+                        <div class="conversation-id">${data.conversation_id}</div>
                         <div class="conversation-turns">${data.turn_count} turns</div>
                     </div>
                     <div class="conversation-meta">
@@ -1549,7 +1726,7 @@
                     </div>
                 </div>
 
-                <h3 style="color: var(--accent-color); margin-bottom: 15px; font-size: 16px;">Conversation Turns</h3>
+                <h3 style="color: var(--text-secondary); margin-bottom: 14px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Conversation Turns</h3>
             `;
 
             // Render each turn
@@ -1557,8 +1734,8 @@
                 html += `
                     <div class="turn-item" onclick="viewTurnInResults('${turn.event_id}')" title="Click to view full evaluation in Results tab">
                         <div class="turn-header">
-                            <div style="color: var(--accent-color); font-weight: 600; font-size: 12px;">
-                                Turn ${index + 1} →
+                            <div style="color: var(--accent); font-weight: 600; font-size: 13px;">
+                                Turn ${index + 1}
                             </div>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <span class="verdict verdict-${turn.verdict}">${turn.verdict}</span>
@@ -1578,9 +1755,7 @@
                             </div>
                         ` : ''}
                         <div class="turn-footer">
-                            <span style="color: var(--text-secondary);">
-                                ${turn.stage_scores.length} evaluation stages • Click to view details
-                            </span>
+                            <span>${turn.stage_scores.length} evaluation stages · Click to view details</span>
                         </div>
                     </div>
                 `;
@@ -1590,6 +1765,7 @@
         }
 
         function backToConversationsList() {
+            console.log('[conversation] back to list');
             currentConversationId = null;
             window.location.hash = 'conversations';
             document.getElementById('conversationsListView').style.display = 'block';
@@ -1626,6 +1802,7 @@
 
         // Navigate from conversation turn to full evaluation in Results tab
         function viewTurnInResults(eventId) {
+            console.log('[turn] navigating to result', eventId);
             // Navigate to results tab with event_id in hash
             window.location.hash = `results/${eventId}`;
         }
