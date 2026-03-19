@@ -43,6 +43,7 @@ EARLY_EXIT_THRESHOLD=0.2
 
 ## Command Line Flags
 
+**Evaluate-Events Command Flags:**
 | Flag | Shorthand | Type | Default | Description |
 |------|-----------|------|---------|-------------|
 | `--input` | `-i` | string | **required** | Input JSONL file path |
@@ -107,6 +108,26 @@ Each line is a JSON object with the same structure as the API request:
 
 This groups 3 evaluations as turns in conversation `conv-abc123`, enabling conversation-level analysis.
 
+### Conversations Input Format (evaluate-conversations)
+
+For `evaluate-conversations`, each line is a conversation object with all turns bundled together:
+
+```jsonl
+{"conversation_id":"conv-001","agent":{"name":"assistant-v1","version":"1.0"},"turns":[{"turn_index":0,"user_query":"What is the capital of France?","answer":"The capital of France is Paris.","context":"France is a country in Western Europe."},{"turn_index":1,"user_query":"What is the population of that city?","answer":"Paris has an estimated population of 2.2 million people within city limits.","context":"Paris is the capital and most populous city of France."},{"turn_index":2,"user_query":"What are some famous landmarks there?","answer":"Famous landmarks in Paris include the Eiffel Tower, Louvre Museum, Notre-Dame Cathedral, and Arc de Triomphe.","context":"Paris is known for its architecture and cultural landmarks."}]}
+{"conversation_id":"conv-002","agent":{"name":"assistant-v1","version":"1.0"},"turns":[{"turn_index":0,"user_query":"What is machine learning?","answer":"Machine learning is a method of data analysis that automates analytical model building using algorithms that learn from data.","context":"Machine learning is a subset of artificial intelligence."},{"turn_index":1,"user_query":"Can you give me an example?","answer":"An example is email spam filtering, where the algorithm learns to identify spam based on patterns in labeled training data.","context":"Machine learning has many practical applications."}]}
+```
+
+**Required fields:**
+- `conversation_id` - Unique conversation identifier
+- `agent` - Agent metadata (`name`, `version`)
+- `turns` - Array of turns, each with `turn_index`, `user_query`, `answer`
+
+**Optional turn fields:**
+- `context` - Retrieved context for RAG evaluation
+- `expected_output` - Ground truth for correctness judge
+
+An example dataset is provided at `resources/conversations.jsonl` with 3 conversations covering geography, machine learning, and Python debugging.
+
 ## Output Formats
 
 ### JSONL Output (Default)
@@ -143,7 +164,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate -i test-valid.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i test-valid.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -163,7 +184,7 @@ Aggregate statistics in JSON format:
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate -i test-invalid.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i test-invalid.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -177,12 +198,12 @@ When `-f summary` is used without `-o`, results are printed to stdout. With `-o`
 
 **Command (stdout):**
 ```bash
-./bin/themis-cli evaluate -i test-valid.jsonl -f summary
+./bin/themis-cli evaluate-events -i test-valid.jsonl -f summary
 ```
 
 **Command (file):**
 ```bash
-./bin/themis-cli evaluate -i test-valid.jsonl -f summary -o summary.json
+./bin/themis-cli evaluate-events -i test-valid.jsonl -f summary -o summary.json
 ```
 
 **Expected Output:**
@@ -201,7 +222,7 @@ When `-f summary` is used without `-o`, results are printed to stdout. With `-o`
 **Command:**
 ```bash
 # Start processing large file
-./bin/themis-cli evaluate -i large-dataset.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i large-dataset.jsonl -o results.jsonl
 
 # Press Ctrl+C after 2 seconds
 ```
@@ -217,7 +238,7 @@ When `-f summary` is used without `-o`, results are printed to stdout. With `-o`
 
 **Command:**
 ```bash
-THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o results.jsonl
+THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -230,7 +251,7 @@ THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o result
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate -i test.jsonl -f csv
+./bin/themis-cli evaluate-events -i test.jsonl -f csv
 ```
 
 **Expected Output:**
@@ -449,7 +470,7 @@ For comprehensive guidance on interpreting validation results:
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate \
+./bin/themis-cli evaluate-events \
   -i resources/dataset.jsonl \
   -o resources/results.jsonl \
   -s resources/summary.json
@@ -468,7 +489,7 @@ For comprehensive guidance on interpreting validation results:
 
 **Command:**
 ```bash
-time THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate \
+time THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate-events \
   -i dataset-1000.jsonl \
   -o results-1000.jsonl
 ```
@@ -490,7 +511,7 @@ time THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate \
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate -i conversation-dataset.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i conversation-dataset.jsonl -o results.jsonl
 ```
 
 **Expected Output:**
@@ -511,6 +532,8 @@ jq -s 'group_by(.conversation_id) | map({conversation: .[0].conversation_id, tur
 ```
 
 ### Test Case 10.1: Evaluate Conversations — Summary Format
+
+Uses the example dataset at `resources/conversations.jsonl` (3 conversations: geography, machine learning, Python debugging).
 
 **Command (stdout):**
 ```bash
@@ -562,13 +585,13 @@ Test with different worker counts:
 
 ```bash
 # 1 worker (sequential)
-time THEMIS_BATCH_WORKERS=1 ./bin/themis-cli evaluate -i dataset-100.jsonl -o /dev/null
+time THEMIS_BATCH_WORKERS=1 ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o /dev/null
 
 # 5 workers (default)
-time ./bin/themis-cli evaluate -i dataset-100.jsonl -o /dev/null
+time ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o /dev/null
 
 # 20 workers (high concurrency)
-time THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o /dev/null
+time THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o /dev/null
 ```
 
 **Expected:**
@@ -582,7 +605,7 @@ time THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o /
 
 ```bash
 # Run evaluation first
-./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
 
 # Then analyze results
 jq 'select(.verdict=="fail")' results.jsonl
@@ -592,7 +615,7 @@ jq 'select(.verdict=="fail")' results.jsonl
 
 ```bash
 # Run evaluation first
-./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
 
 # Calculate average confidence
 jq -s 'map(.confidence) | add/length' results.jsonl
@@ -619,7 +642,7 @@ print(fails[['id', 'confidence', 'verdict']])
 **Solution:** Ensure you specify `-i` (or `--input`) flag with a valid file path.
 
 ```bash
-./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
 ```
 
 ### Issue: "Failed to open input file"
@@ -649,7 +672,7 @@ split -l 10000 large-dataset.jsonl batch-
 **Solution:** Reduce worker count to stay within rate limits.
 
 ```bash
-THEMIS_BATCH_WORKERS=3 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+THEMIS_BATCH_WORKERS=3 ./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
 ```
 
 ## Validation Mode Details
