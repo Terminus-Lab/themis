@@ -35,7 +35,7 @@ Both modes share the same core evaluation engine and judge configuration, allowi
 
 ## Security Notice
 
-**Themis v1.0 is designed for internal/trusted network deployment.**
+**Themis v1.2 is designed for internal/trusted network deployment.**
 For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployment Guide](docs/deployment/api-mode.md).
 
 ## Features
@@ -57,21 +57,21 @@ For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployme
 Download the latest release from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases/latest).
 
 **Choose your platform:**
-- **macOS (Apple Silicon)**: `themis_1.0.0_darwin_arm64.tar.gz` - M1/M2/M3 Macs
-- **macOS (Intel)**: `themis_1.0.0_darwin_amd64.tar.gz` - Intel-based Macs
-- **Linux (x64)**: `themis_1.0.0_linux_amd64.tar.gz`
-- **Linux (ARM)**: `themis_1.0.0_linux_arm64.tar.gz`
-- **Windows (x64)**: `themis_1.0.0_windows_amd64.zip`
+- **macOS (Apple Silicon)**: `themis_1.2.0_darwin_arm64.tar.gz` - M1/M2/M3 Macs
+- **macOS (Intel)**: `themis_1.2.0_darwin_amd64.tar.gz` - Intel-based Macs
+- **Linux (x64)**: `themis_1.2.0_linux_amd64.tar.gz`
+- **Linux (ARM)**: `themis_1.2.0_linux_arm64.tar.gz`
+- **Windows (x64)**: `themis_1.2.0_windows_amd64.zip`
 
 **Extract and setup:**
 ```bash
 # macOS/Linux
-tar -xzf themis_1.0.0_darwin_arm64.tar.gz
-cd themis_1.0.0_darwin_arm64
+tar -xzf themis_1.2.0_darwin_arm64.tar.gz
+cd themis_1.2.0_darwin_arm64
 
 # Windows (PowerShell)
-Expand-Archive themis_1.0.0_windows_amd64.zip
-cd themis_1.0.0_windows_amd64
+Expand-Archive themis_1.2.0_windows_amd64.zip
+cd themis_1.2.0_windows_amd64
 
 # Configure environment
 cp .env.example .env

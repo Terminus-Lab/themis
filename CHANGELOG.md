@@ -7,45 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.3.0] - 2026-03-18
+## [1.2.0] - 2026-03-19
 
 ### Added
-- **Conversation Evaluation Pipeline**: Full multi-turn conversation evaluation using conversation-scoped judges
-  - New `POST /api/v1/evaluate/conversation` API endpoint accepting `conversation_id`, `agent`, and `turns[]`
-  - New `ConversationTurn` and `ConversationEvaluationRequest` models for multi-turn input
-  - New `ConversationEvaluationResult` response with per-conversation `verdict`, `confidence`, and `stages`
-  - New `conversation-flow` judge (`scope: conversation`) in `configs/judges.yaml` — evaluates flow, context-awareness, and consistency across all turns
-  - New `conversation_eval_results` DB table (migration 003) for persistent storage of conversation evaluations
-  - New `ConversationExecutor` (`internal/executor/conversation_executor.go`) orchestrating conversation-scoped judges
-  - Returns 503 if no conversation-scoped judges are configured
-- **Judge Scope Configuration**: Judges now declare a `scope` field in `configs/judges.yaml`
-  - `scope: event` (default) — existing single-turn judges; used by `POST /api/v1/evaluate`
-  - `scope: conversation` — new multi-turn judges; used by `POST /api/v1/evaluate/conversation`
-  - Weight normalization is now per-scope group (event judges normalize independently from conversation judges)
-- **CLI `evaluate-conversations` subcommand**: Batch conversation evaluation
-  - `themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl`
-  - Input: JSONL with one `ConversationEvaluationRequest` per line (`conversation_id`, `agent`, `turns[]`)
-  - Output: JSONL with one `ConversationEvaluationResult` per line
-  - Concurrent worker pool via `THEMIS_BATCH_WORKERS` env var
-  - Returns error if no conversation-scoped judges are configured
+- **`/evaluate` Slash Command Skill** (`evaluate.md` at project root): invoke `/evaluate` in any Claude Code or Codex session to evaluate the current conversation using `themis-cli evaluate-conversations`
+  - Automatically extracts session turns, writes a temp JSONL, runs the CLI, and reports verdict + confidence inline
+  - Supports `/evaluate N` to limit to last N turns
+  - Falls back gracefully if binary or `configs/judges.yaml` not found
+  - Full CLI command reference included in the skill file
+- **`resources/conversations.jsonl`**: example conversation dataset (3 conversations: geography, machine learning, Python debugging) for `evaluate-conversations` testing
 
 ### Changed
-- `JudgePool.BuildFromConfig()` now filters only `scope: event` judges (backward-compatible — existing judges without `scope` default to event)
-- `JudgePool.BuildConversationJudgesFromConfig()` added for `scope: conversation` judges
-- `EvaluationContext` gains `Turns []ConversationTurn` field (populated for conversation evaluation, nil for event evaluation)
-- `api.NewHandler()` signature gains `ConversationExecutor` parameter
-- `setup.Dependencies` gains `ConversationExecutor` field
+- **CLI: renamed `evaluate` subcommand to `evaluate-events`** to distinguish single-turn event evaluation from multi-turn conversation evaluation (`evaluate-conversations`)
+  - `themis-cli evaluate-events -i events.jsonl -o results.jsonl`
+  - Breaking change for existing scripts using `themis-cli evaluate`
+- **Dashboard: ChatGPT-style layout** (`static/dashboard.html`)
+  - Left sidebar navigation replacing horizontal tabs
+  - System sans-serif font replacing monospace
+  - ChatGPT color palette: `#171717` sidebar, `#212121` main, `#10a37f` accent
+  - SVG icons throughout: T-in-circle lettermark for brand, stroke-based nav icons, favicon
+  - Browser tab favicon using inline SVG data URI (respects OS dark/light preference)
+  - Console logging on all interactive elements (filters, pagination, tabs, row expand, conversation drill-down, auto-refresh, theme toggle)
 
-### Migration Notes
-- **Database Migration Required** (PostgreSQL users):
-  ```bash
-  migrate -path ./migrations -database "$THEMIS_DB_URL" up
-  ```
-  Migration 003 creates the `conversation_eval_results` table.
-- **SQLite Auto-Migration**: In-memory SQLite automatically includes the new table — no action needed.
-- Existing `POST /api/v1/evaluate` behavior is unchanged; event judges continue to work as before.
+### Documentation
+- `docs/testing/batch-tests.md`: added Conversations Input Format section, updated all `evaluate` references to `evaluate-events`, added `resources/conversations.jsonl` reference to test cases
+- `README.md`: added `/evaluate` slash command section with setup instructions for Claude Code and Codex, binary and `configs/` placement guide
+- `README.md`: updated CLI batch processing examples to use `evaluate-events`
 
-## [1.2.0] - 2026-03-18
+## [1.1.0] - 2026-03-18
 
 ### Added
 - **Conversation Grouping**: Track multi-turn agent interactions across all entry points
@@ -251,5 +240,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added warning that binaries must run from extracted directory for configs/judges.yaml discovery
 
 [Unreleased]: https://github.com/Terminus-Lab/themis/compare/v1.2.0...HEAD
-[1.2.0]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...v1.2.0
+[1.2.0]: https://github.com/Terminus-Lab/themis/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Terminus-Lab/themis/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Terminus-Lab/themis/releases/tag/v1.0.0
