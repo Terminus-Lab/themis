@@ -99,7 +99,7 @@ The API server provides both a web dashboard and REST endpoints for evaluation a
 **Start the server:**
 ```bash
 ./themis-api
-# or with streaming: STREAMING_ENABLED=true ./themis-api
+# or with streaming: EVENTS_STREAMING_ENABLED=true ./themis-api
 ```
 
 **Web Dashboard**: Navigate to `http://localhost:18082` for real-time visualization of evaluation results with filtering, pagination, and detailed inspection.

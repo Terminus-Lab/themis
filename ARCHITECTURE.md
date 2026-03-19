@@ -138,7 +138,7 @@ Multi-turn agent interactions grouped by `conversation_id`:
 
 **Two modes:**
 - **API only** (default): HTTP endpoints only
-- **API + Streaming** (`STREAMING_ENABLED=true`): HTTP + Redis consumer in same process
+- **API + Streaming** (`EVENTS_STREAMING_ENABLED=true`): HTTP + Redis consumer in same process
 
 **Endpoints:**
 - `POST /api/v1/evaluate` - Full pipeline evaluation

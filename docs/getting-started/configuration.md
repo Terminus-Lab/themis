@@ -53,7 +53,7 @@ THEMIS_DB_URL=postgresql://...              # Required if IN_MEMORY_DB=false
 ### Streaming (optional)
 
 ```env
-STREAMING_ENABLED=false
+EVENTS_STREAMING_ENABLED=false
 REDIS_ADDR=localhost:6379
 REDIS_STREAM_KEY=eval-events
 REDIS_CONSUMER_GROUP=eval-group

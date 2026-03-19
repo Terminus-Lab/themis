@@ -484,7 +484,7 @@ Skip this gate if Redis is not configured in your environment.
 
 ```bash
 # Requires Redis running locally
-STREAMING_ENABLED=true REDIS_ADDR=localhost:6379 ./bin/themis-api &
+EVENTS_STREAMING_ENABLED=true REDIS_ADDR=localhost:6379 ./bin/themis-api &
 PID=$!
 sleep 3
 
@@ -560,7 +560,7 @@ Run through this table. Every row must be checked before tagging.
 | 8 | Precheck toggle | `ENABLE_PRECHECK=false` | Valid response, no stage 1 entries | |
 | 9 | Dashboard UI | Open `http://localhost:18082` | All tabs load, drill-down works | |
 | 10 | Docker build | `docker build` | Image builds, MCP tools listed | |
-| 11 | Streaming | `STREAMING_ENABLED=true` (if Redis) | Health ok, streamed events stored | |
+| 11 | Streaming | `EVENTS_STREAMING_ENABLED=true` (if Redis) | Health ok, streamed events stored | |
 | 12 | goreleaser | `goreleaser build --snapshot` | All 6 platform targets built | |
 
 > Gate 6.4 (Judge accuracy, Kendall's τ ≥ 0.3) is the only hard blocker that cannot be bypassed. All other failures indicate bugs that must be fixed before release.

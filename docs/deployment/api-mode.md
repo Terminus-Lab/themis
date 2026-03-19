@@ -9,7 +9,7 @@ HTTP REST server for synchronous, on-demand evaluation.
 # Expected: "INFO Starting Themis Server address=:18082"
 
 # With Redis streaming:
-STREAMING_ENABLED=true ./bin/themis-api
+EVENTS_STREAMING_ENABLED=true ./bin/themis-api
 ```
 
 ---
@@ -240,7 +240,7 @@ EVAL_AGENT_API_PORT=18084 ./bin/themis-api &
 
 ### Unified API + Streaming
 ```bash
-STREAMING_ENABLED=true ./bin/themis-api
+EVENTS_STREAMING_ENABLED=true ./bin/themis-api
 ```
 One process handles both HTTP requests and Redis stream consumption.
 
