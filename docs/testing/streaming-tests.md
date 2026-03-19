@@ -46,7 +46,7 @@ Add streaming configuration to your `.env`:
 
 ```env
 # Enable streaming consumer alongside API
-STREAMING_ENABLED=true
+EVENTS_STREAMING_ENABLED=true
 
 # Redis Stream Configuration
 REDIS_ADDR=localhost:6379
@@ -72,7 +72,7 @@ go build -o bin/themis-producer cmd/producer/main.go
 ### Start the Consumer
 
 ```bash
-STREAMING_ENABLED=true ./bin/themis-api
+EVENTS_STREAMING_ENABLED=true ./bin/themis-api
 ```
 
 **Expected output:**
@@ -323,13 +323,13 @@ Start 3 consumer instances:
 
 ```bash
 # Consumer 1
-STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 EVAL_AGENT_API_PORT=18082 ./themis-api &
+EVENTS_STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-1 EVAL_AGENT_API_PORT=18082 ./themis-api &
 
 # Consumer 2
-STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 ./themis-api &
+EVENTS_STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-2 EVAL_AGENT_API_PORT=18083 ./themis-api &
 
 # Consumer 3
-STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-3 EVAL_AGENT_API_PORT=18084 ./themis-api &
+EVENTS_STREAMING_ENABLED=true REDIS_CONSUMER_NAME=worker-3 EVAL_AGENT_API_PORT=18084 ./themis-api &
 ```
 
 **Send 30 messages:**

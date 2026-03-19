@@ -76,11 +76,17 @@ func main() {
 		Handler: mux,
 	}
 
-	// ===== Streaming Consumer =====
-	streamingEnabled := env.GetBool("STREAMING_ENABLED", false)
-	if streamingEnabled {
-		startStreamingConsumer(ctx, deps, &logger)
-	} else {
+	// ===== Streaming Consumers =====
+	eventsStreamingEnabled := env.GetBool("EVENTS_STREAMING_ENABLED", false)
+	convStreamingEnabled := env.GetBool("CONVERSATION_STREAMING_ENABLED", false)
+
+	if eventsStreamingEnabled {
+		startEventsStreamingConsumer(ctx, deps, &logger)
+	}
+	if convStreamingEnabled {
+		startConversationStreamingConsumer(ctx, deps, &logger)
+	}
+	if !eventsStreamingEnabled && !convStreamingEnabled {
 		logger.Info().Msg("Streaming mode disabled - API only")
 	}
 
@@ -88,7 +94,8 @@ func main() {
 	go func() {
 		logger.Info().
 			Str("address", addr).
-			Bool("streaming_enabled", streamingEnabled).
+			Bool("events_streaming_enabled", eventsStreamingEnabled).
+			Bool("conversation_streaming_enabled", convStreamingEnabled).
 			Msg("Starting Themis Server")
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -111,8 +118,8 @@ func main() {
 	logger.Info().Msg("Themis server stopped")
 }
 
-func startStreamingConsumer(ctx context.Context, deps *setup.Dependencies, logger *zerolog.Logger) {
-	logger.Info().Msg("Streaming mode enabled - starting Redis consumer")
+func startEventsStreamingConsumer(ctx context.Context, deps *setup.Dependencies, logger *zerolog.Logger) {
+	logger.Info().Msg("Events streaming enabled - starting Redis consumer")
 
 	streamCfg := &stream.StreamConfig{
 		Provider: env.GetString("STREAM_PROVIDER", "redis"),
@@ -127,10 +134,10 @@ func startStreamingConsumer(ctx context.Context, deps *setup.Dependencies, logge
 
 	consumer, err := stream.NewStreamConsumer(ctx, streamCfg, deps.Executor, logger)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("Failed to create stream consumer")
+		logger.Fatal().Err(err).Msg("Failed to create events stream consumer")
 	}
 	if err := consumer.Setup(ctx); err != nil {
-		logger.Fatal().Err(err).Msg("Failed to setup consumer")
+		logger.Fatal().Err(err).Msg("Failed to setup events consumer")
 	}
 
 	go func() {
@@ -138,10 +145,49 @@ func startStreamingConsumer(ctx context.Context, deps *setup.Dependencies, logge
 			Str("stream_key", streamCfg.RedisConfig.Stream).
 			Str("consumer_group", streamCfg.RedisConfig.Group).
 			Str("consumer_name", streamCfg.RedisConfig.ConsumerName).
-			Msg("Starting streaming consumer")
+			Msg("Events streaming consumer started")
 
 		if err := consumer.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			logger.Error().Err(err).Msg("Streaming consumer stopped with error")
+			logger.Error().Err(err).Msg("Events streaming consumer stopped with error")
+		}
+	}()
+}
+
+func startConversationStreamingConsumer(ctx context.Context, deps *setup.Dependencies, logger *zerolog.Logger) {
+	if deps.ConversationExecutor == nil {
+		logger.Fatal().Msg("Conversation streaming enabled but no conversation judges configured - check judges.yaml")
+	}
+
+	logger.Info().Msg("Conversation streaming enabled - starting Redis consumer")
+
+	streamCfg := &stream.StreamConfig{
+		Provider: env.GetString("STREAM_PROVIDER", "redis"),
+		RedisConfig: redis.NewRedisStreamConfig(
+			env.GetString("REDIS_ADDR", "localhost:6379"),
+			env.GetString("REDIS_PASSWORD", ""),
+			env.GetString("REDIS_CONVERSATION_STREAM_KEY", "eval-conversations"),
+			env.GetString("REDIS_CONVERSATION_GROUP", "eval-conv-group"),
+			env.GetString("REDIS_CONSUMER_NAME", env.GetHostname("consumer-1")),
+		),
+	}
+
+	consumer, err := stream.NewConversationStreamConsumer(ctx, streamCfg, deps.ConversationExecutor, logger)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to create conversation stream consumer")
+	}
+	if err := consumer.Setup(ctx); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to setup conversation consumer")
+	}
+
+	go func() {
+		logger.Info().
+			Str("stream_key", streamCfg.RedisConfig.Stream).
+			Str("consumer_group", streamCfg.RedisConfig.Group).
+			Str("consumer_name", streamCfg.RedisConfig.ConsumerName).
+			Msg("Conversation streaming consumer started")
+
+		if err := consumer.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error().Err(err).Msg("Conversation streaming consumer stopped with error")
 		}
 	}()
 }

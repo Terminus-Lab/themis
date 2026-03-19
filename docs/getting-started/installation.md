@@ -8,7 +8,7 @@
 - Azure OpenAI (for Azure-hosted GPT)
 
 **Optional:**
-- Redis — for streaming mode (`STREAMING_ENABLED=true`)
+- Redis — for streaming mode (`EVENTS_STREAMING_ENABLED=true`)
 - PostgreSQL — for persistent storage (SQLite is used by default)
 - Docker — for containerized MCP deployment
 - Go 1.24+ — only needed if building from source

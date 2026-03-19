@@ -19,8 +19,14 @@ Module path: `github.com/Terminus-Lab/themis`
 # API server (HTTP endpoints only)
 go run cmd/api/main.go
 
-# API + Streaming (unified service - recommended for production)
-STREAMING_ENABLED=true go run cmd/api/main.go
+# API + Events streaming
+EVENTS_STREAMING_ENABLED=true go run cmd/api/main.go
+
+# API + Conversation streaming
+CONVERSATION_STREAMING_ENABLED=true go run cmd/api/main.go
+
+# API + both streaming consumers
+EVENTS_STREAMING_ENABLED=true CONVERSATION_STREAMING_ENABLED=true go run cmd/api/main.go
 
 # Batch evaluation (offline datasets)
 go run cmd/batch/main.go evaluate -input dataset.jsonl -output results.jsonl
@@ -125,7 +131,7 @@ Four entry points sharing core evaluation logic:
    - CORS enabled, structured logging
    - **Can run in two modes:**
      - **API only** (default): HTTP endpoints only
-     - **API + Streaming** (`STREAMING_ENABLED=true`): HTTP + Redis consumer in same process
+     - **API + Streaming** (`EVENTS_STREAMING_ENABLED=true`): HTTP + Redis consumer in same process
    - **Unified mode benefits:**
      - Single deployment for both HTTP and streaming
      - Manual testing via API while streaming runs
@@ -190,12 +196,15 @@ JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2: weighted_average, harmonic
 IN_MEMORY_DB=true                  # Use SQLite in-memory (default: true) - zero setup required
 THEMIS_DB_URL=                     # PostgreSQL connection string (only if IN_MEMORY_DB=false)
 
-# Streaming configuration (unified API + Streaming mode)
-STREAMING_ENABLED=false            # Enable Redis stream consumer alongside API
+# Streaming configuration
+EVENTS_STREAMING_ENABLED=false            # Enable Redis consumer for single-turn event evaluations
+CONVERSATION_STREAMING_ENABLED=false      # Enable Redis consumer for full conversation evaluations
 REDIS_ADDR=localhost:6379          # Redis server address
 REDIS_PASSWORD=                    # Redis password (optional)
-REDIS_STREAM_KEY=eval-events       # Redis stream key
-REDIS_CONSUMER_GROUP=eval-group    # Consumer group name
+REDIS_STREAM_KEY=eval-events       # Events stream key
+REDIS_CONSUMER_GROUP=eval-group    # Events consumer group
+REDIS_CONVERSATION_STREAM_KEY=eval-conversations  # Conversations stream key
+REDIS_CONVERSATION_GROUP=eval-conv-group          # Conversations consumer group
 REDIS_CONSUMER_NAME=consumer-1     # Unique consumer name (for horizontal scaling)
 
 # CLI configuration

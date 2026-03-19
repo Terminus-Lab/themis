@@ -364,7 +364,7 @@ themis calibrate \
 go run cmd/api/main.go
 
 # Or streaming mode
-STREAMING_ENABLED=true go run cmd/api/main.go
+EVENTS_STREAMING_ENABLED=true go run cmd/api/main.go
 
 # Step 5: Monitor in production
 # Dashboard: http://localhost:18082
