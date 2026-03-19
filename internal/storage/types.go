@@ -74,3 +74,16 @@ type ConversationSample struct {
 	AgentVersion   string
 	Turns          []TurnSample
 }
+
+// ConversationEvaluation is the DB record for a conversation-level evaluation.
+type ConversationEvaluation struct {
+	ID             string
+	ConversationID string
+	AgentName      string
+	AgentVersion   string
+	TurnCount      int
+	Confidence     float64
+	Verdict        string
+	StageScores    []models.StageResult
+	CreatedAt      time.Time
+}

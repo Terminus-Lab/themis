@@ -126,6 +126,40 @@ curl -X POST .../api/v1/validation/sample/events/download \
 ./bin/themis-cli validate-events -i annotated-events.jsonl -c 0.3
 ```
 
+### POST `/api/v1/evaluate/conversation`
+
+Evaluate a full multi-turn conversation using conversation-scoped judges (`scope: conversation` in `judges.yaml`).
+
+```bash
+curl -X POST http://localhost:18082/api/v1/evaluate/conversation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "conversation_id": "conv-001",
+    "agent": {"name": "my-agent", "version": "1.0"},
+    "turns": [
+      {"turn_index": 1, "user_query": "What is Python?", "answer": "A programming language."},
+      {"turn_index": 2, "user_query": "Is it hard to learn?", "answer": "No, it is beginner-friendly."}
+    ]
+  }'
+```
+
+Response:
+```json
+{
+  "conversation_id": "conv-001",
+  "agent_name": "my-agent",
+  "agent_version": "1.0",
+  "turn_count": 2,
+  "verdict": "pass",
+  "confidence": 0.87,
+  "stages": [{"name": "conversation-flow-judge", "score": 0.87, "reason": "...", "weight": 1.0}]
+}
+```
+
+Returns `503` if no `scope: conversation` judges are configured in `configs/judges.yaml`.
+
+---
+
 ### POST `/api/v1/validation/sample/conversations/download`
 
 Sample a percentage of whole conversations for conversation-level human annotation. Picks N distinct `conversation_id`s and returns all their turns grouped — never returns a partial conversation.

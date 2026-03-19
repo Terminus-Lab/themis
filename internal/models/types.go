@@ -50,17 +50,45 @@ type EvaluationRequest struct {
 	HumanAnnotation *string     `json:"human_annotation,omitempty"` // Optional: for validation mode
 }
 
+// ConversationTurn represents a single turn in a multi-turn conversation.
+type ConversationTurn struct {
+	TurnIndex      int    `json:"turn_index"`
+	UserQuery      string `json:"user_query"`
+	Answer         string `json:"answer"`
+	Context        string `json:"context,omitempty"`
+	ExpectedOutput string `json:"expected_output,omitempty"`
+}
+
+// ConversationEvaluationRequest is the API input for conversation-level evaluation.
+type ConversationEvaluationRequest struct {
+	ConversationID string             `json:"conversation_id"` // Required
+	Agent          Agent              `json:"agent"`
+	Turns          []ConversationTurn `json:"turns"` // All turns in the conversation
+}
+
+// ConversationEvaluationResult is the output of conversation-level evaluation.
+type ConversationEvaluationResult struct {
+	ConversationID string        `json:"conversation_id"`
+	AgentName      string        `json:"agent_name"`
+	AgentVersion   string        `json:"agent_version"`
+	TurnCount      int           `json:"turn_count"`
+	Verdict        Verdict       `json:"verdict"`
+	Confidence     float64       `json:"confidence"`
+	Stages         []StageResult `json:"stages"`
+}
+
 // Normalized internal object
 type EvaluationContext struct {
-	RequestID      string    `json:"request_id" jsonschema:"required,description=Unique event identifier"`
-	ConversationID string    `json:"conversation_id" jsonschema:"required,description=Unique conversation identifier"`
-	AgentName      string    `json:"agent_name,omitempty" jsonschema:"description=Name of the agent being evaluated"`
-	AgentVersion   string    `json:"agent_version,omitempty" jsonschema:"description=Version of the agent being evaluated"`
-	Query          string    `json:"user_query" jsonschema:"required,description=User's original query"`
-	Context        string    `json:"context,omitempty" jsonschema:"description=Optional context or retrieved documents"`
-	Answer         string    `json:"answer" jsonschema:"required,description=Agent response to evaluate"`
-	ExpectedOutput string    `json:"expected_output,omitempty" jsonschema:"description=Optional ground truth for correctness evaluation"`
-	CreatedAt      time.Time `json:"created_at" jsonschema:"description=Time when the evaluation context was created"`
+	RequestID      string             `json:"request_id" jsonschema:"required,description=Unique event identifier"`
+	ConversationID string             `json:"conversation_id" jsonschema:"required,description=Unique conversation identifier"`
+	AgentName      string             `json:"agent_name,omitempty" jsonschema:"description=Name of the agent being evaluated"`
+	AgentVersion   string             `json:"agent_version,omitempty" jsonschema:"description=Version of the agent being evaluated"`
+	Query          string             `json:"user_query" jsonschema:"required,description=User's original query"`
+	Context        string             `json:"context,omitempty" jsonschema:"description=Optional context or retrieved documents"`
+	Answer         string             `json:"answer" jsonschema:"required,description=Agent response to evaluate"`
+	ExpectedOutput string             `json:"expected_output,omitempty" jsonschema:"description=Optional ground truth for correctness evaluation"`
+	Turns          []ConversationTurn `json:"turns,omitempty" jsonschema:"description=For conversation-level evaluation: all turns in the conversation"`
+	CreatedAt      time.Time          `json:"created_at" jsonschema:"description=Time when the evaluation context was created"`
 }
 
 // One evaluator's output

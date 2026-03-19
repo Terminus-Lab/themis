@@ -18,23 +18,26 @@ import (
 )
 
 type Handler struct {
-	executor      *executor.Executor
-	judgeExecutor *executor.JudgeExecutor
-	repository    storage.Repository
-	logger        *zerolog.Logger
+	executor             *executor.Executor
+	judgeExecutor        *executor.JudgeExecutor
+	conversationExecutor *executor.ConversationExecutor
+	repository           storage.Repository
+	logger               *zerolog.Logger
 }
 
 func NewHandler(
 	executor *executor.Executor,
 	judgeExecutor *executor.JudgeExecutor,
+	conversationExecutor *executor.ConversationExecutor,
 	repository storage.Repository,
 	logger *zerolog.Logger,
 ) *Handler {
 	return &Handler{
-		executor:      executor,
-		judgeExecutor: judgeExecutor,
-		repository:    repository,
-		logger:        logger,
+		executor:             executor,
+		judgeExecutor:        judgeExecutor,
+		conversationExecutor: conversationExecutor,
+		repository:           repository,
+		logger:               logger,
 	}
 }
 
@@ -519,6 +522,75 @@ func (h *Handler) parseSampleRequest(req *restful.Request, resp *restful.Respons
 		MinSize:    sampleReq.MinSize,
 		MaxSize:    sampleReq.MaxSize,
 	}, true
+}
+
+// POST /api/v1/evaluate/conversation
+func (h *Handler) EvaluateConversation(req *restful.Request, resp *restful.Response) {
+	if h.conversationExecutor == nil {
+		_ = resp.WriteHeaderAndEntity(http.StatusServiceUnavailable, map[string]string{
+			"error": "conversation evaluation is not available: no conversation-scoped judges configured",
+		})
+		return
+	}
+
+	var evalReq ConversationEvalRequest
+	if err := req.ReadEntity(&evalReq); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to parse conversation evaluation request body")
+		middleware.HandleError(resp, err, http.StatusBadRequest)
+		return
+	}
+
+	if evalReq.ConversationID == "" {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{"error": "conversation_id is required"})
+		return
+	}
+	if len(evalReq.Turns) == 0 {
+		_ = resp.WriteHeaderAndEntity(http.StatusBadRequest, map[string]string{"error": "turns must not be empty"})
+		return
+	}
+
+	turns := make([]models.ConversationTurn, len(evalReq.Turns))
+	for i, t := range evalReq.Turns {
+		turns[i] = models.ConversationTurn{
+			TurnIndex:      t.TurnIndex,
+			UserQuery:      t.UserQuery,
+			Answer:         t.Answer,
+			Context:        t.Context,
+			ExpectedOutput: t.ExpectedOutput,
+		}
+	}
+
+	convReq := models.ConversationEvaluationRequest{
+		ConversationID: evalReq.ConversationID,
+		Agent: models.Agent{
+			Name:    evalReq.Agent.Name,
+			Version: evalReq.Agent.Version,
+		},
+		Turns: turns,
+	}
+
+	h.logger.Info().
+		Str("conversation_id", convReq.ConversationID).
+		Int("turn_count", len(convReq.Turns)).
+		Msg("Start conversation evaluation")
+
+	ctx := req.Request.Context()
+	result := h.conversationExecutor.Execute(ctx, convReq)
+
+	stageScores := make([]StageScore, len(result.Stages))
+	for i, s := range result.Stages {
+		stageScores[i] = StageScore{Name: s.Name, Score: s.Score, Reason: s.Reason, Weight: s.Weight}
+	}
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, ConversationEvalResponse{
+		ConversationID: result.ConversationID,
+		AgentName:      result.AgentName,
+		AgentVersion:   result.AgentVersion,
+		TurnCount:      result.TurnCount,
+		Verdict:        string(result.Verdict),
+		Confidence:     result.Confidence,
+		Stages:         stageScores,
+	})
 }
 
 // Health handler GET API /api/v1/health

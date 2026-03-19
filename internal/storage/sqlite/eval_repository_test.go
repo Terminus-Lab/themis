@@ -704,3 +704,61 @@ func TestGetConversation_ListMultipleConversations(t *testing.T) {
 		t.Errorf("Expected 2 conversations, got %d", len(results))
 	}
 }
+
+func TestConversationEvalRepository_StoreAndGet(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+	ctx := context.Background()
+
+	eval := &storage.ConversationEvaluation{
+		ID:             "conv-eval-001",
+		ConversationID: "conv-abc",
+		AgentName:      "my-agent",
+		AgentVersion:   "2.0",
+		TurnCount:      3,
+		Confidence:     0.88,
+		Verdict:        "pass",
+		StageScores: []models.StageResult{
+			{Name: "conversation-flow-judge", Score: 0.88, Reason: "Good flow", Weight: 1.0},
+		},
+	}
+
+	if err := repo.StoreConversationEval(ctx, eval); err != nil {
+		t.Fatalf("StoreConversationEval failed: %v", err)
+	}
+
+	got, err := repo.GetConversationEval(ctx, "conv-abc")
+	if err != nil {
+		t.Fatalf("GetConversationEval failed: %v", err)
+	}
+	if got.ID != eval.ID {
+		t.Errorf("ID mismatch: got %s, want %s", got.ID, eval.ID)
+	}
+	if got.TurnCount != eval.TurnCount {
+		t.Errorf("TurnCount mismatch: got %d, want %d", got.TurnCount, eval.TurnCount)
+	}
+	if got.Verdict != eval.Verdict {
+		t.Errorf("Verdict mismatch: got %s, want %s", got.Verdict, eval.Verdict)
+	}
+	if got.Confidence != eval.Confidence {
+		t.Errorf("Confidence mismatch: got %.3f, want %.3f", got.Confidence, eval.Confidence)
+	}
+	if len(got.StageScores) != 1 || got.StageScores[0].Name != "conversation-flow-judge" {
+		t.Errorf("StageScores mismatch: %+v", got.StageScores)
+	}
+}
+
+func TestConversationEvalRepository_GetNotFound(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+	ctx := context.Background()
+
+	_, err := repo.GetConversationEval(ctx, "nonexistent-conversation")
+	if err == nil {
+		t.Error("Expected error for nonexistent conversation, got nil")
+	}
+}

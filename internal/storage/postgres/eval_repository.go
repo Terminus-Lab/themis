@@ -434,6 +434,71 @@ func (e *EvalRepository) HealthMetrics(ctx context.Context, since time.Time) (st
 	return data, nil
 }
 
+func (e *EvalRepository) StoreConversationEval(ctx context.Context, eval *storage.ConversationEvaluation) error {
+	query := `
+		INSERT INTO conversation_eval_results
+		(id, conversation_id, agent_name, agent_version, turn_count, confidence, verdict, stage_scores)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+
+	stageScoresJSON, err := json.Marshal(eval.StageScores)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stage scores: %w", err)
+	}
+
+	_, err = e.db.Pool.Exec(ctx, query,
+		eval.ID,
+		eval.ConversationID,
+		eval.AgentName,
+		eval.AgentVersion,
+		eval.TurnCount,
+		eval.Confidence,
+		eval.Verdict,
+		stageScoresJSON,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert conversation eval: %w", err)
+	}
+
+	e.logger.Info().
+		Str("conversation_id", eval.ConversationID).
+		Msg("Stored conversation eval in PostgreSQL")
+	return nil
+}
+
+func (e *EvalRepository) GetConversationEval(ctx context.Context, conversationID string) (*storage.ConversationEvaluation, error) {
+	query := `
+		SELECT id, conversation_id, agent_name, agent_version, turn_count, confidence, verdict, stage_scores
+		FROM conversation_eval_results
+		WHERE conversation_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	var eval storage.ConversationEvaluation
+	var stageScoresJSON []byte
+
+	err := e.db.Pool.QueryRow(ctx, query, conversationID).Scan(
+		&eval.ID,
+		&eval.ConversationID,
+		&eval.AgentName,
+		&eval.AgentVersion,
+		&eval.TurnCount,
+		&eval.Confidence,
+		&eval.Verdict,
+		&stageScoresJSON,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query conversation eval: %w", err)
+	}
+
+	if err := json.Unmarshal(stageScoresJSON, &eval.StageScores); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal stage_scores: %w", err)
+	}
+
+	return &eval, nil
+}
+
 func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.ConversationSummary, error) {
 	query := `
           SELECT

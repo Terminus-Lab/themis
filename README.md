@@ -41,6 +41,7 @@ For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployme
 ## Features
 
 - **Two-Stage Evaluation Pipeline**: Fast prechecks + parallel LLM judges with early exit optimization
+- **Conversation Evaluation**: Multi-turn conversation evaluation with `scope: conversation` judges via `POST /api/v1/evaluate/conversation`
 - **Statistical Validation**: Kendall's τ correlation against human annotations to ensure judge accuracy
 - **Multi-Provider LLM Support**: Mix AWS Bedrock, Azure OpenAI, and OpenAI Platform models in same pipeline
 - **YAML-Driven Configuration**: Edit judge prompts and models without code changes
@@ -104,7 +105,8 @@ The API server provides both a web dashboard and REST endpoints for evaluation a
 **Web Dashboard**: Navigate to `http://localhost:18082` for real-time visualization of evaluation results with filtering, pagination, and detailed inspection.
 
 **API Endpoints:**
-- `POST /api/v1/evaluate` - Full pipeline evaluation
+- `POST /api/v1/evaluate` - Full pipeline evaluation (single turn)
+- `POST /api/v1/evaluate/conversation` - Multi-turn conversation evaluation (all turns at once)
 - `POST /api/v1/evaluate/judge/{name}` - Single judge evaluation
 - `GET /api/v1/results` - Query results with filters (agent_name, verdict, limit, offset)
 - `GET /api/v1/results/{event_id}` - Get specific result by ID
@@ -163,12 +165,18 @@ For setup details and advanced usage, see [MCP Test Cases](docs/testing/mcp-test
 
 Process datasets offline with concurrent workers and validate judge accuracy against human annotations.
 
-**Basic evaluation:**
+**Event evaluation (single-turn):**
 ```bash
 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 # scale workers via env var
 THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
 ```
+
+**Conversation evaluation (multi-turn):**
+```bash
+./bin/themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl
+```
+Input: JSONL with `conversation_id`, `agent`, and `turns[]` per line.
 
 **Validation mode** (Kendall's τ):
 ```bash

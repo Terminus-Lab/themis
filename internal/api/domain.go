@@ -206,3 +206,33 @@ func toConversationSummaryDTOs(summaries []storage.ConversationSummary) []Conver
 	}
 	return dtos
 }
+
+// ConversationEvalRequest is the API request body for POST /api/v1/evaluate/conversation.
+type ConversationEvalRequest struct {
+	ConversationID string `json:"conversation_id"` // Required
+	Agent          struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"agent"`
+	Turns []ConversationTurnRequest `json:"turns"` // Required: at least 1 turn
+}
+
+// ConversationTurnRequest is a single turn in a ConversationEvalRequest.
+type ConversationTurnRequest struct {
+	TurnIndex      int    `json:"turn_index"`
+	UserQuery      string `json:"user_query"`
+	Answer         string `json:"answer"`
+	Context        string `json:"context,omitempty"`
+	ExpectedOutput string `json:"expected_output,omitempty"`
+}
+
+// ConversationEvalResponse is the API response for POST /api/v1/evaluate/conversation.
+type ConversationEvalResponse struct {
+	ConversationID string       `json:"conversation_id"`
+	AgentName      string       `json:"agent_name"`
+	AgentVersion   string       `json:"agent_version"`
+	TurnCount      int          `json:"turn_count"`
+	Verdict        string       `json:"verdict"`
+	Confidence     float64      `json:"confidence"`
+	Stages         []StageScore `json:"stages"`
+}

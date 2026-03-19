@@ -451,6 +451,71 @@ func (e *EvalRepository) SampleConversations(ctx context.Context, filters storag
 	return result, nil
 }
 
+func (e *EvalRepository) StoreConversationEval(ctx context.Context, eval *storage.ConversationEvaluation) error {
+	query := `
+		INSERT INTO conversation_eval_results
+		(id, conversation_id, agent_name, agent_version, turn_count, confidence, verdict, stage_scores, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+	`
+
+	stageScoresJSON, err := json.Marshal(eval.StageScores)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stage scores: %w", err)
+	}
+
+	_, err = e.db.client.ExecContext(ctx, query,
+		eval.ID,
+		eval.ConversationID,
+		eval.AgentName,
+		eval.AgentVersion,
+		eval.TurnCount,
+		eval.Confidence,
+		eval.Verdict,
+		string(stageScoresJSON),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert conversation eval: %w", err)
+	}
+
+	e.logger.Info().
+		Str("conversation_id", eval.ConversationID).
+		Msg("Stored conversation eval in SQLite")
+	return nil
+}
+
+func (e *EvalRepository) GetConversationEval(ctx context.Context, conversationID string) (*storage.ConversationEvaluation, error) {
+	query := `
+		SELECT id, conversation_id, agent_name, agent_version, turn_count, confidence, verdict, stage_scores
+		FROM conversation_eval_results
+		WHERE conversation_id = ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	var eval storage.ConversationEvaluation
+	var stageScoresJSON string
+
+	err := e.db.client.QueryRowContext(ctx, query, conversationID).Scan(
+		&eval.ID,
+		&eval.ConversationID,
+		&eval.AgentName,
+		&eval.AgentVersion,
+		&eval.TurnCount,
+		&eval.Confidence,
+		&eval.Verdict,
+		&stageScoresJSON,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query conversation eval: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(stageScoresJSON), &eval.StageScores); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal stage_scores: %w", err)
+	}
+
+	return &eval, nil
+}
+
 func joinStrings(ss []string, sep string) string {
 	result := ""
 	for i, s := range ss {

@@ -34,6 +34,10 @@ var (
 	// Validate command flags
 	corrThreshold float64
 	saveToDb      bool
+
+	// Evaluate-conversations command flags
+	convInput  string
+	convOutput string
 )
 
 func main() {
@@ -116,6 +120,22 @@ Examples:
 	RunE:         runValidateEvents,
 }
 
+// evaluateConversationsCmd processes conversation JSONL files through conversation-scoped judges.
+var evaluateConversationsCmd = &cobra.Command{
+	Use:   "evaluate-conversations",
+	Short: "Evaluate full conversations using conversation-scoped judges",
+	Long: `Evaluate multi-turn conversations from a JSONL input file.
+
+Each line must be a conversation object with 'conversation_id', 'agent', and 'turns' fields.
+Runs conversation-scoped judges (scope: conversation in configs/judges.yaml).
+
+Examples:
+  # Basic conversation evaluation
+  themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl`,
+	SilenceUsage: true,
+	RunE:         runEvaluateConversations,
+}
+
 // validateConversationsCmd validates conversation-level judge accuracy against human annotations.
 var validateConversationsCmd = &cobra.Command{
 	Use:   "validate-conversations",
@@ -128,7 +148,7 @@ Input file must contain full conversations with 'human_annotation' field per con
 Note: requires conversation-scoped judges configured in configs/judges.yaml.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf("conversation evaluation not yet implemented — coming in next release")
+		return fmt.Errorf("conversation validation not yet implemented — coming in next release")
 	},
 }
 
@@ -167,8 +187,16 @@ func init() {
 
 	_ = validateConversationsCmd.MarkFlagRequired("input")
 
+	// evaluate-conversations command flags
+	evaluateConversationsCmd.Flags().StringVarP(&convInput, "input", "i", "", "Input JSONL file path (conversation records)")
+	evaluateConversationsCmd.Flags().StringVarP(&convOutput, "output", "o", "", "Output JSONL file path")
+	evaluateConversationsCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
+
+	_ = evaluateConversationsCmd.MarkFlagRequired("input")
+
 	// Add commands to root
 	rootCmd.AddCommand(evaluateCmd)
+	rootCmd.AddCommand(evaluateConversationsCmd)
 	rootCmd.AddCommand(validateEventsCmd)
 	rootCmd.AddCommand(validateConversationsCmd)
 	rootCmd.AddCommand(versionCmd)
@@ -378,6 +406,93 @@ func runValidateEvents(cmd *cobra.Command, args []string) error {
 
 	// Validate and output
 	return validateAndOutput(pairs, corrThreshold)
+}
+
+func runEvaluateConversations(cmd *cobra.Command, args []string) error {
+	startTime := time.Now()
+
+	ctx, cancel := setupGracefulShutdown()
+	defer cancel()
+
+	cfg := setup.LoadConfig()
+	if !saveToDb {
+		cfg.InMemoryDB = true
+	} else {
+		if cfg.InMemoryDB {
+			log.Fatal().Msg("--save-to-db requires IN_MEMORY_DB=false in your .env")
+		}
+		if cfg.DBConnectionString == "" {
+			log.Fatal().Msg("--save-to-db requires THEMIS_DB_URL to be set in your .env")
+		}
+	}
+
+	deps, err := setup.Wire(ctx, cfg, &log.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to wire dependencies: %w", err)
+	}
+
+	if deps.ConversationExecutor == nil {
+		return fmt.Errorf("conversation evaluation is unavailable: no conversation-scoped judges found in configs/judges.yaml")
+	}
+
+	// Open input file
+	f, err := os.Open(convInput)
+	if err != nil {
+		return fmt.Errorf("failed to open input file %q: %w", convInput, err)
+	}
+	defer closeFile(f)
+	log.Info().Str("file", convInput).Msg("Reading conversation input file")
+
+	reader := batch.NewConversationReader(f, deps.Logger)
+	recordsCh := reader.ReadAll(ctx)
+
+	var records []batch.ConversationInputRecord
+	for record := range recordsCh {
+		records = append(records, record)
+	}
+
+	log.Info().Int("total", len(records)).Msg("Conversation input file parsed")
+
+	// Open output file (or stdout if not specified)
+	var outFile io.WriteCloser
+	if convOutput == "" {
+		outFile = os.Stdout
+	} else {
+		f2, err := os.Create(convOutput)
+		if err != nil {
+			return fmt.Errorf("failed to create output file %q: %w", convOutput, err)
+		}
+		defer closeFile(f2)
+		outFile = f2
+		log.Info().Str("file", convOutput).Msg("Writing to output file")
+	}
+
+	workers := getWorkersFromEnv()
+	log.Info().Int("workers", workers).Msg("Starting conversation worker pool")
+
+	processor := batch.NewConversationProcessor(deps.ConversationExecutor, workers, deps.Logger)
+	results := processor.Process(ctx, records)
+
+	encoder := json.NewEncoder(outFile)
+	successCount := 0
+	errorCount := 0
+
+	for result := range results {
+		if err := encoder.Encode(result); err != nil {
+			log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to write result")
+			errorCount++
+		} else {
+			successCount++
+		}
+	}
+
+	log.Info().
+		Int("success", successCount).
+		Int("errors", errorCount).
+		Dur("duration", time.Since(startTime)).
+		Msg("Conversation evaluation complete")
+
+	return nil
 }
 
 // Helper functions

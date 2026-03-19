@@ -22,6 +22,20 @@ const schema = `
   CREATE INDEX IF NOT EXISTS idx_verdict ON eval_results(verdict, created_at);
   CREATE INDEX IF NOT EXISTS idx_created_at ON eval_results(created_at);
   CREATE INDEX IF NOT EXISTS idx_conversation_id ON eval_results(conversation_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS conversation_eval_results (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      agent_name TEXT NOT NULL,
+      agent_version TEXT NOT NULL,
+      turn_count INTEGER NOT NULL,
+      confidence REAL NOT NULL,
+      verdict TEXT NOT NULL,
+      stage_scores TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_conv_eval_conversation_id ON conversation_eval_results(conversation_id, created_at);
 `
 
 func (d *DB) InitSchema(ctx context.Context) error {

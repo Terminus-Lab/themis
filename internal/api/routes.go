@@ -36,6 +36,17 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
 	ws.
+		Route(ws.POST("/evaluate/conversation").
+			To(handler.EvaluateConversation).
+			Doc("Evaluate a full multi-turn conversation using conversation-scoped judges").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"evaluate"}).
+			Reads(ConversationEvalRequest{}).
+			Writes(ConversationEvalResponse{}).
+			Returns(200, "OK", ConversationEvalResponse{}).
+			Returns(400, "Bad Request", middleware.ErrorResponse{}).
+			Returns(503, "Service Unavailable", middleware.ErrorResponse{}))
+
+	ws.
 		Route(ws.POST("/evaluate/judge/{judge_name}").
 			To(handler.EvaluateSingleJudge).
 			Doc("Evaluate with a single judge").

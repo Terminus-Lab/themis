@@ -517,8 +517,8 @@ func setupTestAPI(t *testing.T) *restful.Container {
 	exec := executor.NewExecutor(stageRunner, repository, judgeRunner, agg, 0.2, &logger)
 	judgeExec := executor.NewJudgeExecutor(judgeFactory, repository, &logger)
 
-	// API Handler
-	handler := api.NewHandler(exec, judgeExec, repository, &logger)
+	// API Handler (no conversation executor in integration tests)
+	handler := api.NewHandler(exec, judgeExec, nil, repository, &logger)
 
 	// REST Container
 	container := restful.NewContainer()
@@ -1297,13 +1297,170 @@ func TestAPI_ConversationIsolation(t *testing.T) {
 	t.Logf("Conversation isolation: conv-a has %d turns, conv-b has %d turns", responseA.TurnCount, responseB.TurnCount)
 }
 
+/*
+TEST: EvaluateConversation - nil executor returns 503
+Purpose: Verify that if no conversation-scoped judges are configured the endpoint returns 503
+*/
+func TestAPI_EvaluateConversation_NilExecutor(t *testing.T) {
+	logger := zerolog.Nop()
+	repo := setupTestRepository(t, &logger)
+	handler := api.NewHandler(nil, nil, nil, repo, &logger)
+	container := restful.NewContainer()
+	api.RegisterRoutes(container, handler)
+
+	body := `{"conversation_id":"conv-x","turns":[{"turn_index":0,"user_query":"Q","answer":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+/*
+TEST: EvaluateConversation - missing conversation_id returns 400
+*/
+func TestAPI_EvaluateConversation_MissingConversationID(t *testing.T) {
+	// We need a non-nil conversationExecutor so the handler reaches the validation logic.
+	// Use a real executor wired with an empty judge runner stub.
+	container, _ := setupConversationContainer(t)
+
+	body := `{"turns":[{"turn_index":0,"user_query":"Q","answer":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var errResp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to parse error response: %v", err)
+	}
+	if errResp["error"] != "conversation_id is required" {
+		t.Errorf("expected error='conversation_id is required', got '%s'", errResp["error"])
+	}
+}
+
+/*
+TEST: EvaluateConversation - empty turns returns 400
+*/
+func TestAPI_EvaluateConversation_EmptyTurns(t *testing.T) {
+	container, _ := setupConversationContainer(t)
+
+	body := `{"conversation_id":"conv-y","turns":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var errResp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to parse error response: %v", err)
+	}
+	if errResp["error"] != "turns must not be empty" {
+		t.Errorf("expected error='turns must not be empty', got '%s'", errResp["error"])
+	}
+}
+
+/*
+TEST: EvaluateConversation - valid request returns 200 with conversation result
+*/
+func TestAPI_EvaluateConversation_ValidRequest(t *testing.T) {
+	container, _ := setupConversationContainer(t)
+
+	body := `{
+		"conversation_id": "conv-valid-001",
+		"agent": {"name": "test-agent", "version": "1.0"},
+		"turns": [
+			{"turn_index": 0, "user_query": "What is Go?", "answer": "Go is a programming language."},
+			{"turn_index": 1, "user_query": "Who made it?", "answer": "Go was created at Google."}
+		]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp api.ConversationEvalResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.ConversationID != "conv-valid-001" {
+		t.Errorf("expected conversation_id=conv-valid-001, got %s", resp.ConversationID)
+	}
+	if resp.TurnCount != 2 {
+		t.Errorf("expected turn_count=2, got %d", resp.TurnCount)
+	}
+	if resp.AgentName != "test-agent" {
+		t.Errorf("expected agent_name=test-agent, got %s", resp.AgentName)
+	}
+	if resp.Verdict == "" {
+		t.Error("expected verdict to be set")
+	}
+	if resp.Confidence < 0 || resp.Confidence > 1 {
+		t.Errorf("expected confidence in [0,1], got %.2f", resp.Confidence)
+	}
+
+	t.Logf("EvaluateConversation: conversation_id=%s, turn_count=%d, verdict=%s, confidence=%.3f",
+		resp.ConversationID, resp.TurnCount, resp.Verdict, resp.Confidence)
+}
+
+// setupConversationContainer builds a minimal API with a real ConversationExecutor backed by
+// stub (empty) judge runner and the aggregator. No LLM calls needed.
+func setupConversationContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
+	t.Helper()
+	logger := zerolog.Nop()
+	repo := setupTestRepository(t, &logger)
+
+	// Use a stub judge runner that returns an empty slice (no conversation judges configured)
+	stubRunner := &stubJudgeRunner{}
+
+	agg := aggregator.NewAggregator(
+		aggregator.Weights{PreChecks: 0.3, LLMJudge: 0.7},
+		aggregator.VerdictThresholds{Pass: 0.8, Review: 0.5},
+		aggregator.AggregationConfig{EnablePrecheck: false, JudgeAggregationMethod: models.MethodWeightedAverage},
+		&logger,
+	)
+
+	convExec := executor.NewConversationExecutor(stubRunner, repo, agg, &logger)
+	handler := api.NewHandler(nil, nil, convExec, repo, &logger)
+	container := restful.NewContainer()
+	api.RegisterRoutes(container, handler)
+	return container, repo
+}
+
+// stubJudgeRunner returns empty results (simulates no conversation judges configured).
+type stubJudgeRunner struct{}
+
+func (s *stubJudgeRunner) Run(_ context.Context, _ models.EvaluationContext) []models.StageResult {
+	return []models.StageResult{}
+}
+
 // setupSamplingContainer builds a minimal API container backed by an in-memory SQLite repo.
 // No LLM clients needed — used for validation/sampling endpoint tests only.
 func setupSamplingContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
 	t.Helper()
 	logger := zerolog.Nop()
 	repo := setupTestRepository(t, &logger)
-	handler := api.NewHandler(nil, nil, repo, &logger)
+	handler := api.NewHandler(nil, nil, nil, repo, &logger)
 	container := restful.NewContainer()
 	api.RegisterRoutes(container, handler)
 	return container, repo

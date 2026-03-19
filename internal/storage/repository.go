@@ -22,4 +22,7 @@ type Repository interface {
 	Sample(ctx context.Context, filters SampleFilters) ([]Evaluation, error)
 	SampleConversations(ctx context.Context, filters SampleFilters) ([]ConversationSample, error)
 	HealthMetrics(ctx context.Context, since time.Time) (HealthMetricsData, error)
+
+	StoreConversationEval(ctx context.Context, eval *ConversationEvaluation) error
+	GetConversationEval(ctx context.Context, conversationID string) (*ConversationEvaluation, error)
 }

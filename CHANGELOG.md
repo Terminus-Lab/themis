@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-18
+
+### Added
+- **Conversation Evaluation Pipeline**: Full multi-turn conversation evaluation using conversation-scoped judges
+  - New `POST /api/v1/evaluate/conversation` API endpoint accepting `conversation_id`, `agent`, and `turns[]`
+  - New `ConversationTurn` and `ConversationEvaluationRequest` models for multi-turn input
+  - New `ConversationEvaluationResult` response with per-conversation `verdict`, `confidence`, and `stages`
+  - New `conversation-flow` judge (`scope: conversation`) in `configs/judges.yaml` — evaluates flow, context-awareness, and consistency across all turns
+  - New `conversation_eval_results` DB table (migration 003) for persistent storage of conversation evaluations
+  - New `ConversationExecutor` (`internal/executor/conversation_executor.go`) orchestrating conversation-scoped judges
+  - Returns 503 if no conversation-scoped judges are configured
+- **Judge Scope Configuration**: Judges now declare a `scope` field in `configs/judges.yaml`
+  - `scope: event` (default) — existing single-turn judges; used by `POST /api/v1/evaluate`
+  - `scope: conversation` — new multi-turn judges; used by `POST /api/v1/evaluate/conversation`
+  - Weight normalization is now per-scope group (event judges normalize independently from conversation judges)
+- **CLI `evaluate-conversations` subcommand**: Batch conversation evaluation
+  - `themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl`
+  - Input: JSONL with one `ConversationEvaluationRequest` per line (`conversation_id`, `agent`, `turns[]`)
+  - Output: JSONL with one `ConversationEvaluationResult` per line
+  - Concurrent worker pool via `THEMIS_BATCH_WORKERS` env var
+  - Returns error if no conversation-scoped judges are configured
+
+### Changed
+- `JudgePool.BuildFromConfig()` now filters only `scope: event` judges (backward-compatible — existing judges without `scope` default to event)
+- `JudgePool.BuildConversationJudgesFromConfig()` added for `scope: conversation` judges
+- `EvaluationContext` gains `Turns []ConversationTurn` field (populated for conversation evaluation, nil for event evaluation)
+- `api.NewHandler()` signature gains `ConversationExecutor` parameter
+- `setup.Dependencies` gains `ConversationExecutor` field
+
+### Migration Notes
+- **Database Migration Required** (PostgreSQL users):
+  ```bash
+  migrate -path ./migrations -database "$THEMIS_DB_URL" up
+  ```
+  Migration 003 creates the `conversation_eval_results` table.
+- **SQLite Auto-Migration**: In-memory SQLite automatically includes the new table — no action needed.
+- Existing `POST /api/v1/evaluate` behavior is unchanged; event judges continue to work as before.
+
 ## [1.2.0] - 2026-03-18
 
 ### Added

@@ -47,7 +47,11 @@ func (a *Aggregator) Aggregate(id string, stage1 []models.StageResult, stage2 []
 		Stages: append(stage1, stage2...),
 	}
 
-	if len(stage1) == 0 || len(stage2) == 0 {
+	if len(stage2) == 0 {
+		result.Verdict = models.VerdictFail
+		return result
+	}
+	if a.Config.EnablePrecheck && len(stage1) == 0 {
 		result.Verdict = models.VerdictFail
 		return result
 	}

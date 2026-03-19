@@ -33,6 +33,7 @@ type JudgeConfiguration struct {
 	Name                   string       `yaml:"name"`
 	Enabled                bool         `yaml:"enabled"`
 	Description            string       `yaml:"description"`
+	Scope                  string       `yaml:"scope,omitempty"`           // "event" (default) or "conversation"
 	RequiresContext        bool         `yaml:"requires_context"`
 	RequiresExpectedOutput bool         `yaml:"requires_expected_output"` // For correctness evaluation
 	Prompt                 string       `yaml:"prompt"`
@@ -173,14 +174,24 @@ func applyDefaults(cfg *JudgesConfig) {
 }
 
 func normalizeJudgeWeights(cfg *JudgesConfig) {
-	// Count enabled judges and sum existing weights
+	// Normalize weights independently per scope group ("event" and "conversation").
+	// Judges with no scope default to "event".
+	normalizeForScope(cfg, "event")
+	normalizeForScope(cfg, "conversation")
+}
+
+func normalizeForScope(cfg *JudgesConfig, scope string) {
 	enabledCount := 0
 	weightSum := 0.0
 	hasAnyWeight := false
 
 	for i := range cfg.Judges.Evaluators {
 		judge := &cfg.Judges.Evaluators[i]
-		if judge.Enabled {
+		judgeScope := judge.Scope
+		if judgeScope == "" {
+			judgeScope = "event"
+		}
+		if judge.Enabled && judgeScope == scope {
 			enabledCount++
 			if judge.Weight > 0 {
 				hasAnyWeight = true
@@ -193,24 +204,32 @@ func normalizeJudgeWeights(cfg *JudgesConfig) {
 		return
 	}
 
-	// If no weights specified, distribute equally
+	// If no weights specified, distribute equally within this scope
 	if !hasAnyWeight {
 		defaultWeight := 1.0 / float64(enabledCount)
 		for i := range cfg.Judges.Evaluators {
 			judge := &cfg.Judges.Evaluators[i]
-			if judge.Enabled {
+			judgeScope := judge.Scope
+			if judgeScope == "" {
+				judgeScope = "event"
+			}
+			if judge.Enabled && judgeScope == scope {
 				judge.Weight = defaultWeight
 			}
 		}
 		return
 	}
 
-	// If weights don't sum to ~1.0, normalize them
+	// If weights don't sum to ~1.0 within this scope, normalize them
 	const tolerance = 0.001
 	if weightSum < (1.0-tolerance) || weightSum > (1.0+tolerance) {
 		for i := range cfg.Judges.Evaluators {
 			judge := &cfg.Judges.Evaluators[i]
-			if judge.Enabled && judge.Weight > 0 {
+			judgeScope := judge.Scope
+			if judgeScope == "" {
+				judgeScope = "event"
+			}
+			if judge.Enabled && judgeScope == scope && judge.Weight > 0 {
 				judge.Weight = judge.Weight / weightSum
 			}
 		}
