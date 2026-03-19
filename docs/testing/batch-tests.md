@@ -56,12 +56,27 @@ EARLY_EXIT_THRESHOLD=0.2
 |----------|------|---------|-------------|
 | `THEMIS_BATCH_WORKERS` | int | 5 | Number of concurrent evaluation workers |
 
-**Validate Command Flags:**
+**Evaluate-Conversations Command Flags:**
+| Flag | Shorthand | Type | Default | Description |
+|------|-----------|------|---------|-------------|
+| `--input` | `-i` | string | **required** | Input JSONL file path (conversation records) |
+| `--output` | `-o` | string | — | Output JSONL file path (required unless `-f summary`) |
+| `--format` | `-f` | string | "jsonl" | Output format: "jsonl" or "summary" |
+| `--summary` | `-s` | string | "" | Optional separate summary file alongside JSONL output |
+| `--save-to-db` | `-d` | bool | false | Save results to database |
+
+**Validate-Events Command Flags:**
 | Flag | Shorthand | Type | Default | Description |
 |------|-----------|------|---------|-------------|
 | `--input` | `-i` | string | **required** | Input file path with human annotations |
 | `--correlation-threshold` | `-c` | float | 0.3 | Kendall's tau threshold for validation |
 | `--save-to-db` | `-d` | bool | false | Save results to database |
+
+**Validate-Conversations Command Flags:**
+| Flag | Shorthand | Type | Default | Description |
+|------|-----------|------|---------|-------------|
+| `--input` | `-i` | string | **required** | Input file path with human annotations |
+| `--correlation-threshold` | `-c` | float | 0.3 | Kendall's tau threshold for validation |
 
 ## Input Format (JSONL)
 
@@ -233,9 +248,9 @@ THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate -i dataset-100.jsonl -o result
 
 **Command:**
 ```bash
-./bin/themis-cli validate -i resources/annotated_sample.jsonl -c 0.3
+./bin/themis-cli validate-events -i resources/annotated_sample.jsonl -c 0.3
 # or with long flags:
-./bin/themis-cli validate --input resources/annotated_sample.jsonl --correlation-threshold 0.3
+./bin/themis-cli validate-events --input resources/annotated_sample.jsonl --correlation-threshold 0.3
 ```
 
 **Expected Output (if correlation passes):**
@@ -298,7 +313,7 @@ INFO Safe to evaluate full dataset with these judge prompts
 # Create test file with missing human_annotation
 echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
 
-./bin/themis-cli validate -i test-no-annotation.jsonl
+./bin/themis-cli validate-events -i test-no-annotation.jsonl
 ```
 
 **Expected:**
@@ -316,8 +331,8 @@ This dataset tests a well-calibrated judge with clear category boundaries and st
 
 **Command:**
 ```bash
-go run cmd/batch/main.go validate \
-  -i resources/validation_test_dataset.jsonl \
+go run cmd/batch/main.go validate-events \
+  -i resources/validation_success_dataset.jsonl \
   -c 0.3
 ```
 
@@ -380,7 +395,7 @@ This dataset contains:
 
 **Command:**
 ```bash
-go run cmd/batch/main.go validate \
+go run cmd/batch/main.go validate-events \
   -i resources/validation_failed_dataset.jsonl \
   -c 0.3
 ```
@@ -494,6 +509,52 @@ jq -s 'group_by(.conversation_id) | map({conversation: .[0].conversation_id, tur
 #   {"conversation": "conv-b", "turns": 1, "avg_confidence": 0.92}
 # ]
 ```
+
+### Test Case 10.1: Evaluate Conversations — Summary Format
+
+**Command (stdout):**
+```bash
+./bin/themis-cli evaluate-conversations \
+  -i resources/conversations.jsonl \
+  -f summary
+```
+
+**Command (file):**
+```bash
+./bin/themis-cli evaluate-conversations \
+  -i resources/conversations.jsonl \
+  -f summary \
+  -o conv-summary.json
+```
+
+**Expected Output:**
+```json
+{
+  "total": 2,
+  "pass_count": 1,
+  "fail_count": 0,
+  "review_count": 1,
+  "avg_confidence": 0.74,
+  "avg_turn_count": 2.5
+}
+```
+
+Note: `avg_turn_count` is unique to conversation summaries — it is not present in event-level summaries.
+
+### Test Case 10.2: Evaluate Conversations — JSONL + Separate Summary
+
+**Command:**
+```bash
+./bin/themis-cli evaluate-conversations \
+  -i resources/conversations.jsonl \
+  -o conv-results.jsonl \
+  -s conv-summary.json
+```
+
+**Expected:**
+- `conv-results.jsonl` contains one JSON line per conversation with `conversation_id`, `verdict`, `confidence`, `turn_count`, `stages`
+- `conv-summary.json` contains aggregate stats: `total`, `pass_count`, `fail_count`, `review_count`, `avg_confidence`, `avg_turn_count`
+- Both files created successfully
 
 ### Test Case 11: Worker Pool Scaling
 

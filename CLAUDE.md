@@ -336,7 +336,7 @@ Before deploying judge changes to production:
 ```bash
 # 1. Collect human annotations for sample dataset (25% recommended)
 # 2. Run validation mode
-go run cmd/batch/main.go validate \
+go run cmd/batch/main.go validate-events \
   -input human_annotated_sample.jsonl \
   -correlation-threshold 0.3
 

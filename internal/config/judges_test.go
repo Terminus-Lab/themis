@@ -615,6 +615,124 @@ judges:
 	})
 }
 
+func TestNormalizeJudgeWeights_PerScope(t *testing.T) {
+	cfg := &JudgesConfig{
+		Judges: Judges{
+			DefaultModel: ModelConfig{MaxTokens: 256, ModelFamily: "openai", ModelID: "gpt-4o-mini"},
+			Evaluators: []JudgeConfiguration{
+				{Name: "relevance", Enabled: true, Scope: "event", Weight: 0.6,
+					Prompt: "Score: {{.Answer}}\n{\"score\": 0.0, \"reason\": \"\"}"},
+				{Name: "coherence", Enabled: true, Scope: "event", Weight: 0.4,
+					Prompt: "Score: {{.Answer}}\n{\"score\": 0.0, \"reason\": \"\"}"},
+				{Name: "conv-flow", Enabled: true, Scope: "conversation", Weight: 1.0,
+					Prompt: "{{range .Turns}}{{.UserQuery}}{{end}}\n{\"score\": 0.0, \"reason\": \"\"}"},
+			},
+		},
+	}
+
+	applyDefaults(cfg)
+
+	// Event judges should sum to 1.0 (already do: 0.6+0.4)
+	eventSum := 0.0
+	convSum := 0.0
+	for _, j := range cfg.Judges.Evaluators {
+		scope := j.Scope
+		if scope == "" {
+			scope = "event"
+		}
+		if scope == "event" && j.Enabled {
+			eventSum += j.Weight
+		}
+		if scope == "conversation" && j.Enabled {
+			convSum += j.Weight
+		}
+	}
+
+	const tol = 0.001
+	if eventSum < 1.0-tol || eventSum > 1.0+tol {
+		t.Errorf("event judge weights should sum to 1.0, got %.4f", eventSum)
+	}
+	if convSum < 1.0-tol || convSum > 1.0+tol {
+		t.Errorf("conversation judge weights should sum to 1.0, got %.4f", convSum)
+	}
+}
+
+func TestNormalizeJudgeWeights_ConversationScopeDefault(t *testing.T) {
+	// Judges without explicit scope should default to event scope
+	cfg := &JudgesConfig{
+		Judges: Judges{
+			DefaultModel: ModelConfig{MaxTokens: 256, ModelFamily: "openai", ModelID: "gpt-4o-mini"},
+			Evaluators: []JudgeConfiguration{
+				{Name: "a", Enabled: true, Scope: "", Weight: 0.5,
+					Prompt: "{{.Answer}}\n{\"score\": 0.0, \"reason\": \"\"}"},
+				{Name: "b", Enabled: true, Scope: "", Weight: 0.5,
+					Prompt: "{{.Answer}}\n{\"score\": 0.0, \"reason\": \"\"}"},
+			},
+		},
+	}
+	applyDefaults(cfg)
+
+	total := 0.0
+	for _, j := range cfg.Judges.Evaluators {
+		total += j.Weight
+	}
+	const tol = 0.001
+	if total < 1.0-tol || total > 1.0+tol {
+		t.Errorf("weights should sum to 1.0, got %.4f", total)
+	}
+}
+
+func TestNormalizeJudgeWeights_ActualConfig(t *testing.T) {
+	// Verify the actual configs/judges.yaml parses correctly with scopes
+	os.Setenv("JUDGES_CONFIG_PATH", "../../configs/judges.yaml")
+	defer os.Unsetenv("JUDGES_CONFIG_PATH")
+
+	cfg, err := LoadJudgesConfig()
+	if err != nil {
+		t.Fatalf("Failed to load actual judges config: %v", err)
+	}
+
+	eventCount := 0
+	convCount := 0
+	eventWeightSum := 0.0
+	convWeightSum := 0.0
+
+	for _, j := range cfg.Judges.Evaluators {
+		if !j.Enabled {
+			continue
+		}
+		scope := j.Scope
+		if scope == "" {
+			scope = "event"
+		}
+		if scope == "event" {
+			eventCount++
+			eventWeightSum += j.Weight
+		} else if scope == "conversation" {
+			convCount++
+			convWeightSum += j.Weight
+		}
+	}
+
+	if eventCount == 0 {
+		t.Error("Expected at least one enabled event-scoped judge")
+	}
+	if convCount == 0 {
+		t.Error("Expected at least one enabled conversation-scoped judge")
+	}
+
+	const tol = 0.001
+	if eventWeightSum < 1.0-tol || eventWeightSum > 1.0+tol {
+		t.Errorf("event judge weights should sum to 1.0, got %.4f (count=%d)", eventWeightSum, eventCount)
+	}
+	if convWeightSum < 1.0-tol || convWeightSum > 1.0+tol {
+		t.Errorf("conversation judge weights should sum to 1.0, got %.4f (count=%d)", convWeightSum, convCount)
+	}
+
+	t.Logf("event judges=%d (sum=%.4f), conversation judges=%d (sum=%.4f)",
+		eventCount, eventWeightSum, convCount, convWeightSum)
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsHelper(s, substr))

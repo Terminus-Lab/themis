@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-18
+
+### Added
+- **Conversation Evaluation Pipeline**: Full multi-turn conversation evaluation using conversation-scoped judges
+  - New `POST /api/v1/evaluate/conversation` API endpoint accepting `conversation_id`, `agent`, and `turns[]`
+  - New `ConversationTurn` and `ConversationEvaluationRequest` models for multi-turn input
+  - New `ConversationEvaluationResult` response with per-conversation `verdict`, `confidence`, and `stages`
+  - New `conversation-flow` judge (`scope: conversation`) in `configs/judges.yaml` — evaluates flow, context-awareness, and consistency across all turns
+  - New `conversation_eval_results` DB table (migration 003) for persistent storage of conversation evaluations
+  - New `ConversationExecutor` (`internal/executor/conversation_executor.go`) orchestrating conversation-scoped judges
+  - Returns 503 if no conversation-scoped judges are configured
+- **Judge Scope Configuration**: Judges now declare a `scope` field in `configs/judges.yaml`
+  - `scope: event` (default) — existing single-turn judges; used by `POST /api/v1/evaluate`
+  - `scope: conversation` — new multi-turn judges; used by `POST /api/v1/evaluate/conversation`
+  - Weight normalization is now per-scope group (event judges normalize independently from conversation judges)
+- **CLI `evaluate-conversations` subcommand**: Batch conversation evaluation
+  - `themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl`
+  - Input: JSONL with one `ConversationEvaluationRequest` per line (`conversation_id`, `agent`, `turns[]`)
+  - Output: JSONL with one `ConversationEvaluationResult` per line
+  - Concurrent worker pool via `THEMIS_BATCH_WORKERS` env var
+  - Returns error if no conversation-scoped judges are configured
+
+### Changed
+- `JudgePool.BuildFromConfig()` now filters only `scope: event` judges (backward-compatible — existing judges without `scope` default to event)
+- `JudgePool.BuildConversationJudgesFromConfig()` added for `scope: conversation` judges
+- `EvaluationContext` gains `Turns []ConversationTurn` field (populated for conversation evaluation, nil for event evaluation)
+- `api.NewHandler()` signature gains `ConversationExecutor` parameter
+- `setup.Dependencies` gains `ConversationExecutor` field
+
+### Migration Notes
+- **Database Migration Required** (PostgreSQL users):
+  ```bash
+  migrate -path ./migrations -database "$THEMIS_DB_URL" up
+  ```
+  Migration 003 creates the `conversation_eval_results` table.
+- **SQLite Auto-Migration**: In-memory SQLite automatically includes the new table — no action needed.
+- Existing `POST /api/v1/evaluate` behavior is unchanged; event judges continue to work as before.
+
 ## [1.2.0] - 2026-03-18
 
 ### Added
@@ -30,11 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accepts `conversation_id`, `agent_name`, `agent_version` in evaluation tools
   - Returns full conversation detail with all turns chronologically
   - In-memory storage by default (data persists during MCP session)
-- **Validation Sample Download API**: `POST /api/v1/validation/sample/download`
-  - Samples evaluation results by date range and percentage for human annotation
-  - Returns JSONL with only interaction data (`event_id`, `agent`, `interaction`) — no Themis scores to avoid annotator bias
-  - Configurable sample size: `percentage` (1-100, default: 25), `min_size`, `max_size`
-  - Random sampling with `ORDER BY RANDOM()` for unbiased selection
+- **Validation Sampling APIs** — two endpoints for human annotation workflows:
+  - `POST /api/v1/validation/sample/events/download` — samples individual event evaluations; returns JSONL with `event_id`, `agent`, `interaction` (no scores)
+  - `POST /api/v1/validation/sample/conversations/download` — samples whole conversations; returns JSONL where each line is a full conversation with all turns grouped, for conversation-level annotation
+  - Both support: `percentage` (1-100, default: 25), `min_size`, `max_size`, date range filters
+  - Conversation sampling picks N distinct `conversation_id`s then returns all their turns — never returns partial conversations
 - **Enhanced Validation Metrics**: Expanded judge validation beyond Kendall's τ
   - **Cohen's Kappa** - Categorical agreement accounting for chance (industry standard)
   - **Confusion Matrix** - Per-class error breakdown showing exactly where judges fail
@@ -57,7 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - DB schema enforces `NOT NULL` constraint
 - **CLI Refactoring**: Migrated batch CLI to Cobra framework with subcommands
   - Renamed binary: `themis-batch` → `themis-cli`
-  - New command structure: `themis-cli evaluate` and `themis-cli validate`
+  - New command structure: `themis-cli evaluate`, `themis-cli validate-events`, `themis-cli validate-conversations`
   - Moved worker count to environment variable: `THEMIS_BATCH_WORKERS` (default: 5)
   - Removed `--dry-run` flag (not useful for AI agents)
   - Removed `--continue-on-error` flag (always continues on errors now)
@@ -70,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Batch CLI: DB persistence disabled by default** (`themis-cli evaluate`)
   - Results are no longer persisted to DB during batch evaluation by default
   - Use `--save-to-db` / `-d` flag to opt in (requires `IN_MEMORY_DB=false` and `THEMIS_DB_URL`)
-  - Validation command (`themis-cli validate`) always uses in-memory DB — results are never persisted
+  - Validation commands (`themis-cli validate-events`, `themis-cli validate-conversations`) always use in-memory DB — results are never persisted
 - **API Response Enhancement**: `GET /api/v1/conversations/{id}` now includes:
   - `avg_confidence` - Average confidence across all turns
   - `agent_name` - Agent name from first turn
@@ -109,7 +147,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `.goreleaser.yaml` release notes
 - Updated CLI command examples to use new subcommand structure
   - `themis-cli evaluate -i input.jsonl -o output.jsonl`
-  - `themis-cli validate -i annotated.jsonl`
+  - `themis-cli validate-events -i annotated-events.jsonl`
+  - `themis-cli validate-conversations -i annotated-conversations.jsonl`
 - Updated `docs/testing/batch-tests.md` with simplified flag reference
   - Removed Test Case 3 (dry-run validation) - no longer supported
   - Updated all examples to use `THEMIS_BATCH_WORKERS` env var

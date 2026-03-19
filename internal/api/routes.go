@@ -36,6 +36,17 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
 	ws.
+		Route(ws.POST("/evaluate/conversation").
+			To(handler.EvaluateConversation).
+			Doc("Evaluate a full multi-turn conversation using conversation-scoped judges").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"evaluate"}).
+			Reads(ConversationEvalRequest{}).
+			Writes(ConversationEvalResponse{}).
+			Returns(200, "OK", ConversationEvalResponse{}).
+			Returns(400, "Bad Request", middleware.ErrorResponse{}).
+			Returns(503, "Service Unavailable", middleware.ErrorResponse{}))
+
+	ws.
 		Route(ws.POST("/evaluate/judge/{judge_name}").
 			To(handler.EvaluateSingleJudge).
 			Doc("Evaluate with a single judge").
@@ -106,9 +117,19 @@ func RegisterRoutes(container *restful.Container, handler *Handler) {
 			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
 
 	ws.
-		Route(ws.POST("/validation/sample/download").
-			To(handler.DownloadSample).
-			Doc("Sample evaluation results from a date range and download as JSONL").
+		Route(ws.POST("/validation/sample/events/download").
+			To(handler.DownloadEventsSample).
+			Doc("Sample individual event evaluations from a date range and download as JSONL for human annotation").
+			Metadata(restfulspec.KeyOpenAPITags, []string{"validation"}).
+			Reads(SampleRequest{}).
+			Returns(200, "OK (JSONL stream)", nil).
+			Returns(400, "Bad Request", middleware.ErrorResponse{}).
+			Returns(500, "Internal Server Error", middleware.ErrorResponse{}))
+
+	ws.
+		Route(ws.POST("/validation/sample/conversations/download").
+			To(handler.DownloadConversationsSample).
+			Doc("Sample whole conversations from a date range and download as JSONL for conversation-level annotation").
 			Metadata(restfulspec.KeyOpenAPITags, []string{"validation"}).
 			Reads(SampleRequest{}).
 			Returns(200, "OK (JSONL stream)", nil).

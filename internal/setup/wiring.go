@@ -40,10 +40,11 @@ type Config struct {
 }
 
 type Dependencies struct {
-	Executor      *executor.Executor
-	JudgeExecutor *executor.JudgeExecutor
-	Repository    storage.Repository
-	Logger        *zerolog.Logger
+	Executor             *executor.Executor
+	JudgeExecutor        *executor.JudgeExecutor
+	ConversationExecutor *executor.ConversationExecutor
+	Repository           storage.Repository
+	Logger               *zerolog.Logger
 }
 
 func LoadConfig() *Config {
@@ -93,8 +94,16 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 		return nil, fmt.Errorf("failed to build judges from config: %w", err)
 	}
 
-	// Create judge runner with config-driven judges
+	// Create judge runner with config-driven event-scoped judges
 	judgeRunner := judge.NewJudgeRunner(judges, logger)
+
+	// Build conversation-scoped judges
+	conversationJudges, err := judgePool.BuildConversationJudgesFromConfig(judgesConfig)
+	if err != nil {
+		// Conversation judges are optional — log a warning but don't fail startup
+		logger.Warn().Err(err).Msg("no conversation-scoped judges found; conversation evaluation will be unavailable")
+		conversationJudges = nil
+	}
 
 	// Judge factory for single judge execution (reuses same judges)
 	judgeFactory := judge.NewJudgeFactory(judges, logger)
@@ -139,11 +148,32 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 	agentExec := executor.NewExecutor(stageRunner, repository, judgeRunner, agg, cfg.EarlyExitThreshold, logger)
 	judgeExec := executor.NewJudgeExecutor(judgeFactory, repository, logger)
 
+	var convExec *executor.ConversationExecutor
+	if len(conversationJudges) > 0 {
+		convJudgeRunner := judge.NewJudgeRunner(conversationJudges, logger)
+		// Conversation evaluation has no prechecks stage — use a dedicated aggregator
+		// with EnablePrecheck=false so stage2 score is used directly as confidence.
+		convAgg := aggregator.NewAggregator(
+			aggregator.Weights{PreChecks: 0, LLMJudge: 1.0},
+			aggregator.VerdictThresholds{
+				Pass:   cfg.VerdictPassThreshold,
+				Review: cfg.VerdictReviewThreshold,
+			},
+			aggregator.AggregationConfig{
+				EnablePrecheck:         false,
+				JudgeAggregationMethod: judgeAggMethod,
+			},
+			logger,
+		)
+		convExec = executor.NewConversationExecutor(convJudgeRunner, repository, convAgg, logger)
+	}
+
 	return &Dependencies{
-		Executor:      agentExec,
-		JudgeExecutor: judgeExec,
-		Repository:    repository,
-		Logger:        logger,
+		Executor:             agentExec,
+		JudgeExecutor:        judgeExec,
+		ConversationExecutor: convExec,
+		Repository:           repository,
+		Logger:               logger,
 	}, nil
 
 }

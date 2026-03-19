@@ -187,7 +187,7 @@ func TestJudgePool_BuildFromConfig_NoEnabledJudges(t *testing.T) {
 		t.Error("Expected error for no enabled judges")
 	}
 
-	expectedMsg := "no enabled judges found in config"
+	expectedMsg := "no enabled event-scoped judges found in config"
 	if err.Error() != expectedMsg {
 		t.Errorf("Expected '%s' error, got: %v", expectedMsg, err)
 	}

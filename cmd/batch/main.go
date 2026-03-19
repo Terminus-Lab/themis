@@ -34,6 +34,12 @@ var (
 	// Validate command flags
 	corrThreshold float64
 	saveToDb      bool
+
+	// Evaluate-conversations command flags
+	convInput   string
+	convOutput  string
+	convFormat  string
+	convSummary string
 )
 
 func main() {
@@ -89,33 +95,69 @@ Examples:
 	RunE:         runEvaluate,
 }
 
-// validateCmd represents the validation command
-var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Validate judge accuracy against human annotations",
-	Long: `Validate LLM judge accuracy using comprehensive metrics.
+// validateEventsCmd validates event-level (single-turn) judge accuracy against human annotations.
+var validateEventsCmd = &cobra.Command{
+	Use:   "validate-events",
+	Short: "Validate event-level judge accuracy against human annotations",
+	Long: `Validate LLM judge accuracy on individual events using comprehensive metrics.
 
 Computes 3 core metrics:
   1. Kendall's tau (PRIMARY) - Pass/fail decision based on rank correlation
   2. Cohen's Kappa (REPORT) - Categorical agreement accounting for chance
   3. Confusion Matrix (DEBUG) - Per-class precision/recall/F1 scores
 
-Requires input file with 'human_annotation' field for each record.
-Pass/fail decision based on Kendall's tau threshold (default: 0.3).
-
-Outputs JSON with all metrics for comprehensive judge evaluation.
+Input file must have 'human_annotation' field on each record (use
+POST /api/v1/validation/sample/events/download to generate the input).
 
 Examples:
   # Validate with default threshold (0.3)
-  themis-cli validate -i annotated.jsonl -s true
+  themis-cli validate-events -i annotated-events.jsonl
 
   # Custom threshold (stricter validation)
-  themis-cli validate -i annotated.jsonl --correlation-threshold 0.5
+  themis-cli validate-events -i annotated-events.jsonl --correlation-threshold 0.5
 
-  # Save validation report to file
-  themis-cli validate -i annotated.jsonl > validation-report.json`,
+  # Redirect report to file
+  themis-cli validate-events -i annotated-events.jsonl > validation-report.json`,
 	SilenceUsage: true,
-	RunE:         runValidate,
+	RunE:         runValidateEvents,
+}
+
+// evaluateConversationsCmd processes conversation JSONL files through conversation-scoped judges.
+var evaluateConversationsCmd = &cobra.Command{
+	Use:   "evaluate-conversations",
+	Short: "Evaluate full conversations using conversation-scoped judges",
+	Long: `Evaluate multi-turn conversations from a JSONL input file.
+
+Each line must be a conversation object with 'conversation_id', 'agent', and 'turns' fields.
+Runs conversation-scoped judges (scope: conversation in configs/judges.yaml).
+
+Examples:
+  # Basic conversation evaluation
+  themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl
+
+  # Summary output only (stdout)
+  themis-cli evaluate-conversations -i conversations.jsonl -f summary
+
+  # JSONL results + separate summary file
+  themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl -s summary.json`,
+	SilenceUsage: true,
+	RunE:         runEvaluateConversations,
+}
+
+// validateConversationsCmd validates conversation-level judge accuracy against human annotations.
+var validateConversationsCmd = &cobra.Command{
+	Use:   "validate-conversations",
+	Short: "Validate conversation-level judge accuracy against human annotations",
+	Long: `Validate LLM judge accuracy on full conversations using comprehensive metrics.
+
+Input file must contain full conversations with 'human_annotation' field per conversation
+(use POST /api/v1/validation/sample/conversations/download to generate the input).
+
+Note: requires conversation-scoped judges configured in configs/judges.yaml.`,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return fmt.Errorf("conversation validation not yet implemented — coming in next release")
+	},
 }
 
 // versionCmd represents the version command
@@ -140,16 +182,33 @@ func init() {
 
 	_ = evaluateCmd.MarkFlagRequired("input")
 
-	// Validate command flags
-	validateCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
-	validateCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
-	validateCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
+	// validate-events command flags
+	validateEventsCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
+	validateEventsCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
+	validateEventsCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
 
-	_ = validateCmd.MarkFlagRequired("input")
+	_ = validateEventsCmd.MarkFlagRequired("input")
+
+	// validate-conversations command flags
+	validateConversationsCmd.Flags().StringVarP(&input, "input", "i", "", "Input file path with human annotations")
+	validateConversationsCmd.Flags().Float64VarP(&corrThreshold, "correlation-threshold", "c", 0.3, "Kendall's tau threshold")
+
+	_ = validateConversationsCmd.MarkFlagRequired("input")
+
+	// evaluate-conversations command flags
+	evaluateConversationsCmd.Flags().StringVarP(&convInput, "input", "i", "", "Input JSONL file path (conversation records)")
+	evaluateConversationsCmd.Flags().StringVarP(&convOutput, "output", "o", "", "Output JSONL file path")
+	evaluateConversationsCmd.Flags().StringVarP(&convFormat, "format", "f", "jsonl", "Output format: jsonl, summary")
+	evaluateConversationsCmd.Flags().StringVarP(&convSummary, "summary", "s", "", "Optional separate summary file")
+	evaluateConversationsCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
+
+	_ = evaluateConversationsCmd.MarkFlagRequired("input")
 
 	// Add commands to root
 	rootCmd.AddCommand(evaluateCmd)
-	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(evaluateConversationsCmd)
+	rootCmd.AddCommand(validateEventsCmd)
+	rootCmd.AddCommand(validateConversationsCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
@@ -267,7 +326,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runValidate(cmd *cobra.Command, args []string) error {
+func runValidateEvents(cmd *cobra.Command, args []string) error {
 	log.Info().
 		Float64("threshold", corrThreshold).
 		Msg("Validation mode enabled")
@@ -357,6 +416,148 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	// Validate and output
 	return validateAndOutput(pairs, corrThreshold)
+}
+
+func runEvaluateConversations(cmd *cobra.Command, args []string) error {
+	startTime := time.Now()
+
+	validFormats := map[string]bool{"jsonl": true, "summary": true}
+	if !validFormats[convFormat] {
+		return fmt.Errorf("invalid format %q. Supported: jsonl, summary", convFormat)
+	}
+
+	ctx, cancel := setupGracefulShutdown()
+	defer cancel()
+
+	cfg := setup.LoadConfig()
+	if !saveToDb {
+		cfg.InMemoryDB = true
+	} else {
+		if cfg.InMemoryDB {
+			log.Fatal().Msg("--save-to-db requires IN_MEMORY_DB=false in your .env")
+		}
+		if cfg.DBConnectionString == "" {
+			log.Fatal().Msg("--save-to-db requires THEMIS_DB_URL to be set in your .env")
+		}
+	}
+
+	deps, err := setup.Wire(ctx, cfg, &log.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to wire dependencies: %w", err)
+	}
+
+	if deps.ConversationExecutor == nil {
+		return fmt.Errorf("conversation evaluation is unavailable: no conversation-scoped judges found in configs/judges.yaml")
+	}
+
+	// Open input file
+	f, err := os.Open(convInput)
+	if err != nil {
+		return fmt.Errorf("failed to open input file %q: %w", convInput, err)
+	}
+	defer closeFile(f)
+	log.Info().Str("file", convInput).Msg("Reading conversation input file")
+
+	reader := batch.NewConversationReader(f, deps.Logger)
+	recordsCh := reader.ReadAll(ctx)
+
+	var records []batch.ConversationInputRecord
+	for record := range recordsCh {
+		records = append(records, record)
+	}
+
+	log.Info().Int("total", len(records)).Msg("Conversation input file parsed")
+
+	if convOutput == "" && convFormat != "summary" {
+		return fmt.Errorf("required flag \"output\" not set")
+	}
+
+	// Open output file (stdout for summary with no -o, file otherwise)
+	var outFile io.WriteCloser
+	if convOutput == "" {
+		outFile = os.Stdout
+	} else {
+		f2, err := os.Create(convOutput)
+		if err != nil {
+			return fmt.Errorf("failed to create output file %q: %w", convOutput, err)
+		}
+		defer closeFile(f2)
+		outFile = f2
+		log.Info().Str("file", convOutput).Msg("Writing to output file")
+	}
+
+	workers := getWorkersFromEnv()
+	log.Info().Int("workers", workers).Msg("Starting conversation worker pool")
+
+	processor := batch.NewConversationProcessor(deps.ConversationExecutor, workers, deps.Logger)
+	results := processor.Process(ctx, records)
+
+	successCount := 0
+	errorCount := 0
+	var allResults []models.ConversationEvaluationResult
+
+	if convFormat == "summary" {
+		summaryWriter := batch.NewConversationSummaryWriter(outFile, deps.Logger)
+		for result := range results {
+			allResults = append(allResults, result)
+			if err := summaryWriter.Write(result); err != nil {
+				log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to add result to summary")
+				errorCount++
+			} else {
+				successCount++
+			}
+		}
+		if err := summaryWriter.Close(); err != nil {
+			return fmt.Errorf("failed to write summary: %w", err)
+		}
+	} else {
+		encoder := json.NewEncoder(outFile)
+		for result := range results {
+			allResults = append(allResults, result)
+			if err := encoder.Encode(result); err != nil {
+				log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to write result")
+				errorCount++
+			} else {
+				successCount++
+			}
+		}
+	}
+
+	if convSummary != "" {
+		if err := writeConversationSummary(convSummary, allResults); err != nil {
+			return fmt.Errorf("failed to write summary: %w", err)
+		}
+	}
+
+	log.Info().
+		Int("success", successCount).
+		Int("errors", errorCount).
+		Dur("duration", time.Since(startTime)).
+		Msg("Conversation evaluation complete")
+
+	return nil
+}
+
+func writeConversationSummary(path string, results []models.ConversationEvaluationResult) error {
+	summaryFile, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer closeFile(summaryFile)
+
+	summaryWriter := batch.NewConversationSummaryWriter(summaryFile, &log.Logger)
+	for _, result := range results {
+		if err := summaryWriter.Write(result); err != nil {
+			log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to add result to summary")
+		}
+	}
+
+	if err := summaryWriter.Close(); err != nil {
+		return err
+	}
+
+	log.Info().Str("file", path).Msg("Conversation summary written")
+	return nil
 }
 
 // Helper functions

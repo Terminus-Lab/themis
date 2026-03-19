@@ -13,14 +13,9 @@ import (
 
 	"github.com/Terminus-Lab/themis/internal/aggregator"
 	"github.com/Terminus-Lab/themis/internal/api"
-	"github.com/Terminus-Lab/themis/internal/config"
 	"github.com/Terminus-Lab/themis/internal/executor"
-	"github.com/Terminus-Lab/themis/internal/judge"
-	"github.com/Terminus-Lab/themis/internal/llm"
-	"github.com/Terminus-Lab/themis/internal/llm/aws"
-	"github.com/Terminus-Lab/themis/internal/llm/azure"
 	"github.com/Terminus-Lab/themis/internal/models"
-	"github.com/Terminus-Lab/themis/internal/prechecks"
+	"github.com/Terminus-Lab/themis/internal/setup"
 	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/emicklei/go-restful/v3"
@@ -73,7 +68,8 @@ func TestAPI_Evaluate_FullPipeline(t *testing.T) {
 
 	// Create evaluation request (happy case: good answer)
 	evalRequest := models.EvaluationRequest{
-		EventID: "test-001",
+		EventID:        "test-001",
+		ConversationID: "conv-test-001",
 		Interaction: models.Interaction{
 			UserQuery: "What is the capital of France?",
 			Answer:    "The capital of France is Paris.",
@@ -163,7 +159,8 @@ func TestAPI_EvaluateSingleJudge_Relevance(t *testing.T) {
 
 	// Create evaluation request
 	evalRequest := models.EvaluationRequest{
-		EventID: "test-002",
+		EventID:        "test-002",
+		ConversationID: "conv-test-002",
 		Interaction: models.Interaction{
 			UserQuery: "What is AI?",
 			Answer:    "AI stands for Artificial Intelligence.",
@@ -221,7 +218,8 @@ func TestAPI_EvaluateSingleJudge_Faithfulness(t *testing.T) {
 
 	// Create evaluation request WITH context
 	evalRequest := models.EvaluationRequest{
-		EventID: "test-003",
+		EventID:        "test-003",
+		ConversationID: "conv-test-003",
 		Interaction: models.Interaction{
 			UserQuery: "What does the documentation say about Redis?",
 			Answer:    "Redis is used for streaming messages.",
@@ -280,7 +278,8 @@ func TestAPI_Evaluate_MultipleJudges(t *testing.T) {
 	judges := []string{"relevance", "coherence", "completeness", "instruction"}
 
 	evalRequest := models.EvaluationRequest{
-		EventID: "test-004",
+		EventID:        "test-004",
+		ConversationID: "conv-test-004",
 		Interaction: models.Interaction{
 			UserQuery: "Explain Go interfaces in one sentence.",
 			Answer:    "Go interfaces define method signatures that types must implement.",
@@ -326,7 +325,8 @@ func TestAPI_Evaluate_EarlyExit(t *testing.T) {
 
 	// Create request with very poor answer (should fail prechecks)
 	evalRequest := models.EvaluationRequest{
-		EventID: "test-005",
+		EventID:        "test-005",
+		ConversationID: "conv-test-005",
 		Interaction: models.Interaction{
 			UserQuery: "Explain quantum computing, its applications, and future implications?",
 			Answer:    "Yes.", // Very short answer = early exit
@@ -381,146 +381,29 @@ func TestAPI_Evaluate_EarlyExit(t *testing.T) {
 		result.Verdict, result.Confidence, len(result.Stages))
 }
 
-// setupTestAPI creates API with REAL LLM client
+// setupTestAPI creates API with REAL LLM clients wired from configs/judges.yaml
 func setupTestAPI(t *testing.T) *restful.Container {
-	// Check if integration flag is set
 	if !*runIntegration {
 		t.Skip("Skipping integration test - use 'go test -integration' to run with real LLM API calls")
 	}
 
-	// Load environment variables
-	err := godotenv.Load("../../.env")
-	if err != nil {
+	if err := godotenv.Load("../../.env"); err != nil {
 		t.Logf("Warning: No .env file found, using environment variables")
 	}
 
-	// Set config path
 	os.Setenv("JUDGES_CONFIG_PATH", "../../configs/judges.yaml")
-
-	// Determine which LLM provider to use
-	provider := os.Getenv("DEFAULT_LLM_PROVIDER")
-	if provider == "" {
-		provider = "bedrock" // Default to Bedrock
-	}
+	os.Setenv("IN_MEMORY_DB", "true") // always isolate integration tests from real DB
 
 	ctx := context.Background()
 	logger := zerolog.Nop()
 
-	// Create REAL LLM client (not mocked!)
-	var registry *llm.LLMClientRegistry
-
-	switch provider {
-	case "bedrock":
-		region := os.Getenv("AWS_REGION")
-		modelID := os.Getenv("DEFAULT_MODEL_ID")
-		modelFamily := os.Getenv("DEFAULT_MODEL_FAMILY")
-		if modelFamily == "" {
-			modelFamily = "anthropic"
-		}
-
-		if region == "" || modelID == "" {
-			t.Skip("Skipping real Bedrock integration - AWS_REGION or DEFAULT_MODEL_ID not set")
-		}
-
-		llmClient, err := aws.NewClient(ctx, region, modelID)
-		if err != nil {
-			t.Fatalf("Failed to create Bedrock client: %v", err)
-		}
-		t.Logf("Using REAL AWS Bedrock: region=%s, model=%s", region, modelID)
-
-		registry = llm.NewLLMClientRegistry(map[llm.LLMFamily]map[string]llm.LLMClient{
-			llm.LLMFamily(modelFamily): {
-				modelID: llmClient,
-			},
-		})
-
-	case "openai":
-		apiKey := os.Getenv("OPEN_AI_KEY")
-		modelID := os.Getenv("OPEN_AI_MODEL_ID")
-		azureEndpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
-		modelFamily := os.Getenv("DEFAULT_MODEL_FAMILY")
-		if modelFamily == "" {
-			modelFamily = "openai"
-		}
-
-		if apiKey == "" || modelID == "" || azureEndpoint == "" {
-			t.Skip("Skipping real Azure OpenAI integration - OPEN_AI_KEY, OPEN_AI_MODEL_ID or AZURE_OPENAI_ENDPOINT not set")
-		}
-
-		llmClient, err := azure.NewClient(apiKey, modelID, azureEndpoint)
-		if err != nil {
-			t.Fatalf("Failed to create Azure OpenAI client: %v", err)
-		}
-		t.Logf("Using REAL Azure OpenAI GPT: model=%s, endpoint=%s", modelID, azureEndpoint)
-
-		registry = llm.NewLLMClientRegistry(map[llm.LLMFamily]map[string]llm.LLMClient{
-			llm.LLMFamily(modelFamily): {
-				modelID: llmClient,
-			},
-		})
-
-	default:
-		t.Fatalf("Unknown LLM provider: %s (expected 'bedrock' or 'openai')", provider)
-	}
-
-	// Judges with REAL LLM client
-	judgesConfig, err := config.LoadJudgesConfig()
+	cfg := setup.LoadConfig()
+	deps, err := setup.Wire(ctx, cfg, &logger)
 	if err != nil {
-		t.Fatalf("Failed to load judges config: %v", err)
+		t.Fatalf("Failed to wire dependencies: %v", err)
 	}
 
-	judgePool := judge.NewJudgePool(registry, &logger)
-	judges, err := judgePool.BuildFromConfig(judgesConfig)
-	if err != nil {
-		t.Fatalf("Failed to build judges: %v", err)
-	}
-
-	judgeRunner := judge.NewJudgeRunner(judges, &logger)
-	judgeFactory := judge.NewJudgeFactory(judges, &logger)
-
-	// Aggregator Config
-	var judgeAggMethod models.AggregationMethod
-	aggMethod := os.Getenv("JUDGE_AGGREGATION_METHOD")
-	if aggMethod == "" {
-		judgeAggMethod = models.MethodWeightedAverage
-	} else {
-		judgeAggMethod = models.AggregationMethod(aggMethod)
-	}
-
-	aggConfig := aggregator.AggregationConfig{
-		EnablePrecheck:         true,
-		JudgeAggregationMethod: judgeAggMethod,
-	}
-
-	// Aggregator
-	agg := aggregator.NewAggregator(
-		aggregator.Weights{
-			PreChecks: 0.3,
-			LLMJudge:  0.7,
-		},
-		aggregator.VerdictThresholds{
-			Pass:   0.8,
-			Review: 0.5,
-		},
-		aggConfig,
-		&logger,
-	)
-
-	// PreChecks
-	stageRunner := prechecks.NewStageRunner([]prechecks.Checker{
-		&prechecks.LengthChecker{},
-		&prechecks.OverlapChecker{MinOverlapThreshold: 0.3},
-		&prechecks.FormatChecker{},
-	})
-	repository := setupTestRepository(t, &logger)
-	// Executors
-	exec := executor.NewExecutor(stageRunner, repository, judgeRunner, agg, 0.2, &logger)
-	judgeExec := executor.NewJudgeExecutor(judgeFactory, repository, &logger)
-
-	// API Handler
-	handler := api.NewHandler(exec, judgeExec, repository, &logger)
-
-	// REST Container
+	handler := api.NewHandler(deps.Executor, deps.JudgeExecutor, deps.ConversationExecutor, deps.Repository, &logger)
 	container := restful.NewContainer()
 	api.RegisterRoutes(container, handler)
 
@@ -588,24 +471,27 @@ func TestAPI_QueryResults_WithData(t *testing.T) {
 	// First, create some evaluation data by running evaluations
 	evaluations := []models.EvaluationRequest{
 		{
-			EventID: "query-test-001",
-			Agent:   models.Agent{Name: "test-agent", Version: "1.0"},
+			EventID:        "query-test-001",
+			ConversationID: "conv-query-001",
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
 			Interaction: models.Interaction{
 				UserQuery: "What is the capital of France?",
 				Answer:    "The capital of France is Paris.",
 			},
 		},
 		{
-			EventID: "query-test-002",
-			Agent:   models.Agent{Name: "test-agent", Version: "1.0"},
+			EventID:        "query-test-002",
+			ConversationID: "conv-query-002",
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
 			Interaction: models.Interaction{
 				UserQuery: "What is AI?",
 				Answer:    "AI stands for Artificial Intelligence.",
 			},
 		},
 		{
-			EventID: "query-test-003",
-			Agent:   models.Agent{Name: "other-agent", Version: "2.0"},
+			EventID:        "query-test-003",
+			ConversationID: "conv-query-003",
+			Agent:          models.Agent{Name: "other-agent", Version: "2.0"},
 			Interaction: models.Interaction{
 				UserQuery: "Explain quantum computing?",
 				Answer:    "Yes.", // Short answer - likely to fail
@@ -682,24 +568,27 @@ func TestAPI_QueryResults_FilterByAgent(t *testing.T) {
 	// Create evaluations with different agents
 	evaluations := []models.EvaluationRequest{
 		{
-			EventID: "filter-test-001",
-			Agent:   models.Agent{Name: "agent-a", Version: "1.0"},
+			EventID:        "filter-test-001",
+			ConversationID: "conv-filter-001",
+			Agent:          models.Agent{Name: "agent-a", Version: "1.0"},
 			Interaction: models.Interaction{
 				UserQuery: "Test query 1",
 				Answer:    "Test answer 1",
 			},
 		},
 		{
-			EventID: "filter-test-002",
-			Agent:   models.Agent{Name: "agent-b", Version: "1.0"},
+			EventID:        "filter-test-002",
+			ConversationID: "conv-filter-002",
+			Agent:          models.Agent{Name: "agent-b", Version: "1.0"},
 			Interaction: models.Interaction{
 				UserQuery: "Test query 2",
 				Answer:    "Test answer 2",
 			},
 		},
 		{
-			EventID: "filter-test-003",
-			Agent:   models.Agent{Name: "agent-a", Version: "2.0"},
+			EventID:        "filter-test-003",
+			ConversationID: "conv-filter-003",
+			Agent:          models.Agent{Name: "agent-a", Version: "2.0"},
 			Interaction: models.Interaction{
 				UserQuery: "Test query 3",
 				Answer:    "Test answer 3",
@@ -751,8 +640,9 @@ func TestAPI_QueryResults_FilterByVerdict(t *testing.T) {
 
 	// Create evaluations that will produce different verdicts
 	goodAnswer := models.EvaluationRequest{
-		EventID: "verdict-test-001",
-		Agent:   models.Agent{Name: "test-agent", Version: "1.0"},
+		EventID:        "verdict-test-001",
+		ConversationID: "conv-verdict-001",
+		Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
 		Interaction: models.Interaction{
 			UserQuery: "What is the capital of France?",
 			Answer:    "The capital of France is Paris, which is located in the north-central part of the country.",
@@ -761,8 +651,9 @@ func TestAPI_QueryResults_FilterByVerdict(t *testing.T) {
 	}
 
 	poorAnswer := models.EvaluationRequest{
-		EventID: "verdict-test-002",
-		Agent:   models.Agent{Name: "test-agent", Version: "1.0"},
+		EventID:        "verdict-test-002",
+		ConversationID: "conv-verdict-002",
+		Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
 		Interaction: models.Interaction{
 			UserQuery: "Explain the theory of relativity, its implications, and applications in modern physics?",
 			Answer:    "Ok.", // Very short - should fail
@@ -815,8 +706,9 @@ func TestAPI_QueryResults_Pagination(t *testing.T) {
 	// Create multiple evaluations
 	for i := 1; i <= 5; i++ {
 		evalReq := models.EvaluationRequest{
-			EventID: fmt.Sprintf("page-test-%d", i),
-			Agent:   models.Agent{Name: "test-agent", Version: "1.0"},
+			EventID:        fmt.Sprintf("page-test-%d", i),
+			ConversationID: fmt.Sprintf("conv-page-%d", i),
+			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
 			Interaction: models.Interaction{
 				UserQuery: "Test query",
 				Answer:    "Test answer with sufficient length to pass prechecks.",
@@ -878,8 +770,9 @@ func TestAPI_GetResultByID(t *testing.T) {
 
 	// Create an evaluation
 	evalReq := models.EvaluationRequest{
-		EventID: "get-by-id-test",
-		Agent:   models.Agent{Name: "test-agent", Version: "1.0"},
+		EventID:        "get-by-id-test",
+		ConversationID: "conv-get-by-id",
+		Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
 		Interaction: models.Interaction{
 			UserQuery: "What is Go?",
 			Answer:    "Go is a programming language created by Google.",
@@ -1297,13 +1190,170 @@ func TestAPI_ConversationIsolation(t *testing.T) {
 	t.Logf("Conversation isolation: conv-a has %d turns, conv-b has %d turns", responseA.TurnCount, responseB.TurnCount)
 }
 
+/*
+TEST: EvaluateConversation - nil executor returns 503
+Purpose: Verify that if no conversation-scoped judges are configured the endpoint returns 503
+*/
+func TestAPI_EvaluateConversation_NilExecutor(t *testing.T) {
+	logger := zerolog.Nop()
+	repo := setupTestRepository(t, &logger)
+	handler := api.NewHandler(nil, nil, nil, repo, &logger)
+	container := restful.NewContainer()
+	api.RegisterRoutes(container, handler)
+
+	body := `{"conversation_id":"conv-x","turns":[{"turn_index":0,"user_query":"Q","answer":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+/*
+TEST: EvaluateConversation - missing conversation_id returns 400
+*/
+func TestAPI_EvaluateConversation_MissingConversationID(t *testing.T) {
+	// We need a non-nil conversationExecutor so the handler reaches the validation logic.
+	// Use a real executor wired with an empty judge runner stub.
+	container, _ := setupConversationContainer(t)
+
+	body := `{"turns":[{"turn_index":0,"user_query":"Q","answer":"A"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var errResp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to parse error response: %v", err)
+	}
+	if errResp["error"] != "conversation_id is required" {
+		t.Errorf("expected error='conversation_id is required', got '%s'", errResp["error"])
+	}
+}
+
+/*
+TEST: EvaluateConversation - empty turns returns 400
+*/
+func TestAPI_EvaluateConversation_EmptyTurns(t *testing.T) {
+	container, _ := setupConversationContainer(t)
+
+	body := `{"conversation_id":"conv-y","turns":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var errResp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to parse error response: %v", err)
+	}
+	if errResp["error"] != "turns must not be empty" {
+		t.Errorf("expected error='turns must not be empty', got '%s'", errResp["error"])
+	}
+}
+
+/*
+TEST: EvaluateConversation - valid request returns 200 with conversation result
+*/
+func TestAPI_EvaluateConversation_ValidRequest(t *testing.T) {
+	container, _ := setupConversationContainer(t)
+
+	body := `{
+		"conversation_id": "conv-valid-001",
+		"agent": {"name": "test-agent", "version": "1.0"},
+		"turns": [
+			{"turn_index": 0, "user_query": "What is Go?", "answer": "Go is a programming language."},
+			{"turn_index": 1, "user_query": "Who made it?", "answer": "Go was created at Google."}
+		]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp api.ConversationEvalResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.ConversationID != "conv-valid-001" {
+		t.Errorf("expected conversation_id=conv-valid-001, got %s", resp.ConversationID)
+	}
+	if resp.TurnCount != 2 {
+		t.Errorf("expected turn_count=2, got %d", resp.TurnCount)
+	}
+	if resp.AgentName != "test-agent" {
+		t.Errorf("expected agent_name=test-agent, got %s", resp.AgentName)
+	}
+	if resp.Verdict == "" {
+		t.Error("expected verdict to be set")
+	}
+	if resp.Confidence < 0 || resp.Confidence > 1 {
+		t.Errorf("expected confidence in [0,1], got %.2f", resp.Confidence)
+	}
+
+	t.Logf("EvaluateConversation: conversation_id=%s, turn_count=%d, verdict=%s, confidence=%.3f",
+		resp.ConversationID, resp.TurnCount, resp.Verdict, resp.Confidence)
+}
+
+// setupConversationContainer builds a minimal API with a real ConversationExecutor backed by
+// stub (empty) judge runner and the aggregator. No LLM calls needed.
+func setupConversationContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
+	t.Helper()
+	logger := zerolog.Nop()
+	repo := setupTestRepository(t, &logger)
+
+	// Use a stub judge runner that returns an empty slice (no conversation judges configured)
+	stubRunner := &stubJudgeRunner{}
+
+	agg := aggregator.NewAggregator(
+		aggregator.Weights{PreChecks: 0.3, LLMJudge: 0.7},
+		aggregator.VerdictThresholds{Pass: 0.8, Review: 0.5},
+		aggregator.AggregationConfig{EnablePrecheck: false, JudgeAggregationMethod: models.MethodWeightedAverage},
+		&logger,
+	)
+
+	convExec := executor.NewConversationExecutor(stubRunner, repo, agg, &logger)
+	handler := api.NewHandler(nil, nil, convExec, repo, &logger)
+	container := restful.NewContainer()
+	api.RegisterRoutes(container, handler)
+	return container, repo
+}
+
+// stubJudgeRunner returns empty results (simulates no conversation judges configured).
+type stubJudgeRunner struct{}
+
+func (s *stubJudgeRunner) Run(_ context.Context, _ models.EvaluationContext) []models.StageResult {
+	return []models.StageResult{}
+}
+
 // setupSamplingContainer builds a minimal API container backed by an in-memory SQLite repo.
 // No LLM clients needed — used for validation/sampling endpoint tests only.
 func setupSamplingContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
 	t.Helper()
 	logger := zerolog.Nop()
 	repo := setupTestRepository(t, &logger)
-	handler := api.NewHandler(nil, nil, repo, &logger)
+	handler := api.NewHandler(nil, nil, nil, repo, &logger)
 	container := restful.NewContainer()
 	api.RegisterRoutes(container, handler)
 	return container, repo
@@ -1336,7 +1386,7 @@ func TestAPI_DownloadSample_ReturnsJSONL(t *testing.T) {
 	seedSamplingData(t, repo, 10)
 
 	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":100}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1368,7 +1418,7 @@ func TestAPI_DownloadSample_EmptyDB(t *testing.T) {
 	container, _ := setupSamplingContainer(t)
 
 	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1389,7 +1439,7 @@ func TestAPI_DownloadSample_MissingDates(t *testing.T) {
 	container, _ := setupSamplingContainer(t)
 
 	body := `{"percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -1407,7 +1457,7 @@ func TestAPI_DownloadSample_InvalidDate(t *testing.T) {
 	container, _ := setupSamplingContainer(t)
 
 	body := `{"start_date":"not-a-date","end_date":"2099-01-01T00:00:00Z","percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/download", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 

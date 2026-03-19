@@ -67,7 +67,7 @@ Note: τ < 1.0 even with zero discordant pairs because ties reduce the denominat
 ## Usage
 
 ```bash
-./bin/themis-cli validate -i human_annotated.jsonl -c 0.3
+./bin/themis-cli validate-events -i human_annotated.jsonl -c 0.3
 ```
 
 Output includes:

@@ -57,3 +57,33 @@ type ConversationDetail struct {
 	AgentVersion   string
 	Turns          []Evaluation
 }
+
+// TurnSample is a single turn in a sampled conversation — no evaluation scores, for human annotation.
+type TurnSample struct {
+	TurnIndex int
+	EventID   string
+	UserQuery string
+	Answer    string
+	Context   string
+}
+
+// ConversationSample groups all turns of a sampled conversation — no evaluation scores, for human annotation.
+type ConversationSample struct {
+	ConversationID string
+	AgentName      string
+	AgentVersion   string
+	Turns          []TurnSample
+}
+
+// ConversationEvaluation is the DB record for a conversation-level evaluation.
+type ConversationEvaluation struct {
+	ID             string
+	ConversationID string
+	AgentName      string
+	AgentVersion   string
+	TurnCount      int
+	Confidence     float64
+	Verdict        string
+	StageScores    []models.StageResult
+	CreatedAt      time.Time
+}

@@ -22,7 +22,17 @@ func NewJudgePool(registry *llm.LLMClientRegistry, logger *zerolog.Logger) *Judg
 	}
 }
 
+// BuildFromConfig builds event-scoped judges (scope: "event" or unset).
 func (p *JudgePool) BuildFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
+	return p.buildFromConfigForScope(cfg, "event")
+}
+
+// BuildConversationJudgesFromConfig builds conversation-scoped judges (scope: "conversation").
+func (p *JudgePool) BuildConversationJudgesFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
+	return p.buildFromConfigForScope(cfg, "conversation")
+}
+
+func (p *JudgePool) buildFromConfigForScope(cfg *config.JudgesConfig, scope string) ([]Judge, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("judges config is nil")
 	}
@@ -35,6 +45,15 @@ func (p *JudgePool) BuildFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
 			p.logger.Info().
 				Str("judge", judgeCfg.Name).
 				Msg("judge disabled in config, skipping")
+			continue
+		}
+
+		// Filter by scope (empty scope defaults to "event")
+		judgeScope := judgeCfg.Scope
+		if judgeScope == "" {
+			judgeScope = "event"
+		}
+		if judgeScope != scope {
 			continue
 		}
 
@@ -56,6 +75,7 @@ func (p *JudgePool) BuildFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
 
 		p.logger.Info().
 			Str("judge", judgeCfg.Name).
+			Str("scope", scope).
 			Str("model_family", judgeCfg.Model.ModelFamily).
 			Str("model_id", judgeCfg.Model.ModelID).
 			Int("max_tokens", judgeCfg.Model.MaxTokens).
@@ -66,11 +86,12 @@ func (p *JudgePool) BuildFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
 	}
 
 	if len(judges) == 0 {
-		return nil, fmt.Errorf("no enabled judges found in config")
+		return nil, fmt.Errorf("no enabled %s-scoped judges found in config", scope)
 	}
 
 	p.logger.Info().
 		Int("total_judges", len(judges)).
+		Str("scope", scope).
 		Msg("judge pool built successfully")
 
 	return judges, nil

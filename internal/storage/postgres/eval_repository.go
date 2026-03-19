@@ -312,6 +312,114 @@ func (e *EvalRepository) Sample(ctx context.Context, filters storage.SampleFilte
 	return evaluations, nil
 }
 
+func (e *EvalRepository) SampleConversations(ctx context.Context, filters storage.SampleFilters) ([]storage.ConversationSample, error) {
+	// Count distinct conversations in date range
+	var total int
+	err := e.db.Pool.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT conversation_id) FROM eval_results WHERE created_at >= $1 AND created_at <= $2`,
+		filters.StartDate, filters.EndDate,
+	).Scan(&total)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count conversations: %w", err)
+	}
+
+	if total == 0 {
+		return []storage.ConversationSample{}, nil
+	}
+
+	// Compute sample size
+	sampleSize := total * filters.Percentage / 100
+	if filters.MinSize > 0 && sampleSize < filters.MinSize {
+		sampleSize = filters.MinSize
+	}
+	if filters.MaxSize > 0 && sampleSize > filters.MaxSize {
+		sampleSize = filters.MaxSize
+	}
+	if sampleSize > total {
+		sampleSize = total
+	}
+	if sampleSize == 0 {
+		sampleSize = 1
+	}
+
+	// Sample N random conversation_ids
+	convRows, err := e.db.Pool.Query(ctx, `
+		SELECT DISTINCT conversation_id
+		FROM eval_results
+		WHERE created_at >= $1 AND created_at <= $2
+		ORDER BY RANDOM()
+		LIMIT $3
+	`, filters.StartDate, filters.EndDate, sampleSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sample conversation IDs: %w", err)
+	}
+	defer convRows.Close()
+
+	var convIDs []string
+	for convRows.Next() {
+		var id string
+		if err := convRows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan conversation_id: %w", err)
+		}
+		convIDs = append(convIDs, id)
+	}
+	if err := convRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating conversation IDs: %w", err)
+	}
+
+	if len(convIDs) == 0 {
+		return []storage.ConversationSample{}, nil
+	}
+
+	// Fetch all turns for sampled conversations using ANY($1)
+	rows, err := e.db.Pool.Query(ctx, `
+		SELECT conversation_id, agent_name, agent_version, event_id, user_query, answer, context
+		FROM eval_results
+		WHERE conversation_id = ANY($1)
+		ORDER BY conversation_id, created_at ASC
+	`, convIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch conversation turns: %w", err)
+	}
+	defer rows.Close()
+
+	convMap := make(map[string]*storage.ConversationSample)
+	turnIndex := make(map[string]int)
+
+	for rows.Next() {
+		var convID, agentName, agentVersion, eventID, userQuery, answer, context string
+		if err := rows.Scan(&convID, &agentName, &agentVersion, &eventID, &userQuery, &answer, &context); err != nil {
+			return nil, fmt.Errorf("failed to scan turn row: %w", err)
+		}
+		if _, exists := convMap[convID]; !exists {
+			convMap[convID] = &storage.ConversationSample{
+				ConversationID: convID,
+				AgentName:      agentName,
+				AgentVersion:   agentVersion,
+			}
+		}
+		turnIndex[convID]++
+		convMap[convID].Turns = append(convMap[convID].Turns, storage.TurnSample{
+			TurnIndex: turnIndex[convID],
+			EventID:   eventID,
+			UserQuery: userQuery,
+			Answer:    answer,
+			Context:   context,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating turn rows: %w", err)
+	}
+
+	result := make([]storage.ConversationSample, 0, len(convIDs))
+	for _, id := range convIDs {
+		if conv, ok := convMap[id]; ok {
+			result = append(result, *conv)
+		}
+	}
+	return result, nil
+}
+
 func (e *EvalRepository) HealthMetrics(ctx context.Context, since time.Time) (storage.HealthMetricsData, error) {
 	row := e.db.Pool.QueryRow(ctx, `
 		SELECT COUNT(*), COALESCE(AVG(confidence), 0)
@@ -324,6 +432,71 @@ func (e *EvalRepository) HealthMetrics(ctx context.Context, since time.Time) (st
 	}
 
 	return data, nil
+}
+
+func (e *EvalRepository) StoreConversationEval(ctx context.Context, eval *storage.ConversationEvaluation) error {
+	query := `
+		INSERT INTO conversation_eval_results
+		(id, conversation_id, agent_name, agent_version, turn_count, confidence, verdict, stage_scores)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+
+	stageScoresJSON, err := json.Marshal(eval.StageScores)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stage scores: %w", err)
+	}
+
+	_, err = e.db.Pool.Exec(ctx, query,
+		eval.ID,
+		eval.ConversationID,
+		eval.AgentName,
+		eval.AgentVersion,
+		eval.TurnCount,
+		eval.Confidence,
+		eval.Verdict,
+		stageScoresJSON,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert conversation eval: %w", err)
+	}
+
+	e.logger.Info().
+		Str("conversation_id", eval.ConversationID).
+		Msg("Stored conversation eval in PostgreSQL")
+	return nil
+}
+
+func (e *EvalRepository) GetConversationEval(ctx context.Context, conversationID string) (*storage.ConversationEvaluation, error) {
+	query := `
+		SELECT id, conversation_id, agent_name, agent_version, turn_count, confidence, verdict, stage_scores
+		FROM conversation_eval_results
+		WHERE conversation_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	var eval storage.ConversationEvaluation
+	var stageScoresJSON []byte
+
+	err := e.db.Pool.QueryRow(ctx, query, conversationID).Scan(
+		&eval.ID,
+		&eval.ConversationID,
+		&eval.AgentName,
+		&eval.AgentVersion,
+		&eval.TurnCount,
+		&eval.Confidence,
+		&eval.Verdict,
+		&stageScoresJSON,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query conversation eval: %w", err)
+	}
+
+	if err := json.Unmarshal(stageScoresJSON, &eval.StageScores); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal stage_scores: %w", err)
+	}
+
+	return &eval, nil
 }
 
 func (e *EvalRepository) ListConversations(ctx context.Context) ([]storage.ConversationSummary, error) {

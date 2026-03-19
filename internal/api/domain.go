@@ -82,9 +82,18 @@ type HealthMetricsResponse struct {
 	AvgConfidence    float64 `json:"avg_confidence"`
 }
 
-// SampleRecord is the JSONL record format for the sample download.
-// It contains only interaction data for human annotation — no Themis evaluation results.
-type SampleRecord struct {
+// SampleRequest is the shared request body for both sampling endpoints.
+type SampleRequest struct {
+	StartDate  string `json:"start_date" description:"Start of date range (RFC3339, e.g. 2026-01-01T00:00:00Z)"`
+	EndDate    string `json:"end_date" description:"End of date range (RFC3339, e.g. 2026-03-31T23:59:59Z)"`
+	Percentage int    `json:"percentage" description:"Percentage of records to sample (1-100, default: 25)"`
+	MinSize    int    `json:"min_size,omitempty" description:"Minimum sample size (0 = no minimum)"`
+	MaxSize    int    `json:"max_size,omitempty" description:"Maximum sample size (0 = no maximum)"`
+}
+
+// EventSampleRecord is the JSONL record for POST /api/v1/validation/sample/events/download.
+// Contains only interaction data — no evaluation scores, to avoid annotator bias.
+type EventSampleRecord struct {
 	EventID        string `json:"event_id"`
 	ConversationID string `json:"conversation_id"`
 	Agent          struct {
@@ -98,13 +107,23 @@ type SampleRecord struct {
 	} `json:"interaction"`
 }
 
-// SampleRequest is the request body for POST /api/v1/validation/sample/download
-type SampleRequest struct {
-	StartDate  string `json:"start_date" description:"Start of date range (RFC3339, e.g. 2026-01-01T00:00:00Z)"`
-	EndDate    string `json:"end_date" description:"End of date range (RFC3339, e.g. 2026-03-31T23:59:59Z)"`
-	Percentage int    `json:"percentage" description:"Percentage of records to sample (1-100, default: 25)"`
-	MinSize    int    `json:"min_size,omitempty" description:"Minimum sample size (0 = no minimum)"`
-	MaxSize    int    `json:"max_size,omitempty" description:"Maximum sample size (0 = no maximum)"`
+// ConversationSampleTurn is one turn inside a ConversationSampleRecord.
+type ConversationSampleTurn struct {
+	TurnIndex int    `json:"turn_index"`
+	UserQuery string `json:"user_query"`
+	Answer    string `json:"answer"`
+	Context   string `json:"context,omitempty"`
+}
+
+// ConversationSampleRecord is the JSONL record for POST /api/v1/validation/sample/conversations/download.
+// Contains full conversation turns — no evaluation scores, to avoid annotator bias.
+type ConversationSampleRecord struct {
+	ConversationID string `json:"conversation_id"`
+	Agent          struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"agent"`
+	Turns []ConversationSampleTurn `json:"turns"`
 }
 
 // toEvaluationDTO converts storage.Evaluation to API DTO
@@ -186,4 +205,34 @@ func toConversationSummaryDTOs(summaries []storage.ConversationSummary) []Conver
 		dtos[i] = toConversationSummaryDTO(summary)
 	}
 	return dtos
+}
+
+// ConversationEvalRequest is the API request body for POST /api/v1/evaluate/conversation.
+type ConversationEvalRequest struct {
+	ConversationID string `json:"conversation_id"` // Required
+	Agent          struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"agent"`
+	Turns []ConversationTurnRequest `json:"turns"` // Required: at least 1 turn
+}
+
+// ConversationTurnRequest is a single turn in a ConversationEvalRequest.
+type ConversationTurnRequest struct {
+	TurnIndex      int    `json:"turn_index"`
+	UserQuery      string `json:"user_query"`
+	Answer         string `json:"answer"`
+	Context        string `json:"context,omitempty"`
+	ExpectedOutput string `json:"expected_output,omitempty"`
+}
+
+// ConversationEvalResponse is the API response for POST /api/v1/evaluate/conversation.
+type ConversationEvalResponse struct {
+	ConversationID string       `json:"conversation_id"`
+	AgentName      string       `json:"agent_name"`
+	AgentVersion   string       `json:"agent_version"`
+	TurnCount      int          `json:"turn_count"`
+	Verdict        string       `json:"verdict"`
+	Confidence     float64      `json:"confidence"`
+	Stages         []StageScore `json:"stages"`
 }

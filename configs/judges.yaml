@@ -4,6 +4,8 @@
 judges:
   # Default model configuration applied to all judges unless overridden
   default_model:
+    # modelFamily: "anthropic"
+    # modelID: us.anthropic.claude-3-5-sonnet-20240620-v1:0
     modelFamily: "openai"  # Using Azure OpenAI
     modelID: gpt-4.1-mini
     max_tokens: 256
@@ -15,6 +17,7 @@ judges:
     # Relevance Judge: Evaluates if the answer addresses the query
     - name: relevance
       enabled: true
+      scope: event
       weight: 0.25
       description: "Evaluates if the answer addresses the query"
       requires_context: false
@@ -34,6 +37,7 @@ judges:
     # Faithfulness Judge: Evaluates if answer is grounded in context (no hallucinations)
     - name: faithfulness
       enabled: true
+      scope: event
       weight: 0.20
       description: "Evaluates whether the answer is grounded in the provided context"
       requires_context: true
@@ -55,6 +59,7 @@ judges:
     # Coherence Judge: Evaluates internal logical consistency
     - name: coherence
       enabled: true
+      scope: event
       weight: 0.15
       description: "Evaluates if the answer is internally logically consistent"
       requires_context: false
@@ -75,6 +80,7 @@ judges:
     # Completeness Judge: Evaluates if answer fully addresses all parts of query
     - name: completeness
       enabled: true
+      scope: event
       weight: 0.20
       description: "Evaluates whether the answer fully addresses all parts of the query"
       requires_context: false
@@ -102,6 +108,7 @@ judges:
     # Instruction Judge: Evaluates if answer follows explicit instructions
     - name: instruction
       enabled: true
+      scope: event
       weight: 0.15
       description: "Evaluates whether the answer follows explicit instructions in the query"
       requires_context: false
@@ -141,6 +148,7 @@ judges:
     # Correctness Judge: Evaluates semantic match with expected output (ground truth)
     - name: correctness
       enabled: true
+      scope: event
       weight: 0.05
       description: "Evaluates semantic similarity between answer and expected output"
       requires_context: false
@@ -165,5 +173,41 @@ judges:
         {"score": <float>, "reason": "<string>"}
       model:
         max_tokens: 200
+        temperature: 0.0
+        retry: true
+
+    # Conversation Flow Judge: Evaluates overall quality of a multi-turn conversation
+    - name: conversation-flow
+      enabled: true
+      scope: conversation
+      weight: 1.0
+      description: "Evaluates coherence, context-awareness, and flow across all turns of a conversation"
+      requires_context: false
+      prompt: |
+        You are a conversation quality evaluation judge.
+        Evaluate the overall quality of this multi-turn agent conversation.
+
+        Conversation turns:
+        {{range .Turns}}Turn {{.TurnIndex}}:
+        User: {{.UserQuery}}
+        Agent: {{.Answer}}
+        {{end}}
+
+        Score 0.0 to 1.0 based on:
+        - Flow: Does the conversation progress naturally turn-by-turn?
+        - Context-awareness: Does the agent reference and build on prior turns?
+        - Consistency: Are the agent's responses consistent with each other?
+        - Engagement: Does the agent address the user's evolving needs?
+
+        Scoring guidelines:
+        - 1.0: Excellent flow, highly context-aware, fully consistent
+        - 0.7-0.9: Good quality with minor issues
+        - 0.4-0.6: Moderate quality, some context gaps or inconsistencies
+        - 0.0-0.3: Poor quality, ignores prior turns or contradicts itself
+
+        Output ONLY valid JSON (no markdown, no explanation):
+        {"score": <float>, "reason": "<string>"}
+      model:
+        max_tokens: 300
         temperature: 0.0
         retry: true

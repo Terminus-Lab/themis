@@ -91,7 +91,7 @@ Kappa does **not** override τ for deployment decisions.
 ## In Themis Validation Output
 
 ```bash
-./bin/themis-cli validate -i human_annotated.jsonl -c 0.3
+./bin/themis-cli validate-events -i human_annotated.jsonl -c 0.3
 ```
 
 ```json

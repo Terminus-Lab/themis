@@ -178,4 +178,4 @@ F1        = 2 × (P × R) / (P + R)
 
 - Sample datasets: `resources/validation_success_dataset.jsonl`, `resources/validation_failed_dataset.jsonl`
 - Judge configuration: `configs/judges.yaml`
-- CLI: `./bin/themis-cli validate -i dataset.jsonl -c 0.3`
+- CLI: `./bin/themis-cli validate-events -i dataset.jsonl -c 0.3`
