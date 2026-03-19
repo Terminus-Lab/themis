@@ -167,9 +167,9 @@ Process datasets offline with concurrent workers and validate judge accuracy aga
 
 **Event evaluation (single-turn):**
 ```bash
-./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
 # scale workers via env var
-THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
 ```
 
 **Conversation evaluation (multi-turn):**
@@ -234,6 +234,45 @@ judges:
 ```
 
 Each judge can use a different LLM provider and model. For complete configuration reference, see [Configuration Guide](docs/getting-started/configuration.md).
+
+## `/evaluate` Slash Command for Claude Code and Codex
+
+Themis ships an `evaluate.md` skill at the root of the repository. When registered as a slash command it evaluates the current conversation — extracting every user/assistant exchange as turns, running `themis-cli evaluate-conversations`, and reporting back the verdict and confidence score inline.
+
+**Setup — Claude Code:**
+
+```bash
+# Copy the skill to your global commands directory
+cp evaluate.md ~/.claude/commands/evaluate.md
+```
+
+Then in any Claude Code session: `/evaluate` or `/evaluate 5` (last 5 turns only).
+
+**Setup — OpenAI Codex:**
+
+```bash
+# Copy to the Codex custom instructions directory
+cp evaluate.md ~/.codex/commands/evaluate.md
+```
+
+Then use `/evaluate` from the Codex CLI.
+
+**Where to put the binary and judges config:**
+
+The skill looks for `themis-cli` on your `PATH` first, then checks the `THEMIS_CLI` environment variable for the full path. The `configs/judges.yaml` file must live alongside the binary (or in the directory pointed to by `THEMIS_DIR`). The simplest setup:
+
+```bash
+# Recommended: install to a dedicated directory and export THEMIS_DIR
+mkdir -p ~/.themis/configs
+cp bin/themis-cli ~/.themis/
+cp configs/judges.yaml ~/.themis/configs/
+cp .env ~/.themis/
+
+export THEMIS_CLI="$HOME/.themis/themis-cli"
+export THEMIS_DIR="$HOME/.themis"
+```
+
+Add those two exports to your shell profile (`~/.zshrc`, `~/.bashrc`) so they persist across sessions.
 
 ## License
 
