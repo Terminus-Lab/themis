@@ -4,10 +4,10 @@
 judges:
   # Default model configuration applied to all judges unless overridden
   default_model:
-    modelFamily: "anthropic"
-    modelID: us.anthropic.claude-3-5-sonnet-20240620-v1:0
-    # modelFamily: "openai"  # Using Azure OpenAI
-    # modelID: gpt-4.1-mini
+    # modelFamily: "anthropic"
+    # modelID: us.anthropic.claude-3-5-sonnet-20240620-v1:0
+    modelFamily: "openai"  # Using Azure OpenAI
+    modelID: gpt-4.1-mini
     max_tokens: 256
     temperature: 0.0
     retry: true

@@ -36,8 +36,10 @@ var (
 	saveToDb      bool
 
 	// Evaluate-conversations command flags
-	convInput  string
-	convOutput string
+	convInput   string
+	convOutput  string
+	convFormat  string
+	convSummary string
 )
 
 func main() {
@@ -131,7 +133,13 @@ Runs conversation-scoped judges (scope: conversation in configs/judges.yaml).
 
 Examples:
   # Basic conversation evaluation
-  themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl`,
+  themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl
+
+  # Summary output only (stdout)
+  themis-cli evaluate-conversations -i conversations.jsonl -f summary
+
+  # JSONL results + separate summary file
+  themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl -s summary.json`,
 	SilenceUsage: true,
 	RunE:         runEvaluateConversations,
 }
@@ -190,6 +198,8 @@ func init() {
 	// evaluate-conversations command flags
 	evaluateConversationsCmd.Flags().StringVarP(&convInput, "input", "i", "", "Input JSONL file path (conversation records)")
 	evaluateConversationsCmd.Flags().StringVarP(&convOutput, "output", "o", "", "Output JSONL file path")
+	evaluateConversationsCmd.Flags().StringVarP(&convFormat, "format", "f", "jsonl", "Output format: jsonl, summary")
+	evaluateConversationsCmd.Flags().StringVarP(&convSummary, "summary", "s", "", "Optional separate summary file")
 	evaluateConversationsCmd.Flags().BoolVarP(&saveToDb, "save-to-db", "d", false, "Save results to database")
 
 	_ = evaluateConversationsCmd.MarkFlagRequired("input")
@@ -411,6 +421,11 @@ func runValidateEvents(cmd *cobra.Command, args []string) error {
 func runEvaluateConversations(cmd *cobra.Command, args []string) error {
 	startTime := time.Now()
 
+	validFormats := map[string]bool{"jsonl": true, "summary": true}
+	if !validFormats[convFormat] {
+		return fmt.Errorf("invalid format %q. Supported: jsonl, summary", convFormat)
+	}
+
 	ctx, cancel := setupGracefulShutdown()
 	defer cancel()
 
@@ -453,7 +468,11 @@ func runEvaluateConversations(cmd *cobra.Command, args []string) error {
 
 	log.Info().Int("total", len(records)).Msg("Conversation input file parsed")
 
-	// Open output file (or stdout if not specified)
+	if convOutput == "" && convFormat != "summary" {
+		return fmt.Errorf("required flag \"output\" not set")
+	}
+
+	// Open output file (stdout for summary with no -o, file otherwise)
 	var outFile io.WriteCloser
 	if convOutput == "" {
 		outFile = os.Stdout
@@ -473,16 +492,40 @@ func runEvaluateConversations(cmd *cobra.Command, args []string) error {
 	processor := batch.NewConversationProcessor(deps.ConversationExecutor, workers, deps.Logger)
 	results := processor.Process(ctx, records)
 
-	encoder := json.NewEncoder(outFile)
 	successCount := 0
 	errorCount := 0
+	var allResults []models.ConversationEvaluationResult
 
-	for result := range results {
-		if err := encoder.Encode(result); err != nil {
-			log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to write result")
-			errorCount++
-		} else {
-			successCount++
+	if convFormat == "summary" {
+		summaryWriter := batch.NewConversationSummaryWriter(outFile, deps.Logger)
+		for result := range results {
+			allResults = append(allResults, result)
+			if err := summaryWriter.Write(result); err != nil {
+				log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to add result to summary")
+				errorCount++
+			} else {
+				successCount++
+			}
+		}
+		if err := summaryWriter.Close(); err != nil {
+			return fmt.Errorf("failed to write summary: %w", err)
+		}
+	} else {
+		encoder := json.NewEncoder(outFile)
+		for result := range results {
+			allResults = append(allResults, result)
+			if err := encoder.Encode(result); err != nil {
+				log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to write result")
+				errorCount++
+			} else {
+				successCount++
+			}
+		}
+	}
+
+	if convSummary != "" {
+		if err := writeConversationSummary(convSummary, allResults); err != nil {
+			return fmt.Errorf("failed to write summary: %w", err)
 		}
 	}
 
@@ -492,6 +535,28 @@ func runEvaluateConversations(cmd *cobra.Command, args []string) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Conversation evaluation complete")
 
+	return nil
+}
+
+func writeConversationSummary(path string, results []models.ConversationEvaluationResult) error {
+	summaryFile, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer closeFile(summaryFile)
+
+	summaryWriter := batch.NewConversationSummaryWriter(summaryFile, &log.Logger)
+	for _, result := range results {
+		if err := summaryWriter.Write(result); err != nil {
+			log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("Failed to add result to summary")
+		}
+	}
+
+	if err := summaryWriter.Close(); err != nil {
+		return err
+	}
+
+	log.Info().Str("file", path).Msg("Conversation summary written")
 	return nil
 }
 
