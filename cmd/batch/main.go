@@ -73,24 +73,25 @@ and Kendall's tau correlation against human annotations.`,
 	},
 }
 
-// evaluateCmd represents the evaluate command (main functionality)
+// evaluateCmd represents the evaluate-events command (main functionality)
 var evaluateCmd = &cobra.Command{
-	Use:   "evaluate",
-	Short: "Evaluate responses from input file",
-	Long: `Evaluate AI agent responses from a JSONL input file.
+	Use:   "evaluate-events",
+	Short: "Evaluate single-turn events from input file",
+	Long: `Evaluate AI agent responses (single-turn events) from a JSONL input file.
 
+Each line must be an event object with 'event_id', 'agent', and 'interaction' fields.
 Processes records through the Themis evaluation pipeline and writes
 results to output file. Supports concurrent evaluation with worker pool.
 
 Examples:
   # Basic evaluation
-  themis-cli evaluate -i input.jsonl -o results.jsonl
+  themis-cli evaluate-events -i input.jsonl -o results.jsonl
 
   # With summary stats file
-  themis-cli evaluate -i input.jsonl -o results.jsonl -s summary.json
+  themis-cli evaluate-events -i input.jsonl -o results.jsonl -s summary.json
 
   # Output as summary only
-  themis-cli evaluate -i input.jsonl -o summary.json -f summary`,
+  themis-cli evaluate-events -i input.jsonl -o summary.json -f summary`,
 	SilenceUsage: true,
 	RunE:         runEvaluate,
 }
