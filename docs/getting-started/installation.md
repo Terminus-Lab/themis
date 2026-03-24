@@ -8,7 +8,7 @@
 - Azure OpenAI (for Azure-hosted GPT)
 
 **Optional:**
-- Redis — for streaming mode (`EVENTS_STREAMING_ENABLED=true`)
+- Redis — for conversation streaming mode (`CONVERSATION_STREAMING_ENABLED=true`)
 - PostgreSQL — for persistent storage (SQLite is used by default)
 - Docker — for containerized MCP deployment
 - Go 1.24+ — only needed if building from source
@@ -113,7 +113,7 @@ claude mcp add --transport stdio --scope project themis \
 
 # In another terminal
 curl -s http://localhost:18082/api/v1/health | jq .
-# {"status":"ok","version":"1.0.0"}
+# {"status":"ok"}
 ```
 
 ---
@@ -143,5 +143,5 @@ curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPEN_AI_KEY"
 
 ## Next Steps
 
-- [Quick Start](quick-start.md) — Run your first evaluation
+- [Quick Start](quick-start.md) — Run your first conversation evaluation
 - [Configuration](configuration.md) — Tune judges and thresholds
