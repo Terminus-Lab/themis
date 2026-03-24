@@ -55,11 +55,11 @@ func (w *ConversationSummaryWriter) computeStats() ConversationSummaryStats {
 		Total: len(w.results),
 	}
 
-	var totalConfidence float64
+	var totalFinalScore float64
 	var totalTurns int
 
 	for _, result := range w.results {
-		totalConfidence += result.Confidence
+		totalFinalScore += result.FinalScore
 		totalTurns += result.TurnCount
 
 		switch result.Verdict {
@@ -73,7 +73,7 @@ func (w *ConversationSummaryWriter) computeStats() ConversationSummaryStats {
 	}
 
 	if stats.Total > 0 {
-		stats.AvgConfidence = totalConfidence / float64(stats.Total)
+		stats.AvgConfidence = totalFinalScore / float64(stats.Total)
 		stats.AvgTurnCount = float64(totalTurns) / float64(stats.Total)
 	}
 

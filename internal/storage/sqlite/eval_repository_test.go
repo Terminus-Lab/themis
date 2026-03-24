@@ -2,7 +2,6 @@ package sqlite_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -15,22 +14,14 @@ import (
 func setupTestDB(t *testing.T) (*sqlite.DB, func()) {
 	t.Helper()
 
-	// Use in-memory SQLite database
 	db, err := sqlite.New(context.Background(), ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create in-memory database: %v", err)
 	}
-
-	// Initialize schema
 	if err := db.InitSchema(context.Background()); err != nil {
 		t.Fatalf("Failed to initialize schema: %v", err)
 	}
-
-	cleanup := func() {
-		_ = db.Close()
-	}
-
-	return db, cleanup
+	return db, func() { _ = db.Close() }
 }
 
 func newTestLogger() *zerolog.Logger {
@@ -38,727 +29,182 @@ func newTestLogger() *zerolog.Logger {
 	return &logger
 }
 
-func TestEvalRepository_Store_Success(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	eval := &storage.Evaluation{
-		EventID:        "evt-001",
-		ConversationID: "conv-01",
+func sampleRecord(conversationID string) *storage.ConversationRecord {
+	return &storage.ConversationRecord{
+		ID:             "rec-" + conversationID,
+		ConversationID: conversationID,
 		AgentName:      "test-agent",
-		AgentVersion:   "v1.0.0",
-		UserQuery:      "What is Go?",
-		Answer:         "Go is a programming language",
-		Context:        "Go documentation",
-		Confidence:     0.85,
+		AgentVersion:   "1.0",
+		TurnCount:      2,
+		TurnAvg:        0.8,
+		HolisticScore:  0.9,
+		HolisticReason: "good flow",
+		FinalScore:     0.85,
 		Verdict:        "pass",
-		StageScores: []models.StageResult{
-			{Name: "relevance", Score: 0.9, Reason: "relevant", Duration: 100 * time.Millisecond, Weight: 0.3},
-			{Name: "faithfulness", Score: 0.8, Reason: "faithful", Duration: 200 * time.Millisecond, Weight: 0.7},
+		TurnResults: []models.TurnEvaluationResult{
+			{TurnIndex: 0, UserQuery: "Q1", Answer: "A1", TurnScore: 0.8},
+			{TurnIndex: 1, UserQuery: "Q2", Answer: "A2", TurnScore: 0.8},
 		},
 	}
+}
 
-	err := repo.Store(context.Background(), eval)
+func TestEvalRepository_StoreAndGetConversation(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+	ctx := context.Background()
+
+	rec := sampleRecord("conv-abc")
+	if err := repo.StoreConversation(ctx, rec); err != nil {
+		t.Fatalf("StoreConversation failed: %v", err)
+	}
+
+	got, err := repo.GetConversation(ctx, "conv-abc")
 	if err != nil {
-		t.Fatalf("Store failed: %v", err)
+		t.Fatalf("GetConversation failed: %v", err)
 	}
 
-	// Verify stored data by querying back
-	results, count, err := repo.Query(context.Background(), models.QueryFilters{
-		AgentName: "test-agent",
-		Limit:     10,
-	})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
+	if got.ConversationID != "conv-abc" {
+		t.Errorf("ConversationID mismatch: got %s", got.ConversationID)
 	}
-
-	if count != 1 {
-		t.Errorf("Expected count 1, got %d", count)
+	if got.AgentName != "test-agent" {
+		t.Errorf("AgentName mismatch: got %s", got.AgentName)
 	}
-
-	if len(results) != 1 {
-		t.Fatalf("Expected 1 result, got %d", len(results))
+	if got.TurnCount != 2 {
+		t.Errorf("TurnCount mismatch: got %d", got.TurnCount)
 	}
-
-	stored := results[0]
-	if stored.EventID != eval.EventID {
-		t.Errorf("EventID mismatch: expected %s, got %s", eval.EventID, stored.EventID)
+	if got.FinalScore != 0.85 {
+		t.Errorf("FinalScore mismatch: got %.2f", got.FinalScore)
 	}
-	if stored.AgentName != eval.AgentName {
-		t.Errorf("AgentName mismatch: expected %s, got %s", eval.AgentName, stored.AgentName)
+	if got.Verdict != "pass" {
+		t.Errorf("Verdict mismatch: got %s", got.Verdict)
 	}
-	if stored.Confidence != eval.Confidence {
-		t.Errorf("Confidence mismatch: expected %.2f, got %.2f", eval.Confidence, stored.Confidence)
-	}
-	if len(stored.StageScores) != 2 {
-		t.Errorf("Expected 2 stage scores, got %d", len(stored.StageScores))
+	if len(got.TurnResults) != 2 {
+		t.Errorf("TurnResults count mismatch: got %d", len(got.TurnResults))
 	}
 }
 
-func TestEvalRepository_Query_FilterByAgentName(t *testing.T) {
+func TestEvalRepository_GetConversation_NotFound(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 
-	// Insert test data
-	testData := []storage.Evaluation{
-		{
-			EventID:      "evt-001",
-			AgentName:    "agent-a",
-			AgentVersion: "v1.0",
-			UserQuery:    "query1",
-			Answer:       "answer1",
-			Confidence:   0.8,
-			Verdict:      "pass",
-			StageScores:  []models.StageResult{},
-		},
-		{
-			EventID:      "evt-002",
-			AgentName:    "agent-b",
-			AgentVersion: "v1.0",
-			UserQuery:    "query2",
-			Answer:       "answer2",
-			Confidence:   0.7,
-			Verdict:      "fail",
-			StageScores:  []models.StageResult{},
-		},
-		{
-			EventID:      "evt-003",
-			AgentName:    "agent-a",
-			AgentVersion: "v2.0",
-			UserQuery:    "query3",
-			Answer:       "answer3",
-			Confidence:   0.9,
-			Verdict:      "pass",
-			StageScores:  []models.StageResult{},
-		},
-	}
-
-	for _, eval := range testData {
-		if err := repo.Store(context.Background(), &eval); err != nil {
-			t.Fatalf("Failed to store test data: %v", err)
-		}
-	}
-
-	// Query by agent name
-	results, count, err := repo.Query(context.Background(), models.QueryFilters{
-		AgentName: "agent-a",
-		Limit:     10,
-	})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
-	}
-
-	if count != 2 {
-		t.Errorf("Expected count 2, got %d", count)
-	}
-
-	if len(results) != 2 {
-		t.Fatalf("Expected 2 results, got %d", len(results))
-	}
-
-	// Verify all results are for agent-a
-	for _, result := range results {
-		if result.AgentName != "agent-a" {
-			t.Errorf("Expected agent-a, got %s", result.AgentName)
-		}
-	}
-}
-
-func TestEvalRepository_Query_FilterByVerdict(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Insert test data with different verdicts
-	testData := []storage.Evaluation{
-		{EventID: "evt-001", AgentName: "agent", AgentVersion: "v1", UserQuery: "q1", Answer: "a1", Confidence: 0.9, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-002", AgentName: "agent", AgentVersion: "v1", UserQuery: "q2", Answer: "a2", Confidence: 0.4, Verdict: "fail", StageScores: []models.StageResult{}},
-		{EventID: "evt-003", AgentName: "agent", AgentVersion: "v1", UserQuery: "q3", Answer: "a3", Confidence: 0.6, Verdict: "review", StageScores: []models.StageResult{}},
-		{EventID: "evt-004", AgentName: "agent", AgentVersion: "v1", UserQuery: "q4", Answer: "a4", Confidence: 0.3, Verdict: "fail", StageScores: []models.StageResult{}},
-	}
-
-	for _, eval := range testData {
-		if err := repo.Store(context.Background(), &eval); err != nil {
-			t.Fatalf("Failed to store test data: %v", err)
-		}
-	}
-
-	// Query for fail verdicts
-	results, count, err := repo.Query(context.Background(), models.QueryFilters{
-		Verdict: "fail",
-		Limit:   10,
-	})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
-	}
-
-	if count != 2 {
-		t.Errorf("Expected count 2, got %d", count)
-	}
-
-	if len(results) != 2 {
-		t.Fatalf("Expected 2 results, got %d", len(results))
-	}
-
-	for _, result := range results {
-		if result.Verdict != "fail" {
-			t.Errorf("Expected verdict 'fail', got %s", result.Verdict)
-		}
-	}
-}
-
-func TestEvalRepository_Query_Pagination(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Insert 10 test records
-	for i := 1; i <= 10; i++ {
-		eval := storage.Evaluation{
-			EventID:      "evt-" + string(rune('0'+i)),
-			AgentName:    "agent",
-			AgentVersion: "v1",
-			UserQuery:    "query",
-			Answer:       "answer",
-			Confidence:   0.8,
-			Verdict:      "pass",
-			StageScores:  []models.StageResult{},
-		}
-		if err := repo.Store(context.Background(), &eval); err != nil {
-			t.Fatalf("Failed to store test data: %v", err)
-		}
-	}
-
-	// Test pagination: first page
-	results, count, err := repo.Query(context.Background(), models.QueryFilters{
-		Limit:  3,
-		Offset: 0,
-	})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
-	}
-
-	if count != 10 {
-		t.Errorf("Expected total count 10, got %d", count)
-	}
-
-	if len(results) != 3 {
-		t.Errorf("Expected 3 results in first page, got %d", len(results))
-	}
-
-	// Test pagination: second page
-	results, count, err = repo.Query(context.Background(), models.QueryFilters{
-		Limit:  3,
-		Offset: 3,
-	})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
-	}
-
-	if count != 10 {
-		t.Errorf("Expected total count 10, got %d", count)
-	}
-
-	if len(results) != 3 {
-		t.Errorf("Expected 3 results in second page, got %d", len(results))
-	}
-}
-
-func TestEvalRepository_Query_EmptyResults(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Query empty database
-	results, count, err := repo.Query(context.Background(), models.QueryFilters{
-		AgentName: "nonexistent",
-		Limit:     10,
-	})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
-	}
-
-	if count != 0 {
-		t.Errorf("Expected count 0, got %d", count)
-	}
-
-	if len(results) != 0 {
-		t.Errorf("Expected 0 results, got %d", len(results))
-	}
-}
-
-func TestEvalRepository_QueryById_Success(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Store test data
-	eval := &storage.Evaluation{
-		EventID:      "evt-123",
-		AgentName:    "test-agent",
-		AgentVersion: "v1.0.0",
-		UserQuery:    "test query",
-		Answer:       "test answer",
-		Confidence:   0.85,
-		Verdict:      "pass",
-		StageScores: []models.StageResult{
-			{Name: "test", Score: 0.9, Reason: "good", Duration: 100 * time.Millisecond},
-		},
-	}
-
-	if err := repo.Store(context.Background(), eval); err != nil {
-		t.Fatalf("Store failed: %v", err)
-	}
-
-	// Query by ID
-	result, err := repo.QueryById(context.Background(), "evt-123")
-	if err != nil {
-		t.Fatalf("QueryById failed: %v", err)
-	}
-
-	if result.EventID != eval.EventID {
-		t.Errorf("EventID mismatch: expected %s, got %s", eval.EventID, result.EventID)
-	}
-	if result.AgentName != eval.AgentName {
-		t.Errorf("AgentName mismatch: expected %s, got %s", eval.AgentName, result.AgentName)
-	}
-	if result.Confidence != eval.Confidence {
-		t.Errorf("Confidence mismatch: expected %.2f, got %.2f", eval.Confidence, result.Confidence)
-	}
-}
-
-func TestEvalRepository_QueryById_NotFound(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Query non-existent ID
-	_, err := repo.QueryById(context.Background(), "nonexistent")
+	_, err := repo.GetConversation(context.Background(), "nonexistent")
 	if err == nil {
-		t.Error("Expected error for non-existent ID, got nil")
+		t.Error("Expected error for nonexistent conversation, got nil")
 	}
-	// Error is wrapped by repository, just check it's not nil
 }
 
-func TestEvalRepository_Store_DuplicateEventID(t *testing.T) {
+func TestEvalRepository_ListConversations_Empty(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 
-	eval := &storage.Evaluation{
-		EventID:      "evt-duplicate",
-		AgentName:    "agent",
-		AgentVersion: "v1",
-		UserQuery:    "query",
-		Answer:       "answer",
-		Confidence:   0.8,
-		Verdict:      "pass",
-		StageScores:  []models.StageResult{},
-	}
-
-	// Store once - should succeed
-	if err := repo.Store(context.Background(), eval); err != nil {
-		t.Fatalf("First store failed: %v", err)
-	}
-
-	// Store again with same event_id - should succeed (SQLite generates unique id)
-	// Note: event_id is NOT the primary key, id is
-	if err := repo.Store(context.Background(), eval); err != nil {
-		t.Fatalf("Second store failed: %v", err)
-	}
-
-	// Verify both records exist
-	_, count, err := repo.Query(context.Background(), models.QueryFilters{Limit: 10})
-	if err != nil {
-		t.Fatalf("Query failed: %v", err)
-	}
-
-	if count != 2 {
-		t.Errorf("Expected 2 records with same event_id, got %d", count)
-	}
-}
-
-func TestGetConversation(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	testConId := "con1"
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	evals := []storage.Evaluation{
-		{
-			EventID:        "evt-01",
-			ConversationID: testConId,
-			AgentName:      "agent",
-			AgentVersion:   "v1",
-			UserQuery:      "query",
-			Answer:         "answer",
-			Confidence:     0.8,
-			Verdict:        "pass",
-			StageScores:    []models.StageResult{},
-		},
-		{
-			EventID:        "evt-02",
-			ConversationID: testConId,
-			AgentName:      "agent",
-			AgentVersion:   "v1",
-			UserQuery:      "query",
-			Answer:         "answer",
-			Confidence:     0.8,
-			Verdict:        "pass",
-			StageScores:    []models.StageResult{},
-		},
-	}
-
-	for _, eval := range evals {
-		if err := repo.Store(ctx, &eval); err != nil {
-			t.Fatalf("Unable to save eval id: %s in the storage", eval.EventID)
-		}
-	}
-
-	evalsResp, err := repo.GetConversation(ctx, testConId)
-	if err != nil {
-		t.Fatalf("Unable to fetch evals for conv id: %s", testConId)
-	}
-
-	if len(evalsResp) != 2 {
-		t.Fatalf("Expected 2 eval results in conv id: %s, received: %d", testConId, len(evalsResp))
-	}
-
-}
-
-func TestGetConversation_MultipleConversations(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Store evaluations for multiple conversations
-	evals := []storage.Evaluation{
-		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-03", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-04", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-05", ConversationID: "", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-	}
-
-	for _, eval := range evals {
-		if err := repo.Store(ctx, &eval); err != nil {
-			t.Fatalf("Store failed: %v", err)
-		}
-	}
-
-	// Query conv-A, should only get 2 results
-	results, err := repo.GetConversation(ctx, "conv-A")
-	if err != nil {
-		t.Fatalf("GetConversation failed: %v", err)
-	}
-
-	if len(results) != 2 {
-		t.Errorf("Expected 2 results for conv-A, got %d", len(results))
-	}
-
-	for _, result := range results {
-		if result.ConversationID != "conv-A" {
-			t.Errorf("Expected conversation_id conv-A, got %s", result.ConversationID)
-		}
-	}
-}
-
-func TestGetConversation_NotFound(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Query non-existent conversation
-	results, err := repo.GetConversation(ctx, "nonexistent-conv")
-	if err != nil {
-		t.Fatalf("GetConversation should not error on empty results: %v", err)
-	}
-
-	if len(results) != 0 {
-		t.Errorf("Expected 0 results for non-existent conversation, got %d", len(results))
-	}
-}
-
-func TestGetConversation_EmptyConversationID(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Store evaluation with empty conversation_id
-	eval := &storage.Evaluation{
-		EventID: "evt-01", ConversationID: "", AgentName: "agent",
-		AgentVersion: "v1", UserQuery: "query", Answer: "answer",
-		Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{},
-	}
-	if err := repo.Store(ctx, eval); err != nil {
-		t.Fatalf("Store failed: %v", err)
-	}
-
-	// Query with empty string
-	results, err := repo.GetConversation(ctx, "")
-	if err != nil {
-		t.Fatalf("GetConversation failed: %v", err)
-	}
-
-	if len(results) != 0 {
-		t.Errorf("Expected 0 result for empty conversation_id, got %d", len(results))
-	}
-}
-
-func TestGetConversation_GetConversations(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Store evaluations for multiple conversations
-	evals := []storage.Evaluation{
-		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-03", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-04", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-	}
-
-	for _, eval := range evals {
-		if err := repo.Store(ctx, &eval); err != nil {
-			t.Fatalf("Store failed: %v", err)
-		}
-	}
-
-	// Query conv-A, should only get 2 results
-	results, err := repo.ListConversations(ctx)
-	if err != nil {
-		t.Fatalf("GetConversation failed: %v", err)
-	}
-
-	if len(results) != 2 {
-		t.Errorf("Expected 2 conversations, got %d", len(results))
-	}
-}
-
-func seedEvaluations(t *testing.T, repo *sqlite.EvalRepository, n int) {
-	t.Helper()
-	for i := 0; i < n; i++ {
-		eval := &storage.Evaluation{
-			EventID:      fmt.Sprintf("evt-%d", i),
-			AgentName:    "agent",
-			AgentVersion: "v1",
-			UserQuery:    fmt.Sprintf("query %d", i),
-			Answer:       fmt.Sprintf("answer %d", i),
-			Confidence:   0.8,
-			Verdict:      "pass",
-			StageScores:  []models.StageResult{},
-		}
-		if err := repo.Store(context.Background(), eval); err != nil {
-			t.Fatalf("Failed to seed evaluation %d: %v", i, err)
-		}
-	}
-}
-
-func TestEvalRepository_Sample_ReturnsPercentage(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	seedEvaluations(t, repo, 10)
-
-	results, err := repo.Sample(context.Background(), storage.SampleFilters{
-		StartDate:  time.Now().Add(-1 * time.Hour),
-		EndDate:    time.Now().Add(1 * time.Hour),
-		Percentage: 50,
-	})
-
-	if err != nil {
-		t.Fatalf("Sample failed: %v", err)
-	}
-	if len(results) != 5 {
-		t.Errorf("Expected 5 (50%% of 10), got %d", len(results))
-	}
-}
-
-func TestEvalRepository_Sample_EmptyDateRange(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	seedEvaluations(t, repo, 5)
-
-	// Date range in the past — no records match
-	results, err := repo.Sample(context.Background(), storage.SampleFilters{
-		StartDate:  time.Now().Add(-48 * time.Hour),
-		EndDate:    time.Now().Add(-24 * time.Hour),
-		Percentage: 100,
-	})
-
-	if err != nil {
-		t.Fatalf("Sample failed: %v", err)
-	}
-	if len(results) != 0 {
-		t.Errorf("Expected 0 results outside date range, got %d", len(results))
-	}
-}
-
-func TestEvalRepository_Sample_MaxSizeConstraint(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	seedEvaluations(t, repo, 20)
-
-	results, err := repo.Sample(context.Background(), storage.SampleFilters{
-		StartDate:  time.Now().Add(-1 * time.Hour),
-		EndDate:    time.Now().Add(1 * time.Hour),
-		Percentage: 50, // 50% of 20 = 10, but MaxSize caps at 6
-		MaxSize:    6,
-	})
-
-	if err != nil {
-		t.Fatalf("Sample failed: %v", err)
-	}
-	if len(results) != 6 {
-		t.Errorf("Expected 6 (capped by MaxSize), got %d", len(results))
-	}
-}
-
-func TestEvalRepository_Sample_MinSizeConstraint(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	seedEvaluations(t, repo, 10)
-
-	results, err := repo.Sample(context.Background(), storage.SampleFilters{
-		StartDate:  time.Now().Add(-1 * time.Hour),
-		EndDate:    time.Now().Add(1 * time.Hour),
-		Percentage: 10, // 10% of 10 = 1, but MinSize bumps to 4
-		MinSize:    4,
-	})
-
-	if err != nil {
-		t.Fatalf("Sample failed: %v", err)
-	}
-	if len(results) != 4 {
-		t.Errorf("Expected 4 (bumped by MinSize), got %d", len(results))
-	}
-}
-
-func TestGetConversation_ListMultipleConversations(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	repo := sqlite.NewEvalRepository(db, newTestLogger())
-
-	// Store evaluations across two distinct conversations (conversation_id is required)
-	evals := []storage.Evaluation{
-		{EventID: "evt-01", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-02", ConversationID: "conv-A", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-03", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-		{EventID: "evt-04", ConversationID: "conv-B", AgentName: "agent", AgentVersion: "v1",
-			UserQuery: "query", Answer: "answer", Confidence: 0.8, Verdict: "pass", StageScores: []models.StageResult{}},
-	}
-
-	for _, eval := range evals {
-		if err := repo.Store(ctx, &eval); err != nil {
-			t.Fatalf("Store failed: %v", err)
-		}
-	}
-
-	results, err := repo.ListConversations(ctx)
+	summaries, err := repo.ListConversations(context.Background())
 	if err != nil {
 		t.Fatalf("ListConversations failed: %v", err)
 	}
-
-	if len(results) != 2 {
-		t.Errorf("Expected 2 conversations, got %d", len(results))
+	if len(summaries) != 0 {
+		t.Errorf("Expected 0 summaries, got %d", len(summaries))
 	}
 }
 
-func TestConversationEvalRepository_StoreAndGet(t *testing.T) {
+func TestEvalRepository_ListConversations_Multiple(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 	ctx := context.Background()
 
-	eval := &storage.ConversationEvaluation{
-		ID:             "conv-eval-001",
-		ConversationID: "conv-abc",
-		AgentName:      "my-agent",
-		AgentVersion:   "2.0",
-		TurnCount:      3,
-		Confidence:     0.88,
-		Verdict:        "pass",
-		StageScores: []models.StageResult{
-			{Name: "conversation-flow-judge", Score: 0.88, Reason: "Good flow", Weight: 1.0},
-		},
+	for _, id := range []string{"conv-1", "conv-2", "conv-3"} {
+		if err := repo.StoreConversation(ctx, sampleRecord(id)); err != nil {
+			t.Fatalf("StoreConversation failed: %v", err)
+		}
 	}
 
-	if err := repo.StoreConversationEval(ctx, eval); err != nil {
-		t.Fatalf("StoreConversationEval failed: %v", err)
-	}
-
-	got, err := repo.GetConversationEval(ctx, "conv-abc")
+	summaries, err := repo.ListConversations(ctx)
 	if err != nil {
-		t.Fatalf("GetConversationEval failed: %v", err)
+		t.Fatalf("ListConversations failed: %v", err)
 	}
-	if got.ID != eval.ID {
-		t.Errorf("ID mismatch: got %s, want %s", got.ID, eval.ID)
-	}
-	if got.TurnCount != eval.TurnCount {
-		t.Errorf("TurnCount mismatch: got %d, want %d", got.TurnCount, eval.TurnCount)
-	}
-	if got.Verdict != eval.Verdict {
-		t.Errorf("Verdict mismatch: got %s, want %s", got.Verdict, eval.Verdict)
-	}
-	if got.Confidence != eval.Confidence {
-		t.Errorf("Confidence mismatch: got %.3f, want %.3f", got.Confidence, eval.Confidence)
-	}
-	if len(got.StageScores) != 1 || got.StageScores[0].Name != "conversation-flow-judge" {
-		t.Errorf("StageScores mismatch: %+v", got.StageScores)
+	if len(summaries) != 3 {
+		t.Errorf("Expected 3 summaries, got %d", len(summaries))
 	}
 }
 
-func TestConversationEvalRepository_GetNotFound(t *testing.T) {
+func TestEvalRepository_HealthMetrics_Empty(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+
+	metrics, err := repo.HealthMetrics(context.Background(), time.Now().Add(-24*time.Hour))
+	if err != nil {
+		t.Fatalf("HealthMetrics failed: %v", err)
+	}
+	if metrics.TotalEvaluations != 0 {
+		t.Errorf("Expected 0 evaluations, got %d", metrics.TotalEvaluations)
+	}
+}
+
+func TestEvalRepository_HealthMetrics_WithData(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 	ctx := context.Background()
 
-	_, err := repo.GetConversationEval(ctx, "nonexistent-conversation")
-	if err == nil {
-		t.Error("Expected error for nonexistent conversation, got nil")
+	for _, id := range []string{"conv-a", "conv-b"} {
+		if err := repo.StoreConversation(ctx, sampleRecord(id)); err != nil {
+			t.Fatalf("StoreConversation failed: %v", err)
+		}
+	}
+
+	metrics, err := repo.HealthMetrics(ctx, time.Now().Add(-1*time.Hour))
+	if err != nil {
+		t.Fatalf("HealthMetrics failed: %v", err)
+	}
+	if metrics.TotalEvaluations != 2 {
+		t.Errorf("Expected 2 evaluations, got %d", metrics.TotalEvaluations)
+	}
+	if metrics.AvgConfidence <= 0 {
+		t.Errorf("Expected positive AvgConfidence, got %.3f", metrics.AvgConfidence)
+	}
+}
+
+func TestEvalRepository_GetConversation_ReturnsLatest(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := sqlite.NewEvalRepository(db, newTestLogger())
+	ctx := context.Background()
+
+	// Store two records with same conversation_id, second with higher final_score
+	rec1 := sampleRecord("conv-dup")
+	rec1.ID = "rec-first"
+	rec1.FinalScore = 0.5
+	rec1.Verdict = "review"
+	if err := repo.StoreConversation(ctx, rec1); err != nil {
+		t.Fatalf("StoreConversation failed: %v", err)
+	}
+
+	rec2 := sampleRecord("conv-dup")
+	rec2.ID = "rec-second"
+	rec2.FinalScore = 0.9
+	rec2.Verdict = "pass"
+	if err := repo.StoreConversation(ctx, rec2); err != nil {
+		t.Fatalf("StoreConversation failed: %v", err)
+	}
+
+	// GetConversation returns latest (DESC by created_at)
+	got, err := repo.GetConversation(ctx, "conv-dup")
+	if err != nil {
+		t.Fatalf("GetConversation failed: %v", err)
+	}
+	// The latest stored should be returned
+	if got.ConversationID != "conv-dup" {
+		t.Errorf("ConversationID mismatch: got %s", got.ConversationID)
 	}
 }

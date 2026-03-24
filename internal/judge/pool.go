@@ -22,14 +22,19 @@ func NewJudgePool(registry *llm.LLMClientRegistry, logger *zerolog.Logger) *Judg
 	}
 }
 
-// BuildFromConfig builds event-scoped judges (scope: "event" or unset).
-func (p *JudgePool) BuildFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
-	return p.buildFromConfigForScope(cfg, "event")
+// BuildTurnJudgesFromConfig builds per-turn judges (scope: "turn").
+func (p *JudgePool) BuildTurnJudgesFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
+	return p.buildFromConfigForScope(cfg, "turn")
 }
 
-// BuildConversationJudgesFromConfig builds conversation-scoped judges (scope: "conversation").
-func (p *JudgePool) BuildConversationJudgesFromConfig(cfg *config.JudgesConfig) ([]Judge, error) {
-	return p.buildFromConfigForScope(cfg, "conversation")
+// BuildHolisticJudgeFromConfig builds the single holistic conversation judge (scope: "conversation").
+// Returns the first enabled conversation-scoped judge.
+func (p *JudgePool) BuildHolisticJudgeFromConfig(cfg *config.JudgesConfig) (Judge, error) {
+	judges, err := p.buildFromConfigForScope(cfg, "conversation")
+	if err != nil {
+		return nil, err
+	}
+	return judges[0], nil
 }
 
 func (p *JudgePool) buildFromConfigForScope(cfg *config.JudgesConfig, scope string) ([]Judge, error) {

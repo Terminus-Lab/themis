@@ -17,8 +17,8 @@ import (
 )
 
 func main() {
-	data := flag.String("d", "", "Inline JSON EvaluationRequest")
-	stream := flag.String("stream", "eval-events", "Stream name")
+	data := flag.String("d", "", "Inline JSON ConversationEvaluationRequest")
+	stream := flag.String("stream", "eval-conversations", "Stream name")
 	flag.Parse()
 
 	if *data == "" {
@@ -51,7 +51,7 @@ func run(data, stream string) error {
 	}
 	defer closeRedisClient(client)
 
-	var req models.EvaluationRequest
+	var req models.ConversationEvaluationRequest
 	if err := json.Unmarshal([]byte(data), &req); err != nil {
 		return err
 	}
@@ -64,12 +64,16 @@ func run(data, stream string) error {
 		return err
 	}
 
-	log.Info().Str("stream", stream).Str("id", id).Str("event_id", req.EventID).Msg("Published successfully!")
+	log.Info().
+		Str("stream", stream).
+		Str("id", id).
+		Str("conversation_id", req.ConversationID).
+		Msg("Published successfully!")
 	return nil
 }
 
 func closeRedisClient(client *redis.Client) {
 	if err := client.Close(); err != nil {
-		log.Error().Err(err).Msg("Failed to close Redis client")
+		log.Error().Err(err).Msg("failed to close Redis client")
 	}
 }

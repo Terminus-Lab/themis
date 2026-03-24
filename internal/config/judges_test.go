@@ -692,9 +692,9 @@ func TestNormalizeJudgeWeights_ActualConfig(t *testing.T) {
 		t.Fatalf("Failed to load actual judges config: %v", err)
 	}
 
-	eventCount := 0
+	turnCount := 0
 	convCount := 0
-	eventWeightSum := 0.0
+	turnWeightSum := 0.0
 	convWeightSum := 0.0
 
 	for _, j := range cfg.Judges.Evaluators {
@@ -703,34 +703,34 @@ func TestNormalizeJudgeWeights_ActualConfig(t *testing.T) {
 		}
 		scope := j.Scope
 		if scope == "" {
-			scope = "event"
+			scope = "turn"
 		}
-		if scope == "event" {
-			eventCount++
-			eventWeightSum += j.Weight
+		if scope == "turn" {
+			turnCount++
+			turnWeightSum += j.Weight
 		} else if scope == "conversation" {
 			convCount++
 			convWeightSum += j.Weight
 		}
 	}
 
-	if eventCount == 0 {
-		t.Error("Expected at least one enabled event-scoped judge")
+	if turnCount == 0 {
+		t.Error("Expected at least one enabled turn-scoped judge")
 	}
 	if convCount == 0 {
 		t.Error("Expected at least one enabled conversation-scoped judge")
 	}
 
 	const tol = 0.001
-	if eventWeightSum < 1.0-tol || eventWeightSum > 1.0+tol {
-		t.Errorf("event judge weights should sum to 1.0, got %.4f (count=%d)", eventWeightSum, eventCount)
+	if turnWeightSum < 1.0-tol || turnWeightSum > 1.0+tol {
+		t.Errorf("turn judge weights should sum to 1.0, got %.4f (count=%d)", turnWeightSum, turnCount)
 	}
 	if convWeightSum < 1.0-tol || convWeightSum > 1.0+tol {
 		t.Errorf("conversation judge weights should sum to 1.0, got %.4f (count=%d)", convWeightSum, convCount)
 	}
 
-	t.Logf("event judges=%d (sum=%.4f), conversation judges=%d (sum=%.4f)",
-		eventCount, eventWeightSum, convCount, convWeightSum)
+	t.Logf("turn judges=%d (sum=%.4f), conversation judges=%d (sum=%.4f)",
+		turnCount, turnWeightSum, convCount, convWeightSum)
 }
 
 // Helper function

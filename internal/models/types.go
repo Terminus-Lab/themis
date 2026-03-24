@@ -5,14 +5,6 @@ import (
 )
 
 type Verdict string
-type AggregationMethod string
-
-const (
-	MethodWeightedAverage AggregationMethod = "weighted_average"
-	MethodHarmonicMean    AggregationMethod = "harmonic_mean"
-	MethodMedian          AggregationMethod = "median"
-	MethodWeightedProduct AggregationMethod = "weighted_product"
-)
 
 const (
 	VerdictPass   Verdict = "pass"
@@ -20,34 +12,10 @@ const (
 	VerdictReview Verdict = "review"
 )
 
-type EventType string
-
-const (
-	EventTypeAgentResponse EventType = "agent_response"
-	EventTypeAgentError    EventType = "agent_error"
-)
-
 type Agent struct {
 	Name    string `json:"name"`
 	Type    string `json:"type"`
 	Version string `json:"version"`
-}
-
-type Interaction struct {
-	UserQuery      string `json:"user_query"`
-	Context        string `json:"context"`
-	Answer         string `json:"answer"`
-	ExpectedOutput string `json:"expected_output,omitempty"` // Optional: ground truth for correctness evaluation
-}
-
-// Input message
-type EvaluationRequest struct {
-	EventID         string      `json:"event_id"`
-	ConversationID  string      `json:"conversation_id"` // Required: groups related turns
-	EventType       EventType   `json:"event_type"`
-	Agent           Agent       `json:"agent"`
-	Interaction     Interaction `json:"interaction"`
-	HumanAnnotation *string     `json:"human_annotation,omitempty"` // Optional: for validation mode
 }
 
 // ConversationTurn represents a single turn in a multi-turn conversation.
@@ -66,58 +34,50 @@ type ConversationEvaluationRequest struct {
 	Turns          []ConversationTurn `json:"turns"` // All turns in the conversation
 }
 
+// TurnEvaluationResult holds the evaluation scores for a single conversation turn.
+type TurnEvaluationResult struct {
+	TurnIndex int           `json:"turn_index"`
+	UserQuery string        `json:"user_query"`
+	Answer    string        `json:"answer"`
+	Scores    []StageResult `json:"scores"`
+	TurnScore float64       `json:"turn_score"` // average of Scores
+}
+
 // ConversationEvaluationResult is the output of conversation-level evaluation.
 type ConversationEvaluationResult struct {
-	ConversationID string        `json:"conversation_id"`
-	AgentName      string        `json:"agent_name"`
-	AgentVersion   string        `json:"agent_version"`
-	TurnCount      int           `json:"turn_count"`
-	Verdict        Verdict       `json:"verdict"`
-	Confidence     float64       `json:"confidence"`
-	Stages         []StageResult `json:"stages"`
+	ConversationID string                 `json:"conversation_id"`
+	AgentName      string                 `json:"agent_name"`
+	AgentVersion   string                 `json:"agent_version"`
+	TurnCount      int                    `json:"turn_count"`
+	TurnResults    []TurnEvaluationResult `json:"turn_results"`
+	TurnAvg        float64                `json:"turn_avg"`
+	HolisticScore  float64                `json:"holistic_score"`
+	HolisticReason string                 `json:"holistic_reason"`
+	FinalScore     float64                `json:"final_score"`
+	Verdict        Verdict                `json:"verdict"`
 }
 
-// Normalized internal object
+// EvaluationContext is the normalized internal context passed to judges.
 type EvaluationContext struct {
-	RequestID      string             `json:"request_id" jsonschema:"required,description=Unique event identifier"`
-	ConversationID string             `json:"conversation_id" jsonschema:"required,description=Unique conversation identifier"`
-	AgentName      string             `json:"agent_name,omitempty" jsonschema:"description=Name of the agent being evaluated"`
-	AgentVersion   string             `json:"agent_version,omitempty" jsonschema:"description=Version of the agent being evaluated"`
-	Query          string             `json:"user_query" jsonschema:"required,description=User's original query"`
-	Context        string             `json:"context,omitempty" jsonschema:"description=Optional context or retrieved documents"`
-	Answer         string             `json:"answer" jsonschema:"required,description=Agent response to evaluate"`
-	ExpectedOutput string             `json:"expected_output,omitempty" jsonschema:"description=Optional ground truth for correctness evaluation"`
-	Turns          []ConversationTurn `json:"turns,omitempty" jsonschema:"description=For conversation-level evaluation: all turns in the conversation"`
-	CreatedAt      time.Time          `json:"created_at" jsonschema:"description=Time when the evaluation context was created"`
+	RequestID      string             `json:"request_id"`
+	ConversationID string             `json:"conversation_id"`
+	AgentName      string             `json:"agent_name,omitempty"`
+	AgentVersion   string             `json:"agent_version,omitempty"`
+	Query          string             `json:"user_query"`
+	Context        string             `json:"context,omitempty"`
+	Answer         string             `json:"answer"`
+	ExpectedOutput string             `json:"expected_output,omitempty"`
+	Turns          []ConversationTurn `json:"turns,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
 }
 
-// One evaluator's output
+// StageResult is a single judge's output.
 type StageResult struct {
 	Name     string        `json:"name"`
 	Score    float64       `json:"score"`
 	Reason   string        `json:"reason"`
 	Duration time.Duration `json:"duration_ns"`
-	Weight   float64       `json:"weight,omitempty"` // Weight for this judge (0.0-1.0)
-}
-
-// Final output
-type EvaluationResult struct {
-	ID             string             `json:"id"`
-	ConversationID string             `json:"conversation_id"`
-	Stages         []StageResult      `json:"stages"`
-	Confidence     float64            `json:"confidence"`
-	Verdict        Verdict            `json:"verdict"`
-	Metrics        AggregationMetrics `json:"metrics"`
-}
-
-type AggregationMetrics struct {
-	Stage1Avg             float64           `json:"stage1_avg"`
-	Stage2WeightedAvg     float64           `json:"stage2_weighted_avg"`
-	Stage2HarmonicMean    float64           `json:"stage2_harmonic_mean"`
-	Stage2Median          float64           `json:"stage2_median"`
-	Stage2WeightedProduct float64           `json:"stage2_weighted_product"`
-	FinalConfidence       float64           `json:"final_confidence"`
-	MethodUsed            AggregationMethod `json:"aggregation_method"`
+	Weight   float64       `json:"weight,omitempty"`
 }
 
 type QueryFilters struct {
