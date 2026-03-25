@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -100,6 +101,22 @@ func (e *ConversationEvaluator) Execute(ctx context.Context, req models.Conversa
 	result.HolisticScore = holisticResult.Score
 	result.HolisticReason = holisticResult.Reason
 
+	// === Collect eval errors from turn judges and holistic judge ===
+	var evalErrors []string
+	for _, tr := range turnResults {
+		for _, s := range tr.Scores {
+			if s.Error != "" {
+				evalErrors = append(evalErrors, fmt.Sprintf("turn %d / %s: %s", tr.TurnIndex, s.Name, s.Error))
+			}
+		}
+	}
+	if holisticResult.Error != "" {
+		evalErrors = append(evalErrors, fmt.Sprintf("holistic / %s: %s", holisticResult.Name, holisticResult.Error))
+	}
+	if len(evalErrors) > 0 {
+		result.EvalErrors = evalErrors
+	}
+
 	// === Final score ===
 	result.FinalScore = e.computeFinalScore(result.HolisticScore, result.TurnAvg, e.holisticWeight)
 	result.Verdict = e.verdict(result.FinalScore)
@@ -145,7 +162,7 @@ func (e *ConversationEvaluator) evaluateTurns(ctx context.Context, req models.Co
 
 	for i, turn := range req.Turns {
 		wg.Add(1)
-		go func(idx int, t models.ConversationTurn) {
+		go func(idx int, t models.ConversationTurn) {	
 			defer wg.Done()
 
 			evalCtx := models.EvaluationContext{

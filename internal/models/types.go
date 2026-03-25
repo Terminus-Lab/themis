@@ -55,6 +55,7 @@ type ConversationEvaluationResult struct {
 	HolisticReason string                 `json:"holistic_reason"`
 	FinalScore     float64                `json:"final_score"`
 	Verdict        Verdict                `json:"verdict"`
+	EvalErrors     []string               `json:"eval_errors,omitempty"`
 }
 
 // EvaluationContext is the normalized internal context passed to judges.
@@ -76,6 +77,7 @@ type StageResult struct {
 	Name     string        `json:"name"`
 	Score    float64       `json:"score"`
 	Reason   string        `json:"reason"`
+	Error    string        `json:"error,omitempty"`
 	Duration time.Duration `json:"duration_ns"`
 	Weight   float64       `json:"weight,omitempty"`
 }

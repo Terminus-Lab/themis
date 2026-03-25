@@ -50,8 +50,10 @@ func (c *JudgeRunner) Run(ctx context.Context, evaluationContext models.Evaluati
 				evalResult = models.StageResult{
 					Name:     evalResult.Name,
 					Score:    0.0,
+					Error:    "evaluation timed out after " + judgeTimeout.String(),
 					Reason:   "evaluation timed out after " + judgeTimeout.String(),
 					Duration: judgeTimeout,
+					Weight:   evalResult.Weight,
 				}
 			}
 
