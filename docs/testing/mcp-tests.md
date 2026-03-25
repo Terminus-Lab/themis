@@ -1,7 +1,7 @@
 ---
 title: MCP Integration Test Cases
 description: Test scenarios for Themis MCP server with Claude Code, Claude Desktop, and Cursor
-version: 2.0.0
+version: 0.0.1
 tags: [testing, mcp, claude-code, claude-desktop, cursor, integration]
 related:
   - testing/api-tests.md

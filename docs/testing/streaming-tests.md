@@ -1,7 +1,7 @@
 ---
 title: Streaming Mode Test Cases
 description: Test scenarios for Themis Redis Stream conversation consumer
-version: 2.0.0
+version: 0.0.1
 tags: [testing, streaming, redis, async, consumer, horizontal-scaling]
 related:
   - deployment/api-mode.md

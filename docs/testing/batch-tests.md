@@ -1,7 +1,7 @@
 ---
 title: CLI Test Cases
 description: Test scenarios for Themis CLI batch evaluation
-version: 2.0.0
+version: 0.0.1
 tags: [testing, batch, cli, offline, conversations]
 related:
   - testing/api-tests.md

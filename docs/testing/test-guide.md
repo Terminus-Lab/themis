@@ -1,7 +1,7 @@
 ---
 title: Themis Test Guide
 description: Comprehensive test cases for all Themis features — API, CLI, MCP, Streaming, and configuration
-version: 2.0.0
+version: 0.0.1
 tags: [testing, api, cli, mcp, streaming, configuration]
 ---
 

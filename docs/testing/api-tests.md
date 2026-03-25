@@ -1,7 +1,7 @@
 ---
 title: API Test Cases
 description: Comprehensive test scenarios for Themis HTTP API endpoints
-version: 2.0.0
+version: 0.0.1
 tags: [testing, api, http, test-cases, endpoints]
 related:
   - deployment/api-mode.md

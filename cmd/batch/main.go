@@ -95,7 +95,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Themis CLI v2.0.0")
+		fmt.Println("Themis CLI v0.0.1")
 	},
 }
 
