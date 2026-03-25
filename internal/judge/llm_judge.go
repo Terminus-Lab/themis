@@ -66,7 +66,8 @@ func (j *LLMJudge) Evaluate(ctx context.Context, evalCtx models.EvaluationContex
 			Err(err).
 			Str("judge", j.name).
 			Msg("failed to build prompt from template")
-		result.Reason = fmt.Sprintf("Failed to build prompt: %v", err)
+		result.Error = fmt.Sprintf("failed to build prompt: %v", err)
+		result.Reason = result.Error
 		result.Duration = time.Since(now)
 		return result
 	}
@@ -92,6 +93,7 @@ func (j *LLMJudge) Evaluate(ctx context.Context, evalCtx models.EvaluationContex
 			Err(err).
 			Str("judge", j.name).
 			Msg("LLM call failed")
+		result.Error = fmt.Sprintf("LLM call failed: %v", err)
 		result.Reason = "Failed to call LLM"
 		result.Duration = time.Since(now)
 		return result
@@ -106,6 +108,7 @@ func (j *LLMJudge) Evaluate(ctx context.Context, evalCtx models.EvaluationContex
 			Str("judge", j.name).
 			Str("content", resp.Content).
 			Msg("failed to deserialize LLM response")
+		result.Error = fmt.Sprintf("failed to deserialize LLM response: %v", err)
 		result.Reason = "Failed to deserialize LLM response"
 		result.Duration = time.Since(now)
 		return result
@@ -116,6 +119,7 @@ func (j *LLMJudge) Evaluate(ctx context.Context, evalCtx models.EvaluationContex
 		j.logger.Error().
 			Str("judge", j.name).
 			Msg("LLM returned empty score and reason")
+		result.Error = "invalid LLM response: missing score and reason"
 		result.Reason = "Invalid LLM response: missing score and reason"
 		result.Duration = time.Since(now)
 		return result
@@ -126,6 +130,7 @@ func (j *LLMJudge) Evaluate(ctx context.Context, evalCtx models.EvaluationContex
 			Str("judge", j.name).
 			Float64("score", llmResponse.Score).
 			Msg("LLM returned invalid score")
+		result.Error = fmt.Sprintf("invalid LLM response: score %f out of range [0.0, 1.0]", llmResponse.Score)
 		result.Reason = fmt.Sprintf("Invalid LLM response: score %f out of range [0.0, 1.0]", llmResponse.Score)
 		result.Duration = time.Since(now)
 		return result

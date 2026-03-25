@@ -140,6 +140,9 @@ func TestLLMJudge_Evaluate_TemplateExecutionFails(t *testing.T) {
 	if result.Reason == "" || len(result.Reason) < 5 {
 		t.Errorf("Expected error reason, got '%s'", result.Reason)
 	}
+	if result.Error == "" {
+		t.Error("Expected Error field to be set for template execution failure")
+	}
 }
 
 func TestLLMJudge_Evaluate_LLMCallFails(t *testing.T) {
@@ -171,6 +174,9 @@ func TestLLMJudge_Evaluate_LLMCallFails(t *testing.T) {
 	}
 	if result.Reason != "Failed to call LLM" {
 		t.Errorf("Expected LLM error reason, got '%s'", result.Reason)
+	}
+	if result.Error == "" {
+		t.Error("Expected Error field to be set for LLM call failure")
 	}
 }
 
@@ -238,6 +244,9 @@ func TestLLMJudge_Evaluate_InvalidJSON(t *testing.T) {
 	if result.Reason != "Failed to deserialize LLM response" {
 		t.Errorf("Expected deserialization error, got '%s'", result.Reason)
 	}
+	if result.Error == "" {
+		t.Error("Expected Error field to be set for JSON deserialization failure")
+	}
 }
 
 func TestLLMJudge_Evaluate_EmptyScoreAndReason(t *testing.T) {
@@ -270,6 +279,9 @@ func TestLLMJudge_Evaluate_EmptyScoreAndReason(t *testing.T) {
 	}
 	if result.Reason != "Invalid LLM response: missing score and reason" {
 		t.Errorf("Expected invalid response error, got '%s'", result.Reason)
+	}
+	if result.Error == "" {
+		t.Error("Expected Error field to be set for empty score and reason")
 	}
 }
 
@@ -313,6 +325,9 @@ func TestLLMJudge_Evaluate_ScoreOutOfRange(t *testing.T) {
 			}
 			if !contains(result.Reason, "out of range") {
 				t.Errorf("Expected out of range error, got '%s'", result.Reason)
+			}
+			if result.Error == "" {
+				t.Error("Expected Error field to be set for out-of-range score")
 			}
 		})
 	}
