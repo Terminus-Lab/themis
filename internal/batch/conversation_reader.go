@@ -45,13 +45,23 @@ func (r *ConversationReader) ReadAll(ctx context.Context) <-chan ConversationInp
 				continue
 			}
 
-			var req models.ConversationEvaluationRequest
-			if err := json.Unmarshal([]byte(line), &req); err != nil {
+			type rawRecord struct {
+				models.ConversationEvaluationRequest
+				HumanLabel string   `json:"human_label"`
+				HumanScore *float64 `json:"human_score"`
+			}
+			var raw rawRecord
+			if err := json.Unmarshal([]byte(line), &raw); err != nil {
 				ch <- ConversationInputRecord{LineNumber: lineNum, Error: fmt.Errorf("parse error: %w", err)}
 				continue
 			}
 
-			ch <- ConversationInputRecord{LineNumber: lineNum, Request: req}
+			ch <- ConversationInputRecord{
+				LineNumber: lineNum,
+				Request:    raw.ConversationEvaluationRequest,
+				HumanLabel: raw.HumanLabel,
+				HumanScore: raw.HumanScore,
+			}
 		}
 
 		if err := scanner.Err(); err != nil {

@@ -25,6 +25,7 @@ type Config struct {
 	HolisticWeight         float64
 	VerdictPassThreshold   float64
 	VerdictReviewThreshold float64
+	ScoringFormula         string
 	InMemoryDB             bool
 	DBConnectionString     string
 }
@@ -43,6 +44,7 @@ func LoadConfig() *Config {
 		HolisticWeight:         env.GetFloat("CONVERSATION_HOLISTIC_WEIGHT", 0.5),
 		VerdictPassThreshold:   env.GetFloat("VERDICT_PASS_THRESHOLD", 0.8),
 		VerdictReviewThreshold: env.GetFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
+		ScoringFormula:         env.GetString("SCORING_FORMULA", "linear"),
 		InMemoryDB:             env.GetBool("IN_MEMORY_DB", true),
 		DBConnectionString:     env.GetString("THEMIS_DB_URL", ""),
 	}
@@ -87,6 +89,8 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 		return nil, fmt.Errorf("unable to get evaluation repository: %w", err)
 	}
 
+	logger.Info().Str("scoring_formula", cfg.ScoringFormula).Msg("active scoring formula")
+
 	convEvaluator := executor.NewConversationEvaluator(
 		turnRunner,
 		holisticJudge,
@@ -94,6 +98,7 @@ func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependenci
 		cfg.HolisticWeight,
 		cfg.VerdictPassThreshold,
 		cfg.VerdictReviewThreshold,
+		cfg.ScoringFormula,
 		logger,
 	)
 

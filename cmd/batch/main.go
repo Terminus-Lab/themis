@@ -157,8 +157,15 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 	recordsCh := reader.ReadAll(ctx)
 
 	var records []batch.ConversationInputRecord
+	annotations := make(map[string]batch.Annotation)
 	for record := range recordsCh {
 		records = append(records, record)
+		if record.Error == nil && (record.HumanLabel != "" || record.HumanScore != nil) {
+			annotations[record.Request.ConversationID] = batch.Annotation{
+				HumanLabel: record.HumanLabel,
+				HumanScore: record.HumanScore,
+			}
+		}
 	}
 
 	log.Info().Int("total", len(records)).Msg("conversation input file parsed")
@@ -201,6 +208,11 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 				successCount++
 			}
 		}
+		if len(annotations) > 0 {
+			report := batch.ComputeCorrelationReport(allResults, annotations)
+			logCorrelationReport(&report)
+			summaryWriter.SetCorrelationReport(&report)
+		}
 		if err := summaryWriter.Close(); err != nil {
 			return fmt.Errorf("failed to write summary: %w", err)
 		}
@@ -215,10 +227,23 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 				successCount++
 			}
 		}
+		if len(annotations) > 0 {
+			report := batch.ComputeCorrelationReport(allResults, annotations)
+			logCorrelationReport(&report)
+			// Write correlation report as a final JSON line with a marker field
+			type correlationReportLine struct {
+				Type string `json:"_type"`
+				batch.CorrelationReport
+			}
+			line := correlationReportLine{Type: "correlation_report", CorrelationReport: report}
+			if err := encoder.Encode(line); err != nil {
+				log.Error().Err(err).Msg("failed to write correlation report line")
+			}
+		}
 	}
 
 	if summary != "" {
-		if err := writeSummary(summary, allResults); err != nil {
+		if err := writeSummary(summary, allResults, annotations); err != nil {
 			return fmt.Errorf("failed to write summary: %w", err)
 		}
 	}
@@ -232,7 +257,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func writeSummary(path string, results []models.ConversationEvaluationResult) error {
+func writeSummary(path string, results []models.ConversationEvaluationResult, annotations map[string]batch.Annotation) error {
 	summaryFile, err := os.Create(path)
 	if err != nil {
 		return err
@@ -245,8 +270,26 @@ func writeSummary(path string, results []models.ConversationEvaluationResult) er
 			log.Error().Err(err).Str("conversation_id", result.ConversationID).Msg("failed to add result to summary")
 		}
 	}
+	if len(annotations) > 0 {
+		report := batch.ComputeCorrelationReport(results, annotations)
+		summaryWriter.SetCorrelationReport(&report)
+	}
 
 	return summaryWriter.Close()
+}
+
+func logCorrelationReport(report *batch.CorrelationReport) {
+	evt := log.Info().Int("annotated_count", report.AnnotatedCount)
+	if report.KendallTau != nil {
+		evt = evt.Float64("kendall_tau", *report.KendallTau)
+	}
+	if report.CohensKappa != nil {
+		evt = evt.Float64("cohens_kappa", *report.CohensKappa)
+	}
+	if report.WeightedKappa != nil {
+		evt = evt.Float64("weighted_kappa", *report.WeightedKappa)
+	}
+	evt.Msg("correlation report")
 }
 
 func setupGracefulShutdown() (context.Context, context.CancelFunc) {

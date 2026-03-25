@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -16,15 +17,16 @@ import (
 //
 //	Phase A: per-turn judges (relevance, coherence, completeness) → turn_avg
 //	Phase B: holistic judge over all turns → holistic_score
-//	final_score = α × holistic_score + (1-α) × turn_avg
+//	final_score = computed by scoringFormula (linear/geometric/min)
 type ConversationEvaluator struct {
-	turnRunner    *judge.JudgeRunner
-	holisticJudge judge.Judge
-	repository    storage.Repository
-	holisticWeight float64 // α — weight for holistic score (0.0–1.0)
-	passThreshold  float64
+	turnRunner      *judge.JudgeRunner
+	holisticJudge   judge.Judge
+	repository      storage.Repository
+	holisticWeight  float64 // α — weight for holistic score (0.0–1.0)
+	passThreshold   float64
 	reviewThreshold float64
-	logger         *zerolog.Logger
+	scoringFormula  string // "linear" (default), "geometric", or "min"
+	logger          *zerolog.Logger
 }
 
 func NewConversationEvaluator(
@@ -34,6 +36,7 @@ func NewConversationEvaluator(
 	holisticWeight float64,
 	passThreshold float64,
 	reviewThreshold float64,
+	scoringFormula string,
 	logger *zerolog.Logger,
 ) *ConversationEvaluator {
 	return &ConversationEvaluator{
@@ -43,6 +46,7 @@ func NewConversationEvaluator(
 		holisticWeight:  holisticWeight,
 		passThreshold:   passThreshold,
 		reviewThreshold: reviewThreshold,
+		scoringFormula:  scoringFormula,
 		logger:          logger,
 	}
 }
@@ -97,8 +101,7 @@ func (e *ConversationEvaluator) Execute(ctx context.Context, req models.Conversa
 	result.HolisticReason = holisticResult.Reason
 
 	// === Final score ===
-	α := e.holisticWeight
-	result.FinalScore = α*result.HolisticScore + (1-α)*result.TurnAvg
+	result.FinalScore = e.computeFinalScore(result.HolisticScore, result.TurnAvg, e.holisticWeight)
 	result.Verdict = e.verdict(result.FinalScore)
 
 	// === Persist ===
@@ -204,6 +207,28 @@ func weightedAverage(scores []models.StageResult) float64 {
 		return 0.0
 	}
 	return weightedSum / totalWeight
+}
+
+// computeFinalScore applies the configured scoring formula.
+//
+//   - "linear" (default): α×holistic + (1-α)×turnAvg
+//   - "geometric": holistic^α × turnAvg^(1-α) — penalizes low scores more severely
+//   - "min": min(holistic, turnAvg) — fails if either phase fails
+func (e *ConversationEvaluator) computeFinalScore(holistic, turnAvg, alpha float64) float64 {
+	switch e.scoringFormula {
+	case "geometric":
+		if holistic <= 0 || turnAvg <= 0 {
+			return 0
+		}
+		return math.Pow(holistic, alpha) * math.Pow(turnAvg, 1-alpha)
+	case "min":
+		if holistic < turnAvg {
+			return holistic
+		}
+		return turnAvg
+	default: // "linear"
+		return alpha*holistic + (1-alpha)*turnAvg
+	}
 }
 
 func (e *ConversationEvaluator) verdict(score float64) models.Verdict {

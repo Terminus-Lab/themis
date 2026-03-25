@@ -123,7 +123,6 @@
             margin-bottom: 2px;
         }
 
-        /* Reuse .tab class so JS's classList.add('active') still works */
         .tab {
             display: flex;
             align-items: center;
@@ -233,91 +232,13 @@
             padding: 24px 28px;
         }
 
-        /* ── Tabs content panes ── */
+        /* ── Tab content panes ── */
         .tab-content {
             display: none;
         }
 
         .tab-content.active {
             display: block;
-        }
-
-        /* ── Filters ── */
-        .filters {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 18px 20px;
-            margin-bottom: 20px;
-        }
-
-        .filter-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-
-        .filter-group {
-            flex: 1;
-            min-width: 180px;
-        }
-
-        label {
-            display: block;
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 500;
-            margin-bottom: 6px;
-        }
-
-        input, select {
-            width: 100%;
-            background: var(--input-bg);
-            border: 1px solid var(--input-border);
-            color: var(--text-primary);
-            padding: 9px 12px;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 14px;
-            transition: border-color 0.15s;
-            outline: none;
-        }
-
-        input:focus, select:focus {
-            border-color: var(--accent);
-        }
-
-        button {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 9px 18px;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.15s;
-            white-space: nowrap;
-        }
-
-        button:hover {
-            background: var(--accent-hover);
-        }
-
-        button:active {
-            background: var(--accent-active);
-        }
-
-        .btn-secondary {
-            background: var(--surface);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: var(--surface-hover);
         }
 
         /* ── Stats row ── */
@@ -351,58 +272,6 @@
             letter-spacing: -0.5px;
         }
 
-        /* ── Table ── */
-        .results-table {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        thead {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-        }
-
-        th {
-            text-align: left;
-            padding: 13px 16px;
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-        }
-
-        tbody tr {
-            border-bottom: 1px solid var(--border);
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        tbody tr:last-child {
-            border-bottom: none;
-        }
-
-        tbody tr:hover {
-            background: var(--surface-hover);
-        }
-
-        tbody tr.expanded {
-            background: var(--surface-hover);
-        }
-
-        td {
-            padding: 13px 16px;
-            color: var(--text-primary);
-            font-size: 14px;
-        }
-
         /* ── Verdict badges ── */
         .verdict {
             display: inline-block;
@@ -432,107 +301,6 @@
         .confidence {
             color: var(--accent);
             font-weight: 600;
-        }
-
-        .query-preview {
-            max-width: 380px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: var(--text-secondary);
-        }
-
-        /* ── Detail row ── */
-        .detail-row {
-            display: none;
-            background: var(--main-bg);
-        }
-
-        .detail-row.visible {
-            display: table-row;
-        }
-
-        .detail-content {
-            padding: 20px 16px;
-        }
-
-        .detail-section {
-            margin-bottom: 18px;
-        }
-
-        .detail-section:last-child {
-            margin-bottom: 0;
-        }
-
-        .detail-title {
-            color: var(--text-secondary);
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .detail-text {
-            color: var(--text-primary);
-            line-height: 1.7;
-            padding: 12px 14px;
-            background: var(--surface);
-            border-radius: 8px;
-            border-left: 3px solid var(--accent);
-            font-size: 14px;
-        }
-
-        .stages-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-            gap: 10px;
-        }
-
-        .stage-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px 14px;
-        }
-
-        .stage-name {
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 500;
-            margin-bottom: 4px;
-        }
-
-        .stage-score {
-            color: var(--accent);
-            font-size: 20px;
-            font-weight: 700;
-        }
-
-        .stage-reason {
-            color: var(--text-muted);
-            font-size: 12px;
-            margin-top: 6px;
-            line-height: 1.5;
-        }
-
-        /* ── Pagination ── */
-        .pagination {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 16px;
-            border-top: 1px solid var(--border);
-        }
-
-        .pagination-info {
-            color: var(--text-secondary);
-            font-size: 13px;
-        }
-
-        .pagination-controls {
-            display: flex;
-            gap: 8px;
         }
 
         /* ── Utility ── */
@@ -596,9 +364,36 @@
             font-size: 13px;
         }
 
-        .refresh-controls button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        button:active {
+            background: var(--accent-active);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-hover);
         }
 
         /* ── Toggle switch ── */
@@ -645,7 +440,7 @@
             transform: translateX(22px);
         }
 
-        /* ── Conversations ── */
+        /* ── Conversations list ── */
         .conversation-card {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -686,6 +481,7 @@
             display: flex;
             gap: 20px;
             margin-bottom: 12px;
+            flex-wrap: wrap;
         }
 
         .conversation-meta-item {
@@ -707,38 +503,7 @@
             font-size: 13px;
         }
 
-        .conversation-verdicts {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .conversation-verdict-badge {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .conversation-verdict-badge.pass {
-            background: var(--verdict-pass-bg);
-            color: var(--verdict-pass-fg);
-        }
-
-        .conversation-verdict-badge.review {
-            background: var(--verdict-review-bg);
-            color: var(--verdict-review-fg);
-        }
-
-        .conversation-verdict-badge.fail {
-            background: var(--verdict-fail-bg);
-            color: var(--verdict-fail-fg);
-        }
-
-        /* ── Turn items ── */
+        /* ── Turn items in detail view ── */
         .turn-item {
             background: var(--main-bg);
             border: 1px solid var(--border);
@@ -759,12 +524,6 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
-        }
-
-        .turn-event-id {
-            color: var(--text-muted);
-            font-size: 11px;
-            margin-bottom: 4px;
         }
 
         .turn-query {
@@ -808,6 +567,104 @@
             background: var(--surface-hover);
         }
 
+        /* ── Judge scores grid ── */
+        .judge-scores {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            display: none;
+        }
+
+        .judge-scores.visible {
+            display: block;
+        }
+
+        .stages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .stage-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+
+        .stage-name {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            text-transform: capitalize;
+        }
+
+        .stage-score {
+            color: var(--accent);
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .stage-reason {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        /* ── Detail summary card ── */
+        .detail-summary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+        }
+
+        .detail-summary-row {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .detail-summary-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .detail-metric-label {
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .detail-metric-value {
+            color: var(--accent);
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .holistic-reason {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.7;
+            padding: 10px 14px;
+            background: var(--main-bg);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent);
+            margin-top: 12px;
+        }
+
         /* ── Monitoring ── */
         .monitoring-controls {
             display: flex;
@@ -830,6 +687,14 @@
 
         .monitoring-controls select {
             width: auto;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
         }
 
         .metric-section {
@@ -848,996 +713,602 @@
             letter-spacing: 0.5px;
             margin-bottom: 16px;
         }
-
-        .turns-list {
-            margin-top: 14px;
-            padding-top: 14px;
-            border-top: 1px solid var(--border);
-            display: none;
-        }
-
-        .turns-list.visible {
-            display: block;
-        }
     </style>
 </head>
 <body>
-    <div class="app-shell">
+<div class="app-shell">
 
-        <!-- ── Sidebar ── -->
-        <nav class="sidebar">
-            <div class="sidebar-brand">
-                <div class="sidebar-brand-name">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-5px;margin-right:8px;">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="7" y1="9" x2="17" y2="9"/>
-                        <line x1="12" y1="9" x2="12" y2="17"/>
-                    </svg>Themis
-                </div>
-                <div class="sidebar-brand-sub">AI Evaluation Dashboard</div>
-            </div>
+    <!-- ── Sidebar ── -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-name">Themis</div>
+            <div class="sidebar-brand-sub">Conversation Evaluation</div>
+        </div>
 
-            <div class="sidebar-nav">
-                <div class="sidebar-section-label">Views</div>
-                <button class="tab active" id="resultsTabBtn" onclick="showTab('results')">
-                    <span class="tab-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2"/>
-                            <line x1="3" y1="9" x2="21" y2="9"/>
-                            <line x1="3" y1="15" x2="21" y2="15"/>
-                            <line x1="9" y1="9" x2="9" y2="21"/>
-                        </svg>
-                    </span>
-                    Results
-                </button>
-                <button class="tab" id="conversationsTabBtn" onclick="showTab('conversations')">
-                    <span class="tab-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                        </svg>
-                    </span>
-                    Conversations
-                </button>
-                <button class="tab" id="monitoringTabBtn" onclick="showTab('monitoring')">
-                    <span class="tab-icon">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="18" y1="20" x2="18" y2="10"/>
-                            <line x1="12" y1="20" x2="12" y2="4"/>
-                            <line x1="6" y1="20" x2="6" y2="14"/>
-                            <line x1="2" y1="20" x2="22" y2="20"/>
-                        </svg>
-                    </span>
-                    Monitoring
-                </button>
-            </div>
-
-            <div class="sidebar-footer">
-                <button class="theme-toggle" onclick="toggleTheme()">
-                    <span id="themeIcon">🌙</span>
-                    <span class="theme-toggle-label" id="themeLabel">Dark mode</span>
-                </button>
-            </div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Views</div>
+            <button class="tab active" id="conversationsTabBtn" onclick="showTab('conversations')">
+                <span class="tab-icon">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </span>
+                Conversations
+            </button>
+            <button class="tab" id="monitoringTabBtn" onclick="showTab('monitoring')">
+                <span class="tab-icon">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </span>
+                Monitoring
+            </button>
         </nav>
 
-        <!-- ── Main content ── -->
-        <div class="main-content">
-            <div class="top-bar">
-                <div class="top-bar-title" id="topBarTitle">Results</div>
-                <div class="top-bar-sub">Real-time AI agent response evaluations</div>
-            </div>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="themeIcon">🌙</span>
+                <span class="theme-toggle-label" id="themeLabel">Dark mode</span>
+            </button>
+        </div>
+    </div>
 
-            <div class="content-area">
+    <!-- ── Main content ── -->
+    <div class="main-content">
+        <div class="top-bar">
+            <div class="top-bar-title" id="topBarTitle">Conversations</div>
+            <div class="top-bar-sub" id="topBarSub"></div>
+        </div>
 
-                <!-- Results Tab -->
-                <div id="resultsTab" class="tab-content active">
-                    <div class="filters">
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label>Agent Name</label>
-                                <input type="text" id="agentFilter" placeholder="Filter by agent name...">
-                            </div>
-                            <div class="filter-group">
-                                <label>Verdict</label>
-                                <select id="verdictFilter">
-                                    <option value="">All verdicts</option>
-                                    <option value="pass">Pass</option>
-                                    <option value="review">Review</option>
-                                    <option value="fail">Fail</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label>Results per page</label>
-                                <select id="limitFilter">
-                                    <option value="10">10</option>
-                                    <option value="25" selected>25</option>
-                                    <option value="50">50</option>
-                                    <option value="100">100</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <button onclick="applyFilters()">Apply</button>
-                            </div>
-                            <div class="filter-group">
-                                <button class="btn-secondary" onclick="resetFilters()">Reset</button>
-                            </div>
-                        </div>
-                    </div>
+        <div class="content-area">
 
+            <!-- ── Conversations tab ── -->
+            <div class="tab-content active" id="conversationsTab">
+
+                <!-- List view -->
+                <div id="conversationsListView">
+                    <!-- Stats -->
                     <div class="stats">
                         <div class="stat-card">
-                            <div class="stat-label">Total Results</div>
-                            <div class="stat-value" id="totalCount">-</div>
+                            <div class="stat-label">Total Conversations</div>
+                            <div class="stat-value" id="totalConversations">—</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-label">Current Page</div>
-                            <div class="stat-value" id="currentPage">-</div>
+                            <div class="stat-label">Avg Final Score</div>
+                            <div class="stat-value" id="avgFinalScore">—</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-label">Showing</div>
-                            <div class="stat-value" id="showingCount">-</div>
+                            <div class="stat-label">Pass Rate</div>
+                            <div class="stat-value" id="passRate">—</div>
                         </div>
                     </div>
 
-                    <div id="errorContainer"></div>
-
+                    <!-- Refresh controls -->
                     <div class="refresh-controls">
-                        <div class="refresh-status" id="refreshStatus">Auto-refresh: OFF</div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
-                            <span class="toggle-slider"></span>
+                        <span class="refresh-status" id="convRefreshStatus">Ready</span>
+                        <button class="btn-secondary" onclick="fetchConversations()">Refresh</button>
+                        <label style="display:flex;align-items:center;gap:4px;color:var(--text-secondary);font-size:13px;cursor:pointer;">
+                            <span class="toggle-switch">
+                                <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()">
+                                <span class="toggle-slider"></span>
+                            </span>
+                            Auto-refresh
                         </label>
                     </div>
 
-                    <div class="results-table">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Event ID</th>
-                                    <th>Agent</th>
-                                    <th>Query</th>
-                                    <th>Verdict</th>
-                                    <th>Confidence</th>
-                                    <th>Stages</th>
-                                </tr>
-                            </thead>
-                            <tbody id="resultsBody">
-                                <tr>
-                                    <td colspan="6" class="loading">Loading results...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="pagination">
-                            <div class="pagination-info" id="paginationInfo">-</div>
-                            <div class="pagination-controls">
-                                <button id="prevBtn" onclick="previousPage()" disabled>← Previous</button>
-                                <button id="nextBtn" onclick="nextPage()" disabled>Next →</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!-- End Results Tab -->
-
-                <!-- Conversations Tab -->
-                <div id="conversationsTab" class="tab-content">
-                    <div class="refresh-controls">
-                        <div class="refresh-status" id="convRefreshStatus">Loading conversations...</div>
-                        <button onclick="fetchConversations()">Refresh</button>
-                    </div>
-
+                    <!-- Error -->
                     <div id="conversationErrorContainer"></div>
 
-                    <div id="conversationsListView">
-                        <div class="stats">
-                            <div class="stat-card">
-                                <div class="stat-label">Total Conversations</div>
-                                <div class="stat-value" id="totalConversations">-</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-label">Avg Turns / Conv</div>
-                                <div class="stat-value" id="avgTurns">-</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-label">Avg Confidence</div>
-                                <div class="stat-value" id="avgConfidence">-</div>
-                            </div>
-                        </div>
-
-                        <div id="conversationsList">
-                            <div class="empty-state">
-                                <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-                                <div>Loading conversations...</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="conversationDetailView" style="display: none;">
-                        <button class="back-button" onclick="backToConversationsList()">
-                            ← Back to Conversations
-                        </button>
-                        <div id="conversationDetail"></div>
-                    </div>
-                </div>
-                <!-- End Conversations Tab -->
-
-                <!-- Monitoring Tab -->
-                <div id="monitoringTab" class="tab-content">
-                    <div class="monitoring-controls">
-                        <label>Window</label>
-                        <select id="monitoringWindow" onchange="fetchHealthMetrics()">
-                            <option value="24h">Last 24 hours</option>
-                            <option value="7d" selected>Last 7 days</option>
-                            <option value="30d">Last 30 days</option>
-                            <option value="90d">Last 90 days</option>
-                        </select>
-                        <button onclick="fetchHealthMetrics()" style="margin-left: auto;">Refresh</button>
-                    </div>
-
-                    <div id="monitoringError"></div>
-
-                    <div id="monitoringContent">
+                    <!-- Conversation cards -->
+                    <div id="conversationsList">
                         <div class="empty-state">
-                            <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div>
-                            <div>Loading metrics...</div>
+                            <div class="empty-state-icon">📡</div>
+                            <div>Loading conversations...</div>
                         </div>
                     </div>
                 </div>
-                <!-- End Monitoring Tab -->
 
-            </div><!-- end content-area -->
-        </div><!-- end main-content -->
-    </div><!-- end app-shell -->
-
-    <script>
-        const API_BASE = window.location.origin;
-        let currentOffset = 0;
-        let currentLimit = 25;
-        let totalResults = 0;
-        let hasMore = false;
-        let expandedRows = new Set(); // Now stores event_ids instead of row_ids
-        let autoRefreshEnabled = false;
-        let refreshInterval = null;
-
-        async function fetchResults() {
-            const agentName = document.getElementById('agentFilter').value;
-            const verdict = document.getElementById('verdictFilter').value;
-            const limit = parseInt(document.getElementById('limitFilter').value);
-
-            let url = `${API_BASE}/api/v1/results?limit=${limit}&offset=${currentOffset}`;
-            if (agentName) url += `&agent_name=${encodeURIComponent(agentName)}`;
-            if (verdict) url += `&verdict=${encodeURIComponent(verdict)}`;
-
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                renderResults(data);
-                updateStats(data);
-                updatePagination(data);
-                clearError();
-            } catch (error) {
-                showError(`Failed to fetch results: ${error.message}`);
-                renderEmpty();
-            }
-        }
-
-        function renderResults(data) {
-            const tbody = document.getElementById('resultsBody');
-
-            if (!data.results || data.results.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg></div>
-                            <div>No evaluation results found</div>
-                            <div style="margin-top: 10px; font-size: 12px;">Try adjusting your filters or run some evaluations</div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = '';
-            data.results.forEach((result, index) => {
-                const rowId = `row-${result.event_id}`;
-                const detailId = `detail-${result.event_id}`;
-
-                // Main row
-                const row = document.createElement('tr');
-                row.id = rowId;
-                row.onclick = () => toggleDetails(result.event_id);
-                row.innerHTML = `
-                    <td><code>${result.event_id}</code></td>
-                    <td>${result.agent_name} <span class="timestamp">v${result.agent_version}</span></td>
-                    <td class="query-preview">${result.user_query}</td>
-                    <td><span class="verdict verdict-${result.verdict}">${result.verdict}</span></td>
-                    <td class="confidence">${(result.confidence * 100).toFixed(1)}%</td>
-                    <td>${result.stage_scores.length} stages</td>
-                `;
-                tbody.appendChild(row);
-
-                // Detail row (initially hidden)
-                const detailRow = document.createElement('tr');
-                detailRow.id = detailId;
-                detailRow.className = 'detail-row';
-                detailRow.innerHTML = `
-                    <td colspan="6">
-                        <div class="detail-content">
-                            <div class="detail-section">
-                                <div class="detail-title">User Query</div>
-                                <div class="detail-text">${result.user_query}</div>
-                            </div>
-                            <div class="detail-section">
-                                <div class="detail-title">Agent Answer</div>
-                                <div class="detail-text">${result.answer}</div>
-                            </div>
-                            ${result.context ? `
-                            <div class="detail-section">
-                                <div class="detail-title">Context</div>
-                                <div class="detail-text">${result.context}</div>
-                            </div>
-                            ` : ''}
-                            <div class="detail-section">
-                                <div class="detail-title">Stage Scores</div>
-                                <div class="stages-grid">
-                                    ${result.stage_scores.map(stage => `
-                                        <div class="stage-card">
-                                            <div class="stage-name">${stage.name}</div>
-                                            <div class="stage-score">${(stage.score * 100).toFixed(0)}%</div>
-                                            ${stage.reason ? `<div class="stage-reason">${stage.reason}</div>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(detailRow);
-
-                // Re-expand if this row was previously expanded
-                if (expandedRows.has(result.event_id)) {
-                    row.classList.add('expanded');
-                    detailRow.classList.add('visible');
-                }
-            });
-        }
-
-        function toggleDetails(eventId) {
-            const row = document.getElementById(`row-${eventId}`);
-            const detailRow = document.getElementById(`detail-${eventId}`);
-
-            if (!row || !detailRow) return;
-
-            if (expandedRows.has(eventId)) {
-                expandedRows.delete(eventId);
-                row.classList.remove('expanded');
-                detailRow.classList.remove('visible');
-                console.log('[result] collapsed', eventId);
-            } else {
-                expandedRows.add(eventId);
-                row.classList.add('expanded');
-                detailRow.classList.add('visible');
-                console.log('[result] expanded', eventId);
-            }
-        }
-
-        function updateStats(data) {
-            document.getElementById('totalCount').textContent = data.total || 0;
-            document.getElementById('currentPage').textContent = Math.floor(currentOffset / currentLimit) + 1;
-            document.getElementById('showingCount').textContent = data.count || 0;
-
-            totalResults = data.total;
-            hasMore = data.has_more;
-        }
-
-        function updatePagination(data) {
-            const prevBtn = document.getElementById('prevBtn');
-            const nextBtn = document.getElementById('nextBtn');
-            const info = document.getElementById('paginationInfo');
-
-            prevBtn.disabled = currentOffset === 0;
-            nextBtn.disabled = !data.has_more;
-
-            const start = currentOffset + 1;
-            const end = currentOffset + (data.count || 0);
-            info.textContent = `Showing ${start}-${end} of ${data.total || 0} results`;
-        }
-
-        function applyFilters() {
-            currentOffset = 0;
-            currentLimit = parseInt(document.getElementById('limitFilter').value);
-            expandedRows.clear();
-            const agent = document.getElementById('agentFilter').value;
-            const verdict = document.getElementById('verdictFilter').value;
-            console.log('[filters] applied', { agent: agent || '*', verdict: verdict || '*', limit: currentLimit });
-            fetchResults();
-        }
-
-        function resetFilters() {
-            document.getElementById('agentFilter').value = '';
-            document.getElementById('verdictFilter').value = '';
-            document.getElementById('limitFilter').value = '25';
-            console.log('[filters] reset');
-            applyFilters();
-        }
-
-        function nextPage() {
-            if (hasMore) {
-                currentOffset += currentLimit;
-                expandedRows.clear();
-                console.log('[pagination] next →', { offset: currentOffset, limit: currentLimit, total: totalResults });
-                fetchResults();
-            }
-        }
-
-        function previousPage() {
-            if (currentOffset > 0) {
-                currentOffset = Math.max(0, currentOffset - currentLimit);
-                expandedRows.clear();
-                console.log('[pagination] ← previous', { offset: currentOffset, limit: currentLimit, total: totalResults });
-                fetchResults();
-            }
-        }
-
-        function showError(message) {
-            const container = document.getElementById('errorContainer');
-            container.innerHTML = `<div class="error">⚠️ ${message}</div>`;
-        }
-
-        function clearError() {
-            document.getElementById('errorContainer').innerHTML = '';
-        }
-
-        function renderEmpty() {
-            document.getElementById('totalCount').textContent = '0';
-            document.getElementById('currentPage').textContent = '0';
-            document.getElementById('showingCount').textContent = '0';
-        }
-
-        function toggleAutoRefresh() {
-            autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
-            console.log('[auto-refresh]', autoRefreshEnabled ? 'enabled (10s interval)' : 'disabled');
-
-            // Save preference to localStorage
-            localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
-
-            if (autoRefreshEnabled) {
-                startAutoRefresh();
-            } else {
-                stopAutoRefresh();
-            }
-        }
-
-        function startAutoRefresh() {
-            autoRefreshEnabled = true;
-            updateRefreshStatus();
-
-            // Start refresh interval (every 10 seconds)
-            if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(() => {
-                fetchResults();
-            }, 10000);
-        }
-
-        function stopAutoRefresh() {
-            autoRefreshEnabled = false;
-
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-
-            updateRefreshStatus();
-        }
-
-        function updateRefreshStatus() {
-            const statusEl = document.getElementById('refreshStatus');
-
-            if (autoRefreshEnabled) {
-                statusEl.textContent = '🔄 Auto-refresh: ON';
-                statusEl.classList.add('active');
-            } else {
-                statusEl.textContent = '⏸️ Auto-refresh: OFF';
-                statusEl.classList.remove('active');
-            }
-        }
-
-        // Theme Management
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme') || 'dark';
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            console.log('[theme] switched to', newTheme);
-
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeUI(newTheme);
-        }
-
-        function updateThemeUI(theme) {
-            const themeLabel = document.getElementById('themeLabel');
-            const themeIcon = document.getElementById('themeIcon');
-
-            if (theme === 'light') {
-                themeLabel.textContent = 'Light mode';
-                themeIcon.textContent = '☀️';
-            } else {
-                themeLabel.textContent = 'Dark mode';
-                themeIcon.textContent = '🌙';
-            }
-        }
-
-        function initializeTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeUI(savedTheme);
-        }
-
-        // Tab Management
-        const TAB_TITLES = { results: 'Results', conversations: 'Conversations', monitoring: 'Monitoring' };
-        let conversationsLoaded = false;
-        let monitoringLoaded = false;
-
-        function showTab(tabName) {
-            console.log('[tab] switched to', tabName);
-            // Update URL hash
-            window.location.hash = tabName;
-
-            // Update tab buttons
-            document.getElementById('resultsTabBtn').classList.remove('active');
-            document.getElementById('conversationsTabBtn').classList.remove('active');
-            document.getElementById('monitoringTabBtn').classList.remove('active');
-
-            // Update tab content
-            document.getElementById('resultsTab').classList.remove('active');
-            document.getElementById('conversationsTab').classList.remove('active');
-            document.getElementById('monitoringTab').classList.remove('active');
-
-            document.getElementById('topBarTitle').textContent = TAB_TITLES[tabName] || tabName;
-
-            if (tabName === 'results') {
-                document.getElementById('resultsTabBtn').classList.add('active');
-                document.getElementById('resultsTab').classList.add('active');
-            } else if (tabName === 'conversations') {
-                document.getElementById('conversationsTabBtn').classList.add('active');
-                document.getElementById('conversationsTab').classList.add('active');
-                if (!conversationsLoaded) {
-                    fetchConversations();
-                }
-            } else if (tabName === 'monitoring') {
-                document.getElementById('monitoringTabBtn').classList.add('active');
-                document.getElementById('monitoringTab').classList.add('active');
-                if (!monitoringLoaded) {
-                    fetchHealthMetrics();
-                }
-            }
-        }
-
-        async function fetchHealthMetrics() {
-            const window_ = document.getElementById('monitoringWindow').value;
-            const url = `${API_BASE}/api/v1/metrics/health?window=${window_}`;
-            console.log('[monitoring] fetching health metrics', { window: window_ });
-            monitoringLoaded = true;
-
-            document.getElementById('monitoringError').innerHTML = '';
-            document.getElementById('monitoringContent').innerHTML = `
-                <div class="empty-state"><div class="empty-state-icon">📡</div><div>Loading metrics...</div></div>`;
-
-            try {
-                const resp = await fetch(url);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-                const data = await resp.json();
-                renderHealthMetrics(data);
-            } catch (err) {
-                document.getElementById('monitoringError').innerHTML =
-                    `<div class="error">⚠️ Failed to load metrics: ${err.message}</div>`;
-                document.getElementById('monitoringContent').innerHTML = '';
-            }
-        }
-
-        function renderHealthMetrics(data) {
-            const confidence = ((data.avg_confidence || 0) * 100).toFixed(1);
-
-            document.getElementById('monitoringContent').innerHTML = `
-                <div class="metric-section">
-                    <div class="metric-section-title">Overview — ${data.window}</div>
-                    <table style="width:100%; border-collapse:collapse; margin-top:12px;">
-                        <thead>
-                            <tr style="border-bottom:1px solid var(--border); color:var(--text-secondary); text-align:left;">
-                                <th style="padding:8px 12px; font-weight:600; font-size:12px;">Metric</th>
-                                <th style="padding:8px 12px; font-weight:600; font-size:12px;">Value</th>
-                                <th style="padding:8px 12px; font-weight:600; font-size:12px;">Description</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="border-bottom:1px solid var(--border);">
-                                <td style="padding:10px 12px;">Total Evaluations</td>
-                                <td style="padding:10px 12px; color:var(--accent); font-weight:700;">${data.total_evaluations}</td>
-                                <td style="padding:10px 12px; color:var(--text-secondary);">Number of evaluations in the selected window</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:10px 12px;">Avg Confidence</td>
-                                <td style="padding:10px 12px; color:var(--accent); font-weight:700;">${confidence}%</td>
-                                <td style="padding:10px 12px; color:var(--text-secondary);">Mean final confidence score across all evaluations (higher = better)</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>`;
-        }
-
-        function initializeTab() {
-            // Read tab from URL hash, default to 'results'
-            const hash = window.location.hash.substring(1); // Remove '#'
-
-            if (hash.startsWith('results/')) {
-                // Results tab with specific event_id
-                const eventId = hash.substring('results/'.length);
-                showTab('results');
-                // Wait for results to load, then expand the row
-                setTimeout(() => {
-                    expandedRows.add(eventId);
-                    const row = document.getElementById(`row-${eventId}`);
-                    const detailRow = document.getElementById(`detail-${eventId}`);
-                    if (row && detailRow) {
-                        row.classList.add('expanded');
-                        detailRow.classList.add('visible');
-                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }, 500); // Give time for results to render
-            } else if (hash.startsWith('conversations/')) {
-                // Conversation detail view
-                const conversationId = hash.substring('conversations/'.length);
-                showTab('conversations');
-                // Wait for conversations to load, then show detail (don't update hash)
-                if (!conversationsLoaded) {
-                    fetchConversations().then(() => {
-                        viewConversationDetails(conversationId, false);
-                    });
-                } else {
-                    viewConversationDetails(conversationId, false);
-                }
-            } else if (hash === 'conversations') {
-                showTab('conversations');
-            } else if (hash === 'monitoring') {
-                showTab('monitoring');
-            } else {
-                showTab('results');
-            }
-        }
-
-        // Handle browser back/forward buttons
-        window.addEventListener('hashchange', function() {
-            const hash = window.location.hash.substring(1);
-
-            // Update UI without pushing to history (already done by browser)
-            document.getElementById('resultsTabBtn').classList.remove('active');
-            document.getElementById('conversationsTabBtn').classList.remove('active');
-            document.getElementById('monitoringTabBtn').classList.remove('active');
-            document.getElementById('resultsTab').classList.remove('active');
-            document.getElementById('conversationsTab').classList.remove('active');
-            document.getElementById('monitoringTab').classList.remove('active');
-
-            if (hash.startsWith('results/')) {
-                // Results tab with specific event_id
-                const eventId = hash.substring('results/'.length);
-                document.getElementById('resultsTabBtn').classList.add('active');
-                document.getElementById('resultsTab').classList.add('active');
-                document.getElementById('topBarTitle').textContent = 'Results';
-                // Expand the specific row
-                setTimeout(() => {
-                    expandedRows.add(eventId);
-                    const row = document.getElementById(`row-${eventId}`);
-                    const detailRow = document.getElementById(`detail-${eventId}`);
-                    if (row && detailRow) {
-                        row.classList.add('expanded');
-                        detailRow.classList.add('visible');
-                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }, 100);
-            } else if (hash.startsWith('conversations/')) {
-                // Conversation detail view
-                const conversationId = hash.substring('conversations/'.length);
-                document.getElementById('conversationsTabBtn').classList.add('active');
-                document.getElementById('conversationsTab').classList.add('active');
-                document.getElementById('topBarTitle').textContent = 'Conversations';
-                if (!conversationsLoaded) {
-                    fetchConversations().then(() => {
-                        viewConversationDetails(conversationId, false);
-                    });
-                } else {
-                    viewConversationDetails(conversationId, false);
-                }
-            } else if (hash === 'conversations') {
-                document.getElementById('conversationsTabBtn').classList.add('active');
-                document.getElementById('conversationsTab').classList.add('active');
-                document.getElementById('topBarTitle').textContent = 'Conversations';
-                // Show list view if we're viewing detail
-                if (currentConversationId) {
-                    document.getElementById('conversationsListView').style.display = 'block';
-                    document.getElementById('conversationDetailView').style.display = 'none';
-                    currentConversationId = null;
-                }
-                if (!conversationsLoaded) {
-                    fetchConversations();
-                }
-            } else if (hash === 'monitoring') {
-                document.getElementById('monitoringTabBtn').classList.add('active');
-                document.getElementById('monitoringTab').classList.add('active');
-                document.getElementById('topBarTitle').textContent = 'Monitoring';
-                if (!monitoringLoaded) fetchHealthMetrics();
-            } else {
-                document.getElementById('resultsTabBtn').classList.add('active');
-                document.getElementById('resultsTab').classList.add('active');
-                document.getElementById('topBarTitle').textContent = 'Results';
-            }
-        });
-
-        // Conversations Management
-        let conversationsData = [];
-        let currentConversationId = null;
-
-        async function fetchConversations() {
-            const url = `${API_BASE}/api/v1/conversations`;
-            console.log('[conversations] fetching list');
-
-            try {
-                document.getElementById('convRefreshStatus').textContent = '🔄 Loading conversations...';
-
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                conversationsData = data.conversations || [];
-                renderConversations(conversationsData);
-                updateConversationStats(conversationsData);
-                clearConversationError();
-                conversationsLoaded = true;
-
-                const count = conversationsData.length;
-                console.log('[conversations] loaded', count, 'conversations');
-                document.getElementById('convRefreshStatus').textContent = `Loaded ${count} conversation${count !== 1 ? 's' : ''}`;
-            } catch (error) {
-                showConversationError(`Failed to fetch conversations: ${error.message}`);
-                document.getElementById('convRefreshStatus').textContent = 'Failed to load conversations';
-            }
-        }
-
-        function renderConversations(conversations) {
-            const container = document.getElementById('conversationsList');
-
-            if (!conversations || conversations.length === 0) {
-                container.innerHTML = `
+                <!-- Detail view (hidden by default) -->
+                <div id="conversationDetailView" style="display:none;">
+                    <button class="back-button" onclick="backToConversationsList()">
+                        ← Back to conversations
+                    </button>
+                    <div id="conversationDetail"></div>
+                </div>
+
+            </div>
+
+            <!-- ── Monitoring tab ── -->
+            <div class="tab-content" id="monitoringTab">
+                <div class="monitoring-controls">
+                    <label for="monitoringWindow">Window:</label>
+                    <select id="monitoringWindow" onchange="fetchHealthMetrics()">
+                        <option value="1d">Last 1 day</option>
+                        <option value="7d" selected>Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                    </select>
+                    <button class="btn-secondary" onclick="fetchHealthMetrics()" style="margin-left:auto;">Refresh</button>
+                </div>
+                <div id="monitoringError"></div>
+                <div id="monitoringContent">
                     <div class="empty-state">
-                        <div class="empty-state-icon">💬</div>
-                        <div>No conversations found</div>
-                        <div style="margin-top: 10px; font-size: 12px;">Run evaluations with conversation_id to see multi-turn conversations</div>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = '';
-            conversations.forEach(conv => {
-                const card = document.createElement('div');
-                card.className = 'conversation-card';
-                card.onclick = () => viewConversationDetails(conv.conversation_id);
-
-                const firstTurnDate = new Date(conv.first_turn_at).toLocaleString();
-                const lastTurnDate = new Date(conv.last_turn_at).toLocaleString();
-
-                card.innerHTML = `
-                    <div class="conversation-header">
-                        <div class="conversation-id">${conv.conversation_id}</div>
-                        <div class="conversation-turns">${conv.turn_count} turns</div>
-                    </div>
-                    <div class="conversation-meta">
-                        <div class="conversation-meta-item">
-                            <div class="conversation-meta-label">Agent</div>
-                            <div class="conversation-meta-value">${conv.agent_name} v${conv.agent_version}</div>
-                        </div>
-                        <div class="conversation-meta-item">
-                            <div class="conversation-meta-label">Avg Confidence</div>
-                            <div class="conversation-meta-value">${(conv.avg_confidence * 100).toFixed(1)}%</div>
-                        </div>
-                        <div class="conversation-meta-item">
-                            <div class="conversation-meta-label">First Turn</div>
-                            <div class="conversation-meta-value">${firstTurnDate}</div>
-                        </div>
-                    </div>
-                    <div class="conversation-verdicts">
-                        ${conv.verdict_counts.pass > 0 ? `
-                            <div class="conversation-verdict-badge pass">
-                                ✓ ${conv.verdict_counts.pass} Pass
-                            </div>
-                        ` : ''}
-                        ${conv.verdict_counts.review > 0 ? `
-                            <div class="conversation-verdict-badge review">
-                                ⚠ ${conv.verdict_counts.review} Review
-                            </div>
-                        ` : ''}
-                        ${conv.verdict_counts.fail > 0 ? `
-                            <div class="conversation-verdict-badge fail">
-                                ✗ ${conv.verdict_counts.fail} Fail
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-
-                container.appendChild(card);
-            });
-        }
-
-        async function viewConversationDetails(conversationId, updateHash = true) {
-            currentConversationId = conversationId;
-            console.log('[conversation] viewing detail', conversationId);
-            // Update URL hash to include conversation ID (unless called from hashchange)
-            if (updateHash) {
-                window.location.hash = `conversations/${conversationId}`;
-            }
-
-            const url = `${API_BASE}/api/v1/conversations/${conversationId}`;
-
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                renderConversationDetail(data);
-
-                // Hide list view, show detail view
-                document.getElementById('conversationsListView').style.display = 'none';
-                document.getElementById('conversationDetailView').style.display = 'block';
-            } catch (error) {
-                showConversationError(`Failed to fetch conversation details: ${error.message}`);
-            }
-        }
-
-        function renderConversationDetail(data) {
-            const container = document.getElementById('conversationDetail');
-            const turns = data.turns || [];
-
-            if (turns.length === 0) {
-                container.innerHTML = `<div class="empty-state">No turns found</div>`;
-                return;
-            }
-
-            // Header with conversation summary
-            let html = `
-                <div class="conversation-card" style="margin-bottom: 20px; cursor: default;">
-                    <div class="conversation-header">
-                        <div class="conversation-id">${data.conversation_id}</div>
-                        <div class="conversation-turns">${data.turn_count} turns</div>
-                    </div>
-                    <div class="conversation-meta">
-                        <div class="conversation-meta-item">
-                            <div class="conversation-meta-label">Agent</div>
-                            <div class="conversation-meta-value">${data.agent_name} v${data.agent_version}</div>
-                        </div>
-                        <div class="conversation-meta-item">
-                            <div class="conversation-meta-label">Avg Confidence</div>
-                            <div class="conversation-meta-value">${(data.avg_confidence * 100).toFixed(1)}%</div>
-                        </div>
+                        <div class="empty-state-icon">📡</div>
+                        <div>Loading metrics...</div>
                     </div>
                 </div>
+            </div>
 
-                <h3 style="color: var(--text-secondary); margin-bottom: 14px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Conversation Turns</h3>
-            `;
+        </div>
+    </div>
+</div>
 
-            // Render each turn
-            turns.forEach((turn, index) => {
-                html += `
-                    <div class="turn-item" onclick="viewTurnInResults('${turn.event_id}')" title="Click to view full evaluation in Results tab">
-                        <div class="turn-header">
-                            <div style="color: var(--accent); font-weight: 600; font-size: 13px;">
-                                Turn ${index + 1}
-                            </div>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <span class="verdict verdict-${turn.verdict}">${turn.verdict}</span>
-                                <span class="confidence">${(turn.confidence * 100).toFixed(1)}%</span>
-                            </div>
-                        </div>
-                        <div class="turn-event-id">Event ID: ${turn.event_id}</div>
-                        <div class="turn-query">
-                            <strong>Query:</strong> ${turn.user_query}
-                        </div>
-                        <div class="turn-answer">
-                            <strong>Answer:</strong> ${turn.answer}
-                        </div>
-                        ${turn.context ? `
-                            <div class="turn-answer" style="margin-top: 8px;">
-                                <strong>Context:</strong> ${turn.context}
-                            </div>
-                        ` : ''}
-                        <div class="turn-footer">
-                            <span>${turn.stage_scores.length} evaluation stages · Click to view details</span>
-                        </div>
+<script>
+    const API_BASE = window.location.origin;
+
+    // ── Auto-refresh state ──
+    let autoRefreshEnabled = false;
+    let refreshInterval = null;
+
+    // ── Conversations state ──
+    let conversationsData = [];
+    let currentConversationId = null;
+    let conversationsLoaded = false;
+    let monitoringLoaded = false;
+
+    // ── Turn expansion state ──
+    const expandedTurns = new Set();
+
+    // ── Theme ──
+    function toggleTheme() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        updateThemeUI(next);
+    }
+
+    function updateThemeUI(theme) {
+        document.getElementById('themeLabel').textContent = theme === 'light' ? 'Light mode' : 'Dark mode';
+        document.getElementById('themeIcon').textContent = theme === 'light' ? '☀️' : '🌙';
+    }
+
+    function initializeTheme() {
+        const saved = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+        updateThemeUI(saved);
+    }
+
+    // ── Tab management ──
+    function showTab(tabName) {
+        window.location.hash = tabName;
+
+        document.getElementById('conversationsTabBtn').classList.remove('active');
+        document.getElementById('monitoringTabBtn').classList.remove('active');
+        document.getElementById('conversationsTab').classList.remove('active');
+        document.getElementById('monitoringTab').classList.remove('active');
+
+        if (tabName === 'conversations') {
+            document.getElementById('conversationsTabBtn').classList.add('active');
+            document.getElementById('conversationsTab').classList.add('active');
+            document.getElementById('topBarTitle').textContent = 'Conversations';
+            if (!conversationsLoaded) fetchConversations();
+        } else if (tabName === 'monitoring') {
+            document.getElementById('monitoringTabBtn').classList.add('active');
+            document.getElementById('monitoringTab').classList.add('active');
+            document.getElementById('topBarTitle').textContent = 'Monitoring';
+            if (!monitoringLoaded) fetchHealthMetrics();
+        }
+    }
+
+    function initializeTab() {
+        const hash = window.location.hash.substring(1);
+        if (hash.startsWith('conversations/')) {
+            const convId = hash.substring('conversations/'.length);
+            showTab('conversations');
+            fetchConversations().then(() => viewConversationDetails(convId, false));
+        } else if (hash === 'monitoring') {
+            showTab('monitoring');
+        } else {
+            showTab('conversations');
+        }
+    }
+
+    window.addEventListener('hashchange', function () {
+        const hash = window.location.hash.substring(1);
+        document.getElementById('conversationsTabBtn').classList.remove('active');
+        document.getElementById('monitoringTabBtn').classList.remove('active');
+        document.getElementById('conversationsTab').classList.remove('active');
+        document.getElementById('monitoringTab').classList.remove('active');
+
+        if (hash.startsWith('conversations/')) {
+            const convId = hash.substring('conversations/'.length);
+            document.getElementById('conversationsTabBtn').classList.add('active');
+            document.getElementById('conversationsTab').classList.add('active');
+            document.getElementById('topBarTitle').textContent = 'Conversations';
+            if (!conversationsLoaded) {
+                fetchConversations().then(() => viewConversationDetails(convId, false));
+            } else {
+                viewConversationDetails(convId, false);
+            }
+        } else if (hash === 'conversations') {
+            document.getElementById('conversationsTabBtn').classList.add('active');
+            document.getElementById('conversationsTab').classList.add('active');
+            document.getElementById('topBarTitle').textContent = 'Conversations';
+            if (currentConversationId) {
+                document.getElementById('conversationsListView').style.display = 'block';
+                document.getElementById('conversationDetailView').style.display = 'none';
+                currentConversationId = null;
+            }
+            if (!conversationsLoaded) fetchConversations();
+        } else if (hash === 'monitoring') {
+            document.getElementById('monitoringTabBtn').classList.add('active');
+            document.getElementById('monitoringTab').classList.add('active');
+            document.getElementById('topBarTitle').textContent = 'Monitoring';
+            if (!monitoringLoaded) fetchHealthMetrics();
+        } else {
+            showTab('conversations');
+        }
+    });
+
+    // ── Conversations ──
+    async function fetchConversations() {
+        const url = `${API_BASE}/api/v1/conversations`;
+        document.getElementById('convRefreshStatus').textContent = '🔄 Loading...';
+        document.getElementById('conversationErrorContainer').innerHTML = '';
+
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+            const data = await resp.json();
+            conversationsData = data.conversations || [];
+            renderConversations(conversationsData);
+            updateConversationStats(conversationsData);
+            conversationsLoaded = true;
+            const count = conversationsData.length;
+            document.getElementById('convRefreshStatus').textContent =
+                `Loaded ${count} conversation${count !== 1 ? 's' : ''}`;
+        } catch (err) {
+            document.getElementById('conversationErrorContainer').innerHTML =
+                `<div class="error">Failed to fetch conversations: ${err.message}</div>`;
+            document.getElementById('convRefreshStatus').textContent = 'Failed to load';
+        }
+    }
+
+    function renderConversations(conversations) {
+        const container = document.getElementById('conversationsList');
+
+        if (!conversations || conversations.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">💬</div>
+                    <div>No conversations yet</div>
+                    <div style="margin-top:10px;font-size:12px;">
+                        Evaluate conversations via the API or CLI to see results here
                     </div>
-                `;
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        conversations.forEach(conv => {
+            const card = document.createElement('div');
+            card.className = 'conversation-card';
+            card.onclick = () => viewConversationDetails(conv.conversation_id);
+
+            const score = typeof conv.final_score === 'number'
+                ? (conv.final_score * 100).toFixed(1) + '%'
+                : '—';
+            const createdAt = conv.created_at
+                ? new Date(conv.created_at).toLocaleString()
+                : '—';
+            const agentLabel = conv.agent_version
+                ? `${conv.agent_name} v${conv.agent_version}`
+                : conv.agent_name || '—';
+
+            card.innerHTML = `
+                <div class="conversation-header">
+                    <div class="conversation-id">${escapeHtml(conv.conversation_id)}</div>
+                    <span class="verdict verdict-${conv.verdict || 'review'}">${conv.verdict || '—'}</span>
+                </div>
+                <div class="conversation-meta">
+                    <div class="conversation-meta-item">
+                        <div class="conversation-meta-label">Agent</div>
+                        <div class="conversation-meta-value">${escapeHtml(agentLabel)}</div>
+                    </div>
+                    <div class="conversation-meta-item">
+                        <div class="conversation-meta-label">Turns</div>
+                        <div class="conversation-meta-value">${conv.turn_count || 0}</div>
+                    </div>
+                    <div class="conversation-meta-item">
+                        <div class="conversation-meta-label">Final Score</div>
+                        <div class="conversation-meta-value confidence">${score}</div>
+                    </div>
+                    <div class="conversation-meta-item">
+                        <div class="conversation-meta-label">Evaluated</div>
+                        <div class="conversation-meta-value timestamp">${createdAt}</div>
+                    </div>
+                </div>`;
+            container.appendChild(card);
+        });
+    }
+
+    function updateConversationStats(conversations) {
+        if (!conversations || conversations.length === 0) {
+            document.getElementById('totalConversations').textContent = '0';
+            document.getElementById('avgFinalScore').textContent = '—';
+            document.getElementById('passRate').textContent = '—';
+            return;
+        }
+
+        const total = conversations.length;
+        const scores = conversations.map(c => c.final_score || 0);
+        const avg = scores.reduce((a, b) => a + b, 0) / total;
+        const passCount = conversations.filter(c => c.verdict === 'pass').length;
+
+        document.getElementById('totalConversations').textContent = total;
+        document.getElementById('avgFinalScore').textContent = (avg * 100).toFixed(1) + '%';
+        document.getElementById('passRate').textContent = ((passCount / total) * 100).toFixed(0) + '%';
+    }
+
+    async function viewConversationDetails(conversationId, updateHash = true) {
+        currentConversationId = conversationId;
+        if (updateHash) window.location.hash = `conversations/${conversationId}`;
+
+        document.getElementById('conversationDetail').innerHTML =
+            `<div class="loading">Loading conversation...</div>`;
+        document.getElementById('conversationsListView').style.display = 'none';
+        document.getElementById('conversationDetailView').style.display = 'block';
+        expandedTurns.clear();
+
+        try {
+            const resp = await fetch(`${API_BASE}/api/v1/conversations/${conversationId}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+            const data = await resp.json();
+            renderConversationDetail(data);
+        } catch (err) {
+            document.getElementById('conversationDetail').innerHTML =
+                `<div class="error">Failed to load conversation: ${err.message}</div>`;
+        }
+    }
+
+    function renderConversationDetail(data) {
+        const container = document.getElementById('conversationDetail');
+        const turns = data.turn_results || [];
+
+        const agentLabel = data.agent_version
+            ? `${data.agent_name} v${data.agent_version}`
+            : data.agent_name || '—';
+        const finalScore = typeof data.final_score === 'number'
+            ? (data.final_score * 100).toFixed(1) + '%' : '—';
+        const turnAvg = typeof data.turn_avg === 'number'
+            ? (data.turn_avg * 100).toFixed(1) + '%' : '—';
+        const holisticScore = typeof data.holistic_score === 'number'
+            ? (data.holistic_score * 100).toFixed(1) + '%' : '—';
+
+        let html = `
+            <div class="detail-summary">
+                <div class="detail-summary-row">
+                    <div class="detail-metric">
+                        <div class="detail-metric-label">Conversation</div>
+                        <div style="color:var(--accent);font-size:15px;font-weight:600;">${escapeHtml(data.conversation_id)}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-metric-label">Agent</div>
+                        <div style="color:var(--text-primary);font-size:14px;">${escapeHtml(agentLabel)}</div>
+                    </div>
+                    <div style="margin-left:auto;">
+                        <span class="verdict verdict-${data.verdict || 'review'}" style="font-size:13px;padding:4px 14px;">${data.verdict || '—'}</span>
+                    </div>
+                </div>
+                <div class="detail-summary-row">
+                    <div class="detail-metric">
+                        <div class="detail-metric-label">Final Score</div>
+                        <div class="detail-metric-value">${finalScore}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-metric-label">Turn Avg</div>
+                        <div class="detail-metric-value">${turnAvg}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-metric-label">Holistic</div>
+                        <div class="detail-metric-value">${holisticScore}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-metric-label">Turns</div>
+                        <div class="detail-metric-value">${data.turn_count || turns.length}</div>
+                    </div>
+                </div>
+                ${data.holistic_reason ? `
+                <div class="holistic-reason">
+                    <strong style="color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Holistic Assessment</strong><br>
+                    ${escapeHtml(data.holistic_reason)}
+                </div>` : ''}
+            </div>
+
+            <h3 style="color:var(--text-secondary);margin-bottom:14px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">
+                Turns (${turns.length})
+            </h3>`;
+
+        if (turns.length === 0) {
+            html += `<div class="empty-state">No turn data available</div>`;
+        } else {
+            turns.forEach((turn, idx) => {
+                const turnId = `turn-${idx}`;
+                const turnScore = typeof turn.turn_score === 'number'
+                    ? (turn.turn_score * 100).toFixed(1) + '%' : '—';
+                const judgeScoresHtml = buildJudgeScoresHtml(turn.scores || []);
+
+                html += `
+                    <div class="turn-item" onclick="toggleTurn('${turnId}')">
+                        <div class="turn-header">
+                            <div style="color:var(--accent);font-weight:600;font-size:13px;">
+                                Turn ${turn.turn_index || idx + 1}
+                            </div>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <span class="confidence">${turnScore}</span>
+                            </div>
+                        </div>
+                        <div class="turn-query"><strong>Query:</strong> ${escapeHtml(turn.user_query || '')}</div>
+                        <div class="turn-answer"><strong>Answer:</strong> ${escapeHtml(turn.answer || '')}</div>
+                        <div class="turn-footer">
+                            <span>${(turn.scores || []).length} judges · Click to ${expandedTurns.has(turnId) ? 'hide' : 'show'} scores</span>
+                        </div>
+                        <div class="judge-scores${expandedTurns.has(turnId) ? ' visible' : ''}" id="${turnId}-scores">
+                            ${judgeScoresHtml}
+                        </div>
+                    </div>`;
             });
-
-            container.innerHTML = html;
         }
 
-        function backToConversationsList() {
-            console.log('[conversation] back to list');
-            currentConversationId = null;
-            window.location.hash = 'conversations';
-            document.getElementById('conversationsListView').style.display = 'block';
-            document.getElementById('conversationDetailView').style.display = 'none';
+        container.innerHTML = html;
+    }
+
+    function buildJudgeScoresHtml(scores) {
+        if (!scores || scores.length === 0) return '<div style="color:var(--text-muted);font-size:13px;">No judge scores available</div>';
+        return `<div class="stages-grid">` + scores.map(s => `
+            <div class="stage-card">
+                <div class="stage-name">${escapeHtml(s.name || '')}</div>
+                <div class="stage-score">${typeof s.score === 'number' ? (s.score * 100).toFixed(1) + '%' : '—'}</div>
+                ${s.reason ? `<div class="stage-reason">${escapeHtml(s.reason)}</div>` : ''}
+            </div>`).join('') + `</div>`;
+    }
+
+    function toggleTurn(turnId) {
+        const scoresEl = document.getElementById(`${turnId}-scores`);
+        if (!scoresEl) return;
+
+        if (expandedTurns.has(turnId)) {
+            expandedTurns.delete(turnId);
+            scoresEl.classList.remove('visible');
+        } else {
+            expandedTurns.add(turnId);
+            scoresEl.classList.add('visible');
         }
 
-        function updateConversationStats(conversations) {
-            if (!conversations || conversations.length === 0) {
-                document.getElementById('totalConversations').textContent = '0';
-                document.getElementById('avgTurns').textContent = '-';
-                document.getElementById('avgConfidence').textContent = '-';
-                return;
-            }
-
-            const totalConv = conversations.length;
-            const totalTurns = conversations.reduce((sum, c) => sum + c.turn_count, 0);
-            const avgTurns = (totalTurns / totalConv).toFixed(1);
-            const totalConfidence = conversations.reduce((sum, c) => sum + c.avg_confidence, 0);
-            const avgConfidence = ((totalConfidence / totalConv) * 100).toFixed(1);
-
-            document.getElementById('totalConversations').textContent = totalConv;
-            document.getElementById('avgTurns').textContent = avgTurns;
-            document.getElementById('avgConfidence').textContent = avgConfidence + '%';
-        }
-
-        function showConversationError(message) {
-            const container = document.getElementById('conversationErrorContainer');
-            container.innerHTML = `<div class="error">⚠️ ${message}</div>`;
-        }
-
-        function clearConversationError() {
-            document.getElementById('conversationErrorContainer').innerHTML = '';
-        }
-
-        // Navigate from conversation turn to full evaluation in Results tab
-        function viewTurnInResults(eventId) {
-            console.log('[turn] navigating to result', eventId);
-            // Navigate to results tab with event_id in hash
-            window.location.hash = `results/${eventId}`;
-        }
-
-        // Initial setup
-        function initializeDashboard() {
-            // Initialize theme first
-            initializeTheme();
-
-            // Initialize tab from URL hash
-            initializeTab();
-
-            // Restore auto-refresh preference from localStorage
-            const savedPreference = localStorage.getItem('autoRefreshEnabled');
-            if (savedPreference !== null) {
-                autoRefreshEnabled = savedPreference === 'true';
-                document.getElementById('autoRefreshToggle').checked = autoRefreshEnabled;
-
-                if (autoRefreshEnabled) {
-                    startAutoRefresh();
-                }
-            }
-
-            updateRefreshStatus();
-
-            // Only fetch data for the active tab
-            const currentTab = window.location.hash.substring(1) || 'results';
-            if (currentTab === 'results') {
-                fetchResults();
-            } else if (currentTab === 'monitoring') {
-                fetchHealthMetrics();
+        // Update footer hint text
+        const item = scoresEl.closest('.turn-item');
+        if (item) {
+            const footer = item.querySelector('.turn-footer span');
+            if (footer) {
+                const scoreCount = (scoresEl.querySelectorAll('.stage-card') || []).length;
+                footer.textContent = `${scoreCount} judges · Click to ${expandedTurns.has(turnId) ? 'hide' : 'show'} scores`;
             }
         }
+    }
 
-        initializeDashboard();
-    </script>
+    function backToConversationsList() {
+        currentConversationId = null;
+        window.location.hash = 'conversations';
+        document.getElementById('conversationsListView').style.display = 'block';
+        document.getElementById('conversationDetailView').style.display = 'none';
+    }
+
+    // ── Auto-refresh ──
+    function toggleAutoRefresh() {
+        autoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+        localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
+        if (autoRefreshEnabled) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    }
+
+    function startAutoRefresh() {
+        autoRefreshEnabled = true;
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => {
+            // Only refresh the list view (not while viewing details)
+            if (!currentConversationId) fetchConversations();
+        }, 10000);
+        document.getElementById('convRefreshStatus').classList.add('active');
+    }
+
+    function stopAutoRefresh() {
+        autoRefreshEnabled = false;
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+        }
+        document.getElementById('convRefreshStatus').classList.remove('active');
+    }
+
+    // ── Monitoring ──
+    async function fetchHealthMetrics() {
+        const windowVal = document.getElementById('monitoringWindow').value;
+        const url = `${API_BASE}/api/v1/metrics/health?window=${windowVal}`;
+        monitoringLoaded = true;
+
+        document.getElementById('monitoringError').innerHTML = '';
+        document.getElementById('monitoringContent').innerHTML =
+            `<div class="empty-state"><div class="empty-state-icon">📡</div><div>Loading metrics...</div></div>`;
+
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+            const data = await resp.json();
+            renderHealthMetrics(data);
+        } catch (err) {
+            document.getElementById('monitoringError').innerHTML =
+                `<div class="error">Failed to load metrics: ${err.message}</div>`;
+            document.getElementById('monitoringContent').innerHTML = '';
+        }
+    }
+
+    function renderHealthMetrics(data) {
+        const avgConf = ((data.avg_confidence || 0) * 100).toFixed(1);
+        document.getElementById('monitoringContent').innerHTML = `
+            <div class="metric-section">
+                <div class="metric-section-title">Overview — ${data.window}</div>
+                <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--border);color:var(--text-secondary);text-align:left;">
+                            <th style="padding:8px 12px;font-weight:600;font-size:12px;">Metric</th>
+                            <th style="padding:8px 12px;font-weight:600;font-size:12px;">Value</th>
+                            <th style="padding:8px 12px;font-weight:600;font-size:12px;">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:10px 12px;">Total Evaluations</td>
+                            <td style="padding:10px 12px;color:var(--accent);font-weight:700;">${data.total_evaluations}</td>
+                            <td style="padding:10px 12px;color:var(--text-secondary);">Conversations evaluated in the selected window</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:10px 12px;">Avg Final Score</td>
+                            <td style="padding:10px 12px;color:var(--accent);font-weight:700;">${avgConf}%</td>
+                            <td style="padding:10px 12px;color:var(--text-secondary);">Mean final score across all evaluations (higher = better)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>`;
+    }
+
+    // ── Helpers ──
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Init ──
+    function initializeDashboard() {
+        initializeTheme();
+        initializeTab();
+
+        const savedPref = localStorage.getItem('autoRefreshEnabled');
+        if (savedPref === 'true') {
+            autoRefreshEnabled = true;
+            document.getElementById('autoRefreshToggle').checked = true;
+            startAutoRefresh();
+        }
+    }
+
+    initializeDashboard();
+</script>
 </body>
 </html>
