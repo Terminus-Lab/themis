@@ -8,8 +8,6 @@ import (
 	"github.com/openai/openai-go/option"
 )
 
-const defaultBaseURL = "http://localhost:11434/v1"
-
 type Client struct {
 	Client       *openai.Client
 	ModelID      string
@@ -19,10 +17,6 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, baseURL, modelID string) (*Client, error) {
-	if baseURL == "" {
-		baseURL = defaultBaseURL
-	}
-
 	openaiClient := openai.NewClient(
 		option.WithAPIKey("ollama"),
 		option.WithBaseURL(baseURL),

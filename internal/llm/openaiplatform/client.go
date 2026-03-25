@@ -30,20 +30,3 @@ func NewClient(ctx context.Context, openAiKey string, modelID string) (*Client, 
 		MaxDelay:     12 * time.Second,
 	}, nil
 }
-
-// NewClientWithBaseURL creates a client pointed at a custom base URL (e.g. Ollama at http://localhost:11434/v1).
-func NewClientWithBaseURL(ctx context.Context, apiKey, baseURL, modelID string) (*Client, error) {
-	openaiClient := openai.NewClient(
-		option.WithAPIKey(apiKey),
-		option.WithBaseURL(baseURL),
-		option.WithMaxRetries(3),
-	)
-
-	return &Client{
-		Client:       &openaiClient,
-		ModelID:      modelID,
-		MaxRetries:   3,
-		InitialDelay: 100 * time.Millisecond,
-		MaxDelay:     12 * time.Second,
-	}, nil
-}

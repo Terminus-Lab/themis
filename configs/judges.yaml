@@ -9,6 +9,8 @@ judges:
     # modelFamily: "openai"  # Using Azure OpenAI
     modelFamily: "openai_platform"  # Using OpenAI Platform
     modelID: gpt-4o-mini
+    # modelFamily: "ollama"
+    # modelID: "qwen2.5:7b"
     max_tokens: 256
     temperature: 0.0
     retry: true
