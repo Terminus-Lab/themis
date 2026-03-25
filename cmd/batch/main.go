@@ -14,6 +14,7 @@ import (
 	"github.com/Terminus-Lab/themis/internal/batch"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/setup"
+	setuplogger "github.com/Terminus-Lab/themis/internal/setup/logger"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -35,8 +36,7 @@ var (
 )
 
 func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	log.Logger = setuplogger.New("info")
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

@@ -8,20 +8,18 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/Terminus-Lab/themis/internal/mcpadapter"
 	"github.com/Terminus-Lab/themis/internal/setup"
-	"github.com/rs/zerolog"
+	setuplogger "github.com/Terminus-Lab/themis/internal/setup/logger"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
-	logger := log.Logger
+	logger := setuplogger.New("info")
+	log.Logger = logger
 
 	_ = godotenv.Load()
 

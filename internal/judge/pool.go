@@ -53,10 +53,10 @@ func (p *JudgePool) buildFromConfigForScope(cfg *config.JudgesConfig, scope stri
 			continue
 		}
 
-		// Filter by scope (empty scope defaults to "event")
+		// Filter by scope (empty scope defaults to "turn")
 		judgeScope := judgeCfg.Scope
 		if judgeScope == "" {
-			judgeScope = "event"
+			judgeScope = "turn"
 		}
 		if judgeScope != scope {
 			continue
@@ -86,7 +86,6 @@ func (p *JudgePool) buildFromConfigForScope(cfg *config.JudgesConfig, scope stri
 			Int("max_tokens", judgeCfg.Model.MaxTokens).
 			Float64("temperature", judgeCfg.Model.Temperature).
 			Bool("retry", judgeCfg.Model.Retry).
-			Bool("requires_context", judgeCfg.RequiresContext).
 			Msg("judge created successfully")
 	}
 

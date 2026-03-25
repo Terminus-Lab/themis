@@ -20,14 +20,14 @@ import (
 	"github.com/Terminus-Lab/themis/internal/api/middleware"
 	"github.com/Terminus-Lab/themis/internal/env"
 	"github.com/Terminus-Lab/themis/internal/setup"
+	setuplogger "github.com/Terminus-Lab/themis/internal/setup/logger"
 	"github.com/Terminus-Lab/themis/internal/stream"
 	"github.com/Terminus-Lab/themis/internal/stream/redis"
 )
 
 func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
-	logger := log.Logger
+	logger := setuplogger.New("info")
+	log.Logger = logger
 
 	if err := godotenv.Load(); err != nil {
 		logger.Warn().Msg("No .env file found")

@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+BASE_URL="http://localhost:18082"
+
 echo "=== 1. Build ==="
 go build -o bin/themis-api cmd/api/main.go
 go build -o bin/themis-cli cmd/batch/main.go
@@ -15,70 +17,62 @@ echo "=== 3. Start API server ==="
 SERVER_PID=$!
 sleep 3
 
-echo "=== 4. API health check ==="
-curl -sf http://localhost:18082/api/v1/health | jq -e '.status == "ok"' > /dev/null
+echo "=== 4. Health check ==="
+curl -sf "$BASE_URL/api/v1/health" | jq -e '.status == "ok"' > /dev/null
 echo "✓ Health OK"
 
-echo "=== 5. Evaluate (pass case) ==="
-RESULT=$(curl -sf -X POST http://localhost:18082/api/v1/evaluate \
+echo "=== 5. Evaluate conversation ==="
+RESULT=$(curl -sf -X POST "$BASE_URL/api/v1/conversations/evaluate" \
   -H "Content-Type: application/json" \
-  -d '{"event_id":"smoke-1","conversation_id":"conv-smoke-1","event_type":"agent_response","agent":{"name":"smoke","type":"rag","version":"1"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"2 plus 2 equals 4."}}')
+  -d '{
+    "conversation_id": "smoke-conv-001",
+    "agent": {"name": "smoke-agent", "version": "1.0"},
+    "turns": [
+      {"turn_index": 0, "user_query": "What is the capital of France?", "answer": "The capital of France is Paris."},
+      {"turn_index": 1, "user_query": "What is the population of Paris?", "answer": "Paris has approximately 2.2 million people within city limits."}
+    ]
+  }')
 echo "$RESULT" | jq -e '.verdict' > /dev/null
-echo "✓ Evaluate OK: $(echo $RESULT | jq -r '{verdict,confidence}')"
+echo "$RESULT" | jq -e '.final_score' > /dev/null
+CONV_ID=$(echo "$RESULT" | jq -r '.conversation_id')
+echo "✓ Evaluate OK: $(echo "$RESULT" | jq -r '{verdict, final_score}')"
 
-echo "=== 6. Query results ==="
-curl -sf "http://localhost:18082/api/v1/results?limit=5" | jq -e '.total >= 1' > /dev/null
-echo "✓ Query results OK"
+echo "=== 6. List conversations ==="
+LIST=$(curl -sf "$BASE_URL/api/v1/conversations")
+echo "$LIST" | jq -e '.total >= 1' > /dev/null
+echo "✓ List conversations OK: $(echo "$LIST" | jq '{total}')"
 
-echo "=== 7. Multi-turn conversation ==="
-for turn in 2 3; do
-  curl -sf -X POST http://localhost:18082/api/v1/evaluate \
-    -H "Content-Type: application/json" \
-    -d "{\"event_id\":\"smoke-$turn\",\"conversation_id\":\"conv-smoke-1\",\"event_type\":\"agent_response\",\"agent\":{\"name\":\"smoke\",\"version\":\"1\"},\"interaction\":{\"user_query\":\"Question $turn\",\"answer\":\"Answer $turn with sufficient detail.\"}}" > /dev/null
-done
-CONV=$(curl -sf "http://localhost:18082/api/v1/conversations/conv-smoke-1")
-echo "$CONV" | jq -e '.turn_count == 3' > /dev/null
-echo "✓ Conversation turns OK: $(echo $CONV | jq '{conversation_id, turn_count}')"
+echo "=== 7. Get conversation by ID ==="
+DETAIL=$(curl -sf "$BASE_URL/api/v1/conversations/$CONV_ID")
+echo "$DETAIL" | jq -e '.conversation_id' > /dev/null
+echo "$DETAIL" | jq -e '.turn_results | length >= 1' > /dev/null
+echo "✓ Get conversation OK: $(echo "$DETAIL" | jq -r '{conversation_id, verdict, turn_count}')"
 
-echo "=== 8. List conversations ==="
-curl -sf "http://localhost:18082/api/v1/conversations" | jq -e '.total >= 1' > /dev/null
-echo "✓ List conversations OK"
+echo "=== 8. Health metrics ==="
+curl -sf "$BASE_URL/api/v1/metrics/health?window=7d" | jq -e '.total_evaluations >= 1' > /dev/null
+echo "✓ Health metrics OK"
 
-echo "=== 9. Sample download ==="
-curl -sf -X POST http://localhost:18082/api/v1/validation/sample/events/download \
-  -H "Content-Type: application/json" \
-  -d '{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":100}' \
-  -o /tmp/smoke-sample.jsonl
-SAMPLE_LINES=$(wc -l < /tmp/smoke-sample.jsonl)
-[ "$SAMPLE_LINES" -ge 1 ] || { echo "✗ Sample download returned 0 lines"; exit 1; }
-head -1 /tmp/smoke-sample.jsonl | jq -e '.event_id' > /dev/null
-echo "✓ Sample download OK: $SAMPLE_LINES records"
-
-echo "=== 10. Stop API server ==="
+echo "=== 9. Stop API server ==="
 kill $SERVER_PID
 wait $SERVER_PID 2>/dev/null || true
 echo "✓ Graceful shutdown OK"
 
-echo "=== 11. CLI evaluate ==="
-./bin/themis-cli evaluate -i resources/dataset.jsonl -o /tmp/smoke-results.jsonl
-echo "✓ CLI evaluate OK: $(wc -l < /tmp/smoke-results.jsonl) records"
+echo "=== 10. CLI evaluate (JSONL output) ==="
+./bin/themis-cli evaluate -i resources/conversations.jsonl -o /tmp/smoke-results.jsonl
+RESULT_LINES=$(wc -l < /tmp/smoke-results.jsonl | tr -d ' ')
+[ "$RESULT_LINES" -ge 1 ] || { echo "✗ CLI evaluate returned 0 lines"; exit 1; }
+head -1 /tmp/smoke-results.jsonl | jq -e '.verdict' > /dev/null
+echo "✓ CLI evaluate OK: $RESULT_LINES result(s)"
 
-echo "=== 12. CLI summary ==="
-./bin/themis-cli evaluate -i resources/dataset.jsonl -f summary
+echo "=== 11. CLI evaluate (summary output) ==="
+./bin/themis-cli evaluate -i resources/conversations.jsonl -f summary
 echo "✓ CLI summary OK"
 
-echo "=== 13. CLI evaluate-conversations (summary) ==="
-./bin/themis-cli evaluate-conversations \
-  -i resources/conversations.jsonl \
-  -f summary \
-  -o /tmp/smoke-conv-summary.json
-cat /tmp/smoke-conv-summary.json | jq -e '.total >= 1' > /dev/null
-cat /tmp/smoke-conv-summary.json | jq -e 'has("pass_count") and has("fail_count") and has("review_count") and has("avg_confidence") and has("avg_turn_count")' > /dev/null
-echo "✓ CLI evaluate-conversations summary OK: $(cat /tmp/smoke-conv-summary.json | jq '{total, pass_count, fail_count, review_count, avg_confidence}')"
-
-echo "=== 14. CLI validate-events ==="
-./bin/themis-cli validate-events -i resources/annotated_sample.jsonl -c 0.3
-echo "✓ CLI validate-events OK"
+echo "=== 12. CLI evaluate with human annotations ==="
+./bin/themis-cli evaluate -i resources/annotated_sample.jsonl -o /tmp/smoke-annotated.jsonl
+LAST_LINE=$(tail -1 /tmp/smoke-annotated.jsonl)
+echo "$LAST_LINE" | jq -e '._type == "correlation_report"' > /dev/null
+echo "✓ CLI annotation correlation OK: $(echo "$LAST_LINE" | jq -r '{annotated_count, kendall_tau, cohens_kappa}')"
 
 echo ""
 echo "All smoke tests passed ✓"
