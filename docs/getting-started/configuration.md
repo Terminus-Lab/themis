@@ -22,9 +22,12 @@ AWS_SECRET_ACCESS_KEY=your_secret
 # Azure OpenAI
 OPEN_AI_KEY=your_azure_key
 AZURE_OPENAI_ENDPOINT=https://...openai.azure.com/openai/deployments/...
+
+# Ollama (local, no API key required)
+OLLAMA_BASE_URL=http://localhost:11434/v1   # default — no change needed if running locally
 ```
 
-All three can be configured simultaneously — judges reference providers by `modelFamily`.
+All providers can be configured simultaneously — judges reference providers by `modelFamily`. See [Ollama setup guide](ollama.md) for local inference.
 
 ### Pipeline
 
@@ -71,7 +74,7 @@ THEMIS_BATCH_WORKERS=5              # Concurrent workers (default: 5)
 ```yaml
 judges:
   default_model:
-    modelFamily: "openai_platform"  # anthropic | openai | openai_platform
+    modelFamily: "openai_platform"  # anthropic | openai | openai_platform | ollama
     modelID: gpt-4o-mini
     max_tokens: 200
     temperature: 0.0
