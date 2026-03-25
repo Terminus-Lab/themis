@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -10,6 +11,10 @@ import (
 	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/rs/zerolog"
 )
+
+func approxEqual(a, b float64) bool {
+	return math.Abs(a-b) < 1e-9
+}
 
 // stubJudge implements judge.Judge for testing.
 type stubJudge struct {
@@ -55,7 +60,7 @@ func newTestEvaluator(turnJudges []judge.Judge, holisticJudge judge.Judge) *Conv
 
 // --- weightedAverage tests ---
 
-func TestWeightedAverage_ExcludesErroredJudges(t *testing.T) {
+func TestWeightedAverage_ErroredJudgeCountsAsZero(t *testing.T) {
 	scores := []models.StageResult{
 		{Name: "relevance", Score: 0.9, Weight: 0.35},
 		{Name: "coherence", Score: 0.0, Weight: 0.30, Error: "LLM call failed: API error"},
@@ -64,10 +69,10 @@ func TestWeightedAverage_ExcludesErroredJudges(t *testing.T) {
 
 	got := weightedAverage(scores)
 
-	// Only relevance and completeness count; coherence is excluded.
-	// (0.9*0.35 + 0.8*0.35) / (0.35+0.35)
-	expected := (0.9*0.35 + 0.8*0.35) / (0.35 + 0.35)
-	if got != expected {
+	// Errored coherence judge counts as score 0.0 (penalty).
+	// (0.9*0.35 + 0.0*0.30 + 0.8*0.35) / (0.35+0.30+0.35)
+	expected := (0.9*0.35 + 0.0*0.30 + 0.8*0.35) / (0.35 + 0.30 + 0.35)
+	if !approxEqual(got, expected) {
 		t.Errorf("weightedAverage = %f, want %f", got, expected)
 	}
 }
@@ -129,9 +134,11 @@ func TestConversationEvaluator_EvalErrors_SurfacedWhenTurnJudgeFails(t *testing.
 		t.Fatal("Expected eval_errors to be non-empty when a judge failed")
 	}
 
-	// Errored coherence judge excluded: only relevance (0.9, w=0.35) counts → turn_avg = 0.9
-	if result.TurnAvg != 0.9 {
-		t.Errorf("Expected turn_avg=0.9 (errored judge excluded), got %f", result.TurnAvg)
+	// Errored coherence judge counts as 0.0 (penalty).
+	// turn_avg = (0.9*0.35 + 0.0*0.30) / (0.35+0.30)
+	expected := (0.9*0.35 + 0.0*0.30) / (0.35 + 0.30)
+	if !approxEqual(result.TurnAvg, expected) {
+		t.Errorf("Expected turn_avg=%f (errored judge penalizes score), got %f", expected, result.TurnAvg)
 	}
 }
 

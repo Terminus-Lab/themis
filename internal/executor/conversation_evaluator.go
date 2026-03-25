@@ -162,7 +162,7 @@ func (e *ConversationEvaluator) evaluateTurns(ctx context.Context, req models.Co
 
 	for i, turn := range req.Turns {
 		wg.Add(1)
-		go func(idx int, t models.ConversationTurn) {
+		go func(idx int, t models.ConversationTurn) {	
 			defer wg.Done()
 
 			evalCtx := models.EvaluationContext{
@@ -213,9 +213,6 @@ func weightedAverage(scores []models.StageResult) float64 {
 	totalWeight := 0.0
 	weightedSum := 0.0
 	for _, s := range scores {
-		if s.Error != "" {
-			continue
-		}
 		w := s.Weight
 		if w == 0 {
 			w = 1.0
