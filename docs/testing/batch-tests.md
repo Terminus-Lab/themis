@@ -77,10 +77,13 @@ Add `human_label` and/or `human_score` fields to any conversation to enable corr
 ```
 
 When annotations are present, the CLI automatically computes:
-- **Kendall's τ-b** — rank correlation between Themis scores and human scores
-- **Cohen's κ** — unweighted label agreement (fail/review/pass)
-- **Weighted κ** — linear-weighted label agreement (penalises fail↔pass more than fail↔review)
-- **Confusion matrix** — 3×3 matrix (human rows, Themis columns)
+
+| Metric | Measures | When useful |
+|--------|----------|-------------|
+| Kendall's τ | Score rank correlation (continuous) | Is Themis score ordering consistent with human score ordering? |
+| Cohen's κ | Label agreement (fail/review/pass) | Overall verdict match rate, chance-corrected |
+| Weighted κ | Label agreement, severity-penalized | Distinguishes small errors (review↔pass) from large ones (fail↔pass) — useful for cross-version tracking |
+| Confusion matrix | Per-class breakdown | Where exactly are the disagreements? |
 
 A ready-to-use annotated dataset is included at `resources/annotated_sample.jsonl` (15 conversations: 5 pass, 5 review, 5 fail).
 
@@ -164,22 +167,34 @@ go run cmd/batch/main.go evaluate \
 
 **Expected:**
 - Exit code: 0
-- Per-conversation scores and verdicts printed
-- Correlation report appended to output, e.g.:
+- JSON summary printed to stdout, e.g.:
 
-```
-annotated_count=15
-kendall_tau=0.72
-cohens_kappa=0.65
-weighted_kappa=0.71
-confusion_matrix:
-         fail  review  pass
-fail        4       1     0
-review      0       4     1
-pass        0       1     4
+```json
+{
+  "total": 15,
+  "verdict_counts": {
+    "fail": 5,
+    "pass": 5,
+    "review": 5
+  },
+  "correlation_report": {
+    "annotated_count": 15,
+    "kendall_tau": 0.72,
+    "cohens_kappa": 0.65,
+    "weighted_kappa": 0.71,
+    "confusion_matrix": {
+      "labels": ["fail", "review", "pass"],
+      "matrix": [
+        [4, 1, 0],
+        [0, 4, 1],
+        [0, 1, 4]
+      ]
+    }
+  }
+}
 ```
 
-To save both JSONL and a summary in one pass:
+To save both JSONL results and a separate summary in one pass:
 
 ```bash
 go run cmd/batch/main.go evaluate \
@@ -188,7 +203,7 @@ go run cmd/batch/main.go evaluate \
   -s /tmp/annotated_summary.json
 ```
 
-The final line of the JSONL output will contain the correlation report:
+The final line of the JSONL output (`-o`) will contain the correlation report:
 
 ```json
 {"_type":"correlation_report","annotated_count":15,"kendall_tau":0.72,"cohens_kappa":0.65,"weighted_kappa":0.71,"confusion_matrix":{...}}

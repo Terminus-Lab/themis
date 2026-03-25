@@ -11,11 +11,7 @@ import (
 // ConversationSummaryStats holds aggregate statistics for a batch of conversation evaluations.
 type ConversationSummaryStats struct {
 	Total             int                `json:"total"`
-	PassCount         int                `json:"pass_count"`
-	FailCount         int                `json:"fail_count"`
-	ReviewCount       int                `json:"review_count"`
-	AvgConfidence     float64            `json:"avg_confidence"`
-	AvgTurnCount      float64            `json:"avg_turn_count"`
+	VerdictCounts     map[string]int     `json:"verdict_counts"`
 	CorrelationReport *CorrelationReport `json:"correlation_report,omitempty"`
 }
 
@@ -60,29 +56,12 @@ func (w *ConversationSummaryWriter) Close() error {
 
 func (w *ConversationSummaryWriter) computeStats() ConversationSummaryStats {
 	stats := ConversationSummaryStats{
-		Total: len(w.results),
+		Total:         len(w.results),
+		VerdictCounts: make(map[string]int),
 	}
-
-	var totalFinalScore float64
-	var totalTurns int
 
 	for _, result := range w.results {
-		totalFinalScore += result.FinalScore
-		totalTurns += result.TurnCount
-
-		switch result.Verdict {
-		case models.VerdictPass:
-			stats.PassCount++
-		case models.VerdictFail:
-			stats.FailCount++
-		case models.VerdictReview:
-			stats.ReviewCount++
-		}
-	}
-
-	if stats.Total > 0 {
-		stats.AvgConfidence = totalFinalScore / float64(stats.Total)
-		stats.AvgTurnCount = float64(totalTurns) / float64(stats.Total)
+		stats.VerdictCounts[string(result.Verdict)]++
 	}
 
 	return stats
