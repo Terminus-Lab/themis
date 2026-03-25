@@ -16,11 +16,10 @@ func TestNewLLMJudge_Success(t *testing.T) {
 	logger := zerolog.Nop()
 
 	cfg := config.JudgeConfiguration{
-		Name:            "test-judge",
-		Enabled:         true,
-		Description:     "Test judge",
-		RequiresContext: false,
-		Prompt:          "Score: {{.Answer}}",
+		Name:        "test-judge",
+		Enabled:     true,
+		Description: "Test judge",
+		Prompt:      "Score: {{.Answer}}",
 		Model: &config.ModelConfig{
 			MaxTokens:   256,
 			Temperature: 0.0,
@@ -35,9 +34,6 @@ func TestNewLLMJudge_Success(t *testing.T) {
 
 	if judge.name != "test-judge" {
 		t.Errorf("Expected name 'test-judge', got '%s'", judge.name)
-	}
-	if judge.requiresContext {
-		t.Error("Expected requiresContext=false")
 	}
 	if judge.modelConfig.MaxTokens != 256 {
 		t.Errorf("Expected MaxTokens=256, got %d", judge.modelConfig.MaxTokens)
@@ -80,9 +76,8 @@ func TestLLMJudge_Evaluate_Success(t *testing.T) {
 	logger := zerolog.Nop()
 
 	cfg := config.JudgeConfiguration{
-		Name:            "relevance",
-		Prompt:          "Query: {{.Query}}\nAnswer: {{.Answer}}",
-		RequiresContext: false,
+		Name:   "relevance",
+		Prompt: "Query: {{.Query}}\nAnswer: {{.Answer}}",
 		Model: &config.ModelConfig{
 			MaxTokens:   256,
 			Temperature: 0.0,
@@ -116,36 +111,6 @@ func TestLLMJudge_Evaluate_Success(t *testing.T) {
 	}
 	if result.Name != "relevance-judge" {
 		t.Errorf("Expected name='relevance-judge', got '%s'", result.Name)
-	}
-}
-
-func TestLLMJudge_Evaluate_MissingContext(t *testing.T) {
-	logger := zerolog.Nop()
-
-	cfg := config.JudgeConfiguration{
-		Name:            "faithfulness",
-		Prompt:          "Context: {{.Context}}\nAnswer: {{.Answer}}",
-		RequiresContext: true, // Requires context
-		Model: &config.ModelConfig{
-			MaxTokens: 256,
-		},
-	}
-
-	judge, _ := NewLLMJudge(cfg, &MockLLMClient{}, &logger)
-
-	evalCtx := models.EvaluationContext{
-		Query:   "test",
-		Answer:  "test",
-		Context: "", // Missing context
-	}
-
-	result := judge.Evaluate(context.Background(), evalCtx)
-
-	if result.Score != 0.0 {
-		t.Errorf("Expected score=0.0 for missing context, got %f", result.Score)
-	}
-	if result.Reason != "Context required but not provided" {
-		t.Errorf("Expected context error, got '%s'", result.Reason)
 	}
 }
 

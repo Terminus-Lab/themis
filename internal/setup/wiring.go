@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Terminus-Lab/themis/internal/aggregator"
 	"github.com/Terminus-Lab/themis/internal/config"
 	"github.com/Terminus-Lab/themis/internal/env"
 	"github.com/Terminus-Lab/themis/internal/executor"
@@ -13,8 +12,6 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm/aws"
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
 	"github.com/Terminus-Lab/themis/internal/llm/openaiplatform"
-	"github.com/Terminus-Lab/themis/internal/models"
-	"github.com/Terminus-Lab/themis/internal/prechecks"
 	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/Terminus-Lab/themis/internal/storage/postgres"
 	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
@@ -23,165 +20,98 @@ import (
 
 type Config struct {
 	AWSRegion              string
-	ClaudeModelID          string
 	OpenAIKey              string
-	OpenAIModelID          string
 	AzureOpenAIEndpoint    string
-	DefaultProvider        string
-	EnablePrecheck         bool
-	InMemoryDB             bool
-	DBConnectionString     string
-	PrecheckWeight         float64
-	LLMJudgeWeight         float64
-	EarlyExitThreshold     float64
+	HolisticWeight         float64
 	VerdictPassThreshold   float64
 	VerdictReviewThreshold float64
-	JudgeAggregationMethod string
+	ScoringFormula         string
+	InMemoryDB             bool
+	DBConnectionString     string
 }
 
 type Dependencies struct {
-	Executor             *executor.Executor
-	JudgeExecutor        *executor.JudgeExecutor
-	ConversationExecutor *executor.ConversationExecutor
-	Repository           storage.Repository
-	Logger               *zerolog.Logger
+	ConversationEvaluator *executor.ConversationEvaluator
+	Repository            storage.Repository
+	Logger                *zerolog.Logger
 }
 
 func LoadConfig() *Config {
 	return &Config{
 		AWSRegion:              env.GetString("AWS_REGION", "us-east-1"),
-		ClaudeModelID:          env.GetString("CLAUDE_MODEL_ID", ""),
 		OpenAIKey:              env.GetString("OPEN_AI_KEY", ""),
-		OpenAIModelID:          env.GetString("OPEN_AI_MODEL_ID", ""),
 		AzureOpenAIEndpoint:    env.GetString("AZURE_OPENAI_ENDPOINT", ""),
-		DefaultProvider:        env.GetString("DEFAULT_LLM_PROVIDER", "bedrock"),
-		EnablePrecheck:         env.GetBool("ENABLE_PRECHECK", true),
-		InMemoryDB:             env.GetBool("IN_MEMORY_DB", true),
-		DBConnectionString:     env.GetString("THEMIS_DB_URL", ""),
-		PrecheckWeight:         env.GetFloat("PRECHECK_WEIGHT", 0.3),
-		LLMJudgeWeight:         env.GetFloat("LLM_JUDGE_WEIGHT", 0.7),
-		EarlyExitThreshold:     env.GetFloat("EARLY_EXIT_THRESHOLD", 0.2),
+		HolisticWeight:         env.GetFloat("CONVERSATION_HOLISTIC_WEIGHT", 0.5),
 		VerdictPassThreshold:   env.GetFloat("VERDICT_PASS_THRESHOLD", 0.8),
 		VerdictReviewThreshold: env.GetFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
-		JudgeAggregationMethod: env.GetString("JUDGE_AGGREGATION_METHOD", ""),
+		ScoringFormula:         env.GetString("SCORING_FORMULA", "linear"),
+		InMemoryDB:             env.GetBool("IN_MEMORY_DB", true),
+		DBConnectionString:     env.GetString("THEMIS_DB_URL", ""),
 	}
 }
 
 func Wire(ctx context.Context, cfg *Config, logger *zerolog.Logger) (*Dependencies, error) {
-	// Load judges configuration from YAML first
+	// Load judges configuration
 	judgesConfig, err := config.LoadJudgesConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load judges config: %w", err)
 	}
 
-	// Create registry with all models referenced in judges config
+	// Create LLM client registry
 	registry, err := createLLMClientRegistry(ctx, cfg, judgesConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM client registry: %w", err)
 	}
 
-	// PreChecks
-	stageRunner := prechecks.NewStageRunner([]prechecks.Checker{
-		&prechecks.LengthChecker{},
-		&prechecks.OverlapChecker{MinOverlapThreshold: 0.3},
-		&prechecks.FormatChecker{},
-	})
-
-	// Create judge pool and build judges from config
 	judgePool := judge.NewJudgePool(registry, logger)
-	judges, err := judgePool.BuildFromConfig(judgesConfig)
+
+	// Build per-turn judges (scope: "turn")
+	turnJudges, err := judgePool.BuildTurnJudgesFromConfig(judgesConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build judges from config: %w", err)
+		return nil, fmt.Errorf("failed to build turn judges: %w", err)
 	}
+	turnRunner := judge.NewJudgeRunner(turnJudges, logger)
 
-	// Create judge runner with config-driven event-scoped judges
-	judgeRunner := judge.NewJudgeRunner(judges, logger)
-
-	// Build conversation-scoped judges
-	conversationJudges, err := judgePool.BuildConversationJudgesFromConfig(judgesConfig)
+	// Build holistic judge (scope: "conversation")
+	holisticJudge, err := judgePool.BuildHolisticJudgeFromConfig(judgesConfig)
 	if err != nil {
-		// Conversation judges are optional — log a warning but don't fail startup
-		logger.Warn().Err(err).Msg("no conversation-scoped judges found; conversation evaluation will be unavailable")
-		conversationJudges = nil
+		return nil, fmt.Errorf("failed to build holistic judge: %w", err)
 	}
 
-	// Judge factory for single judge execution (reuses same judges)
-	judgeFactory := judge.NewJudgeFactory(judges, logger)
-
-	// Aggregator
-	var judgeAggMethod models.AggregationMethod
-	if cfg.JudgeAggregationMethod == "" {
-		judgeAggMethod = models.MethodWeightedAverage
-	} else {
-		judgeAggMethod = models.AggregationMethod(cfg.JudgeAggregationMethod)
-	}
-
-	aggConfig := aggregator.AggregationConfig{
-		EnablePrecheck:         cfg.EnablePrecheck,
-		JudgeAggregationMethod: judgeAggMethod,
-	}
-
-	agg := aggregator.NewAggregator(
-		aggregator.Weights{
-			PreChecks: cfg.PrecheckWeight,
-			LLMJudge:  cfg.LLMJudgeWeight,
-		},
-		aggregator.VerdictThresholds{
-			Pass:   cfg.VerdictPassThreshold,
-			Review: cfg.VerdictReviewThreshold,
-		},
-		aggConfig,
-		logger,
-	)
-
+	// Database
 	db, err := getDatabaseClient(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("unable tot create db client. error: %w", err)
+		return nil, fmt.Errorf("unable to create db client: %w", err)
 	}
 
 	repository, err := NewEvalRepository(db, logger)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get evaluation repository. Error: %w", err)
+		return nil, fmt.Errorf("unable to get evaluation repository: %w", err)
 	}
 
-	// Executors
-	agentExec := executor.NewExecutor(stageRunner, repository, judgeRunner, agg, cfg.EarlyExitThreshold, logger)
-	judgeExec := executor.NewJudgeExecutor(judgeFactory, repository, logger)
+	logger.Info().Str("scoring_formula", cfg.ScoringFormula).Msg("active scoring formula")
 
-	var convExec *executor.ConversationExecutor
-	if len(conversationJudges) > 0 {
-		convJudgeRunner := judge.NewJudgeRunner(conversationJudges, logger)
-		// Conversation evaluation has no prechecks stage — use a dedicated aggregator
-		// with EnablePrecheck=false so stage2 score is used directly as confidence.
-		convAgg := aggregator.NewAggregator(
-			aggregator.Weights{PreChecks: 0, LLMJudge: 1.0},
-			aggregator.VerdictThresholds{
-				Pass:   cfg.VerdictPassThreshold,
-				Review: cfg.VerdictReviewThreshold,
-			},
-			aggregator.AggregationConfig{
-				EnablePrecheck:         false,
-				JudgeAggregationMethod: judgeAggMethod,
-			},
-			logger,
-		)
-		convExec = executor.NewConversationExecutor(convJudgeRunner, repository, convAgg, logger)
-	}
+	convEvaluator := executor.NewConversationEvaluator(
+		turnRunner,
+		holisticJudge,
+		repository,
+		cfg.HolisticWeight,
+		cfg.VerdictPassThreshold,
+		cfg.VerdictReviewThreshold,
+		cfg.ScoringFormula,
+		logger,
+	)
 
 	return &Dependencies{
-		Executor:             agentExec,
-		JudgeExecutor:        judgeExec,
-		ConversationExecutor: convExec,
-		Repository:           repository,
-		Logger:               logger,
+		ConversationEvaluator: convEvaluator,
+		Repository:            repository,
+		Logger:                logger,
 	}, nil
-
 }
 
 func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *config.JudgesConfig) (*llm.LLMClientRegistry, error) {
 	clients := make(map[llm.LLMFamily]map[string]llm.LLMClient)
 
-	// Extract all unique models from judges config
 	type modelKey struct {
 		family  string
 		modelID string
@@ -194,7 +124,6 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 		}
 	}
 
-	// Create clients for each unique model
 	for model := range uniqueModels {
 		family := llm.LLMFamily(model.family)
 
@@ -227,6 +156,7 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 				clients[family] = make(map[string]llm.LLMClient)
 			}
 			clients[family][model.modelID] = client
+
 		case llm.FamilyOpenAIPlatform:
 			if cfg.OpenAIKey == "" {
 				return nil, fmt.Errorf("OPEN_AI_KEY required for openai_platform model %s", model.modelID)
@@ -239,6 +169,7 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 				clients[family] = make(map[string]llm.LLMClient)
 			}
 			clients[family][model.modelID] = client
+
 		default:
 			return nil, fmt.Errorf("unsupported model family: %s", model.family)
 		}
@@ -257,21 +188,17 @@ func getDatabaseClient(ctx context.Context, cfg *Config) (storage.DB, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		// Initialize schema for SQLite
 		if err := client.InitSchema(ctx); err != nil {
 			return nil, fmt.Errorf("failed to initialize SQLite schema: %w", err)
 		}
-
-		return client, nil
-	} else {
-		client, err := postgres.New(ctx, cfg.DBConnectionString)
-		if err != nil {
-			return nil, err
-		}
-
 		return client, nil
 	}
+
+	client, err := postgres.New(ctx, cfg.DBConnectionString)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func NewEvalRepository(db storage.DB, logger *zerolog.Logger) (storage.Repository, error) {

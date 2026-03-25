@@ -6,5 +6,7 @@ import "github.com/Terminus-Lab/themis/internal/models"
 type ConversationInputRecord struct {
 	LineNumber int
 	Request    models.ConversationEvaluationRequest
+	HumanLabel string   // optional: "pass", "review", "fail"
+	HumanScore *float64 // optional: 0.0–1.0
 	Error      error
 }

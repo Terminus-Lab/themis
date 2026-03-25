@@ -22,7 +22,6 @@ func TestLoadJudgesConfig_Success(t *testing.T) {
     - name: relevance
       enabled: true
       description: "Checks relevance"
-      requires_context: false
       prompt: |
         Score the answer: {{.Answer}}
         {"score": <float>, "reason": "<string>"}
@@ -33,7 +32,6 @@ func TestLoadJudgesConfig_Success(t *testing.T) {
     - name: faithfulness
       enabled: true
       description: "Checks faithfulness"
-      requires_context: true
       prompt: |
         Context: {{.Context}}
         Answer: {{.Answer}}
@@ -78,10 +76,6 @@ func TestLoadJudgesConfig_Success(t *testing.T) {
 	if !relevance.Enabled {
 		t.Error("Expected relevance to be enabled")
 	}
-	if relevance.RequiresContext {
-		t.Error("Expected relevance.requires_context=false")
-	}
-
 	// Check model override was applied
 	if relevance.Model.MaxTokens != 128 {
 		t.Errorf("Expected relevance max_tokens=128, got %d", relevance.Model.MaxTokens)
@@ -99,10 +93,6 @@ func TestLoadJudgesConfig_Success(t *testing.T) {
 	if faithfulness.Name != "faithfulness" {
 		t.Errorf("Expected judge name 'faithfulness', got '%s'", faithfulness.Name)
 	}
-	if !faithfulness.RequiresContext {
-		t.Error("Expected faithfulness.requires_context=true")
-	}
-
 	// Model should be populated with defaults
 	if faithfulness.Model == nil {
 		t.Fatal("Expected faithfulness.Model to be populated with defaults")
@@ -439,112 +429,6 @@ func TestApplyDefaults_MergesPartialOverrides(t *testing.T) {
 	}
 }
 
-func TestValidate_RequiresContextWithoutContextPlaceholder(t *testing.T) {
-	cfg := &JudgesConfig{
-		Judges: Judges{
-			Evaluators: []JudgeConfiguration{
-				{
-					Name:            "faithfulness",
-					Prompt:          "Score this answer: {{.Answer}}", // Missing {{.Context}}
-					RequiresContext: true,
-				},
-			},
-		},
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Expected validation error for judge requiring context without {{.Context}} in prompt")
-	}
-
-	if !contains(err.Error(), "requires context") || !contains(err.Error(), "{{.Context}}") {
-		t.Errorf("Expected error about missing {{.Context}}, got: %v", err)
-	}
-}
-
-func TestValidate_RequiresContextWithContextPlaceholder(t *testing.T) {
-	cfg := &JudgesConfig{
-		Judges: Judges{
-			Evaluators: []JudgeConfiguration{
-				{
-					Name:            "faithfulness",
-					Prompt:          "Context: {{.Context}}\nAnswer: {{.Answer}}", // Has {{.Context}}
-					RequiresContext: true,
-				},
-			},
-		},
-	}
-
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("Expected validation to pass for judge with {{.Context}}, got: %v", err)
-	}
-}
-
-func TestValidate_RequiresExpectedOutputWithoutPlaceholder(t *testing.T) {
-	cfg := &JudgesConfig{
-		Judges: Judges{
-			Evaluators: []JudgeConfiguration{
-				{
-					Name:                   "correctness",
-					Prompt:                 "Answer: {{.Answer}}\nScore it.", // Missing {{.ExpectedOutput}}
-					RequiresExpectedOutput: true,
-				},
-			},
-		},
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Error("Expected validation error for judge requiring expected_output without {{.ExpectedOutput}} in prompt")
-	}
-
-	if !contains(err.Error(), "requires expected_output") || !contains(err.Error(), "{{.ExpectedOutput}}") {
-		t.Errorf("Expected error about missing {{.ExpectedOutput}}, got: %v", err)
-	}
-}
-
-func TestValidate_RequiresExpectedOutputWithPlaceholder(t *testing.T) {
-	cfg := &JudgesConfig{
-		Judges: Judges{
-			Evaluators: []JudgeConfiguration{
-				{
-					Name:                   "correctness",
-					Prompt:                 "Answer: {{.Answer}}\nExpected: {{.ExpectedOutput}}", // Has {{.ExpectedOutput}}
-					RequiresExpectedOutput: true,
-				},
-			},
-		},
-	}
-
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("Expected validation to pass for judge with {{.ExpectedOutput}}, got: %v", err)
-	}
-}
-
-func TestValidate_RequiresBothContextAndExpectedOutput(t *testing.T) {
-	cfg := &JudgesConfig{
-		Judges: Judges{
-			Evaluators: []JudgeConfiguration{
-				{
-					Name: "complex",
-					Prompt: `Context: {{.Context}}
-Answer: {{.Answer}}
-Expected: {{.ExpectedOutput}}`,
-					RequiresContext:        true,
-					RequiresExpectedOutput: true,
-				},
-			},
-		},
-	}
-
-	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("Expected validation to pass for judge with both {{.Context}} and {{.ExpectedOutput}}, got: %v", err)
-	}
-}
-
 func TestLoadJudgesConfig_SearchOrder(t *testing.T) {
 	t.Run("returns error when no config found", func(t *testing.T) {
 		os.Unsetenv("JUDGES_CONFIG_PATH")
@@ -692,9 +576,9 @@ func TestNormalizeJudgeWeights_ActualConfig(t *testing.T) {
 		t.Fatalf("Failed to load actual judges config: %v", err)
 	}
 
-	eventCount := 0
+	turnCount := 0
 	convCount := 0
-	eventWeightSum := 0.0
+	turnWeightSum := 0.0
 	convWeightSum := 0.0
 
 	for _, j := range cfg.Judges.Evaluators {
@@ -703,34 +587,34 @@ func TestNormalizeJudgeWeights_ActualConfig(t *testing.T) {
 		}
 		scope := j.Scope
 		if scope == "" {
-			scope = "event"
+			scope = "turn"
 		}
-		if scope == "event" {
-			eventCount++
-			eventWeightSum += j.Weight
+		if scope == "turn" {
+			turnCount++
+			turnWeightSum += j.Weight
 		} else if scope == "conversation" {
 			convCount++
 			convWeightSum += j.Weight
 		}
 	}
 
-	if eventCount == 0 {
-		t.Error("Expected at least one enabled event-scoped judge")
+	if turnCount == 0 {
+		t.Error("Expected at least one enabled turn-scoped judge")
 	}
 	if convCount == 0 {
 		t.Error("Expected at least one enabled conversation-scoped judge")
 	}
 
 	const tol = 0.001
-	if eventWeightSum < 1.0-tol || eventWeightSum > 1.0+tol {
-		t.Errorf("event judge weights should sum to 1.0, got %.4f (count=%d)", eventWeightSum, eventCount)
+	if turnWeightSum < 1.0-tol || turnWeightSum > 1.0+tol {
+		t.Errorf("turn judge weights should sum to 1.0, got %.4f (count=%d)", turnWeightSum, turnCount)
 	}
 	if convWeightSum < 1.0-tol || convWeightSum > 1.0+tol {
 		t.Errorf("conversation judge weights should sum to 1.0, got %.4f (count=%d)", convWeightSum, convCount)
 	}
 
-	t.Logf("event judges=%d (sum=%.4f), conversation judges=%d (sum=%.4f)",
-		eventCount, eventWeightSum, convCount, convWeightSum)
+	t.Logf("turn judges=%d (sum=%.4f), conversation judges=%d (sum=%.4f)",
+		turnCount, turnWeightSum, convCount, convWeightSum)
 }
 
 // Helper function

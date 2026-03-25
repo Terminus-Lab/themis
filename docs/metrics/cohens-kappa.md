@@ -1,118 +1,132 @@
-# Cohen's Kappa
+---
+title: Cohen's Kappa — Verdict Agreement
+description: Measuring agreement between Themis verdicts and human labels
+tags: [metrics, validation, cohens-kappa, agreement, human-annotation]
+---
 
-**Role**: Secondary metric for industry reporting and stakeholder communication.
+# Cohen's Kappa — Verdict Agreement
 
-Measures categorical agreement between two raters, correcting for agreement that could occur by chance alone.
+## What It Is
+
+Cohen's κ (kappa) measures the agreement between Themis verdict labels (`pass`/`review`/`fail`) and human-assigned labels, **correcting for chance agreement**.
+
+Raw accuracy (percentage match) is misleading — if 80% of conversations are `pass`, a system that always predicts `pass` achieves 80% accuracy without learning anything. κ corrects for this.
+
+- κ = **1.0** — perfect agreement
+- κ = **0.0** — agreement no better than chance
+- κ < **0.0** — worse than chance (systematic disagreement)
+
+| κ | Interpretation |
+|---|----------------|
+| 0.80 – 1.00 | Almost perfect |
+| 0.60 – 0.80 | Substantial |
+| 0.40 – 0.60 | Moderate |
+| 0.20 – 0.40 | Fair |
+| < 0.20 | Slight or poor |
+
+A production-ready judge setup should achieve κ > 0.60.
 
 ---
 
-## Formula
+## When to Use It
 
-```
-κ = (p_o - p_e) / (1 - p_e)
+Use κ when your dataset has human-assigned verdict labels (not scores). It directly measures whether Themis's `pass`/`review`/`fail` classification matches human expert judgment on the same conversations.
 
-p_o = observed agreement (proportion of exact matches)
-p_e = expected agreement by chance
-```
-
-Range: −1 to +1.
-- κ = 1: Perfect agreement
-- κ = 0: Agreement no better than chance
-- κ < 0: Systematic disagreement
+> **Status:** The batch CLI does not yet compute κ automatically. The field `human_label` is not yet part of `ConversationEvaluationRequest`. When implemented, it will be added as an optional field and the CLI will output a kappa report when human labels are present.
 
 ---
 
-## Why Not Just Use Accuracy
+## Input Format
 
-A judge that always predicts `pass` achieves 85% accuracy on a dataset where 85% of records are `pass`. But κ = 0 — the agreement is entirely explained by the class distribution, not by the judge doing any real evaluation. Kappa exposes this.
-
----
-
-## Example
-
-10 responses evaluated by human and judge:
-
-| Response | Human | Judge | Match? |
-|----------|-------|-------|--------|
-| R1 | pass | pass | ✓ |
-| R2 | pass | pass | ✓ |
-| R3 | pass | review | ✗ |
-| R4 | review | review | ✓ |
-| R5 | review | pass | ✗ |
-| R6 | fail | fail | ✓ |
-| R7 | fail | review | ✗ |
-| R8 | pass | pass | ✓ |
-| R9 | review | review | ✓ |
-| R10 | fail | fail | ✓ |
-
-Distribution: Human — 4 pass, 3 review, 3 fail. Judge — 5 pass, 3 review, 2 fail.
-
-**p_o** = 7/10 = 0.70
-
-**p_e** (chance agreement per class):
-- pass: (4/10) × (5/10) = 0.20
-- review: (3/10) × (3/10) = 0.09
-- fail: (3/10) × (2/10) = 0.06
-- **p_e = 0.35**
-
-```
-κ = (0.70 - 0.35) / (1 - 0.35) = 0.54 → "Moderate agreement"
-```
-
----
-
-## Interpretation Scale (Landis & Koch)
-
-| Range | Meaning |
-|-------|---------|
-| κ > 0.80 | Almost perfect |
-| κ = 0.60–0.80 | Substantial — industry standard |
-| κ = 0.40–0.60 | Moderate — acceptable |
-| κ = 0.20–0.40 | Fair — needs improvement |
-| κ < 0.20 | Poor |
-
----
-
-## Kappa vs Kendall's τ
-
-| Metric | Measures | Decision role |
-|--------|----------|--------------|
-| **Kendall's τ** | Rank correlation | **Primary** — pass/fail gate |
-| **Cohen's κ** | Categorical agreement | **Secondary** — reporting only |
-
-Kappa does **not** override τ for deployment decisions.
-
-**High κ, low τ** → verdicts are correct but confidence scores don't correlate. Fix: adjust aggregation method or stage weights.
-
-**High τ, low κ** → scores correlate but verdict thresholds are miscalibrated. Fix: adjust `VERDICT_PASS_THRESHOLD` / `VERDICT_REVIEW_THRESHOLD`.
-
----
-
-## In Themis Validation Output
-
-```bash
-./bin/themis-cli validate-events -i human_annotated.jsonl -c 0.3
-```
+Planned input format (conversation level):
 
 ```json
-{
-  "correlation_metrics": {
-    "kendalls_tau": 0.45,
-    "interpretation": "Moderate to strong agreement",
-    "passed": true
-  },
-  "agreement_metrics": {
-    "cohens_kappa": 0.62,
-    "interpretation": "Substantial agreement"
-  }
-}
+{"conversation_id":"conv-001","human_label":"pass","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-002","human_label":"fail","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-003","human_label":"review","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
 ```
 
-**Always inspect the confusion matrix alongside kappa** — kappa alone won't show if the judge never uses a particular verdict class.
+`human_label` must be one of: `"pass"`, `"review"`, `"fail"`.
 
 ---
 
-## Next Steps
+## Computing Manually (Current Approach)
 
-- [Confusion Matrix](confusion-matrix.md) — per-class error breakdown
-- [Interpretation Guide](interpretation-guide.md) — decision framework and failure patterns
+**Step 1 — Run batch evaluation:**
+```bash
+./bin/themis-cli evaluate -input annotated-dataset.jsonl -output results.jsonl
+```
+
+**Step 2 — Compute κ:**
+```python
+import json
+from sklearn.metrics import cohen_kappa_score
+
+# Load
+themis = {r['conversation_id']: r['verdict']
+          for r in (json.loads(l) for l in open('results.jsonl'))}
+human  = {r['conversation_id']: r['human_label']
+          for r in (json.loads(l) for l in open('annotated-dataset.jsonl'))
+          if 'human_label' in r}
+
+ids = sorted(set(themis) & set(human))
+t = [themis[i] for i in ids]
+h = [human[i]  for i in ids]
+
+kappa = cohen_kappa_score(h, t, labels=['pass', 'review', 'fail'])
+print(f"Cohen's κ = {kappa:.3f}  (n = {len(ids)})")
+```
+
+---
+
+## Weighted Kappa
+
+For ordered labels (fail < review < pass), a disagreement of `fail` vs `pass` is worse than `fail` vs `review`. Use **linear weighted kappa** to penalize larger disagreements more:
+
+```python
+kappa_weighted = cohen_kappa_score(h, t,
+                                   labels=['fail', 'review', 'pass'],
+                                   weights='linear')
+print(f"Weighted κ = {kappa_weighted:.3f}")
+```
+
+Weighted kappa is usually more informative than unweighted for a 3-class ordered classification.
+
+---
+
+## Diagnosing Low Kappa
+
+Low κ is usually caused by one of:
+
+| Symptom | Diagnosis | Fix |
+|---------|-----------|-----|
+| Themis marks `review` where humans say `pass` | Pass threshold too high | Lower `VERDICT_PASS_THRESHOLD` |
+| Themis marks `pass` where humans say `fail` | Judges too lenient | Raise `VERDICT_PASS_THRESHOLD` or `VERDICT_REVIEW_THRESHOLD` |
+| `review` class rarely agrees | Middle band too wide or too narrow | Tune both thresholds together |
+| Agreement on `pass`/`fail` but not `review` | `review` band is poorly positioned | Adjust `VERDICT_REVIEW_THRESHOLD` |
+
+Use the [Confusion Matrix](confusion-matrix.md) alongside κ to pinpoint exactly which label pairs are disagreeing.
+
+---
+
+## Inter-Annotator Kappa
+
+κ can also be computed between two human annotators before involving Themis at all. This tells you how consistent your human labels are — the ceiling for what Themis can achieve.
+
+If two human annotators agree at κ = 0.75, you cannot expect Themis to exceed 0.75 on that dataset. This is the **inter-annotator ceiling**.
+
+```python
+# Replace themis labels with a second annotator's labels
+kappa_human = cohen_kappa_score(annotator_1, annotator_2,
+                                labels=['pass', 'review', 'fail'])
+print(f"Inter-annotator κ = {kappa_human:.3f}")
+```
+
+---
+
+## See Also
+
+- [Kendall's Tau](kendalls-tau.md) — rank correlation with human scores
+- [Confusion Matrix](confusion-matrix.md) — per-class breakdown of agreement
+- [Interpretation Guide](interpretation-guide.md) — reading Themis scores
+- [Configuration](../getting-started/configuration.md) — tuning verdict thresholds

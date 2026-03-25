@@ -10,19 +10,17 @@ import (
 
 // ConversationSummaryStats holds aggregate statistics for a batch of conversation evaluations.
 type ConversationSummaryStats struct {
-	Total         int     `json:"total"`
-	PassCount     int     `json:"pass_count"`
-	FailCount     int     `json:"fail_count"`
-	ReviewCount   int     `json:"review_count"`
-	AvgConfidence float64 `json:"avg_confidence"`
-	AvgTurnCount  float64 `json:"avg_turn_count"`
+	Total             int                `json:"total"`
+	VerdictCounts     map[string]int     `json:"verdict_counts"`
+	CorrelationReport *CorrelationReport `json:"correlation_report,omitempty"`
 }
 
 // ConversationSummaryWriter accumulates conversation evaluation results and writes aggregate stats.
 type ConversationSummaryWriter struct {
-	output  io.Writer
-	logger  *zerolog.Logger
-	results []models.ConversationEvaluationResult
+	output            io.Writer
+	logger            *zerolog.Logger
+	results           []models.ConversationEvaluationResult
+	correlationReport *CorrelationReport
 }
 
 func NewConversationSummaryWriter(output io.Writer, logger *zerolog.Logger) *ConversationSummaryWriter {
@@ -38,8 +36,14 @@ func (w *ConversationSummaryWriter) Write(result models.ConversationEvaluationRe
 	return nil
 }
 
+// SetCorrelationReport attaches a pre-computed correlation report to be included in the summary output.
+func (w *ConversationSummaryWriter) SetCorrelationReport(r *CorrelationReport) {
+	w.correlationReport = r
+}
+
 func (w *ConversationSummaryWriter) Close() error {
 	stats := w.computeStats()
+	stats.CorrelationReport = w.correlationReport
 
 	data, err := json.MarshalIndent(stats, "", "  ")
 	if err != nil {
@@ -52,29 +56,12 @@ func (w *ConversationSummaryWriter) Close() error {
 
 func (w *ConversationSummaryWriter) computeStats() ConversationSummaryStats {
 	stats := ConversationSummaryStats{
-		Total: len(w.results),
+		Total:         len(w.results),
+		VerdictCounts: make(map[string]int),
 	}
-
-	var totalConfidence float64
-	var totalTurns int
 
 	for _, result := range w.results {
-		totalConfidence += result.Confidence
-		totalTurns += result.TurnCount
-
-		switch result.Verdict {
-		case models.VerdictPass:
-			stats.PassCount++
-		case models.VerdictFail:
-			stats.FailCount++
-		case models.VerdictReview:
-			stats.ReviewCount++
-		}
-	}
-
-	if stats.Total > 0 {
-		stats.AvgConfidence = totalConfidence / float64(stats.Total)
-		stats.AvgTurnCount = float64(totalTurns) / float64(stats.Total)
+		stats.VerdictCounts[string(result.Verdict)]++
 	}
 
 	return stats

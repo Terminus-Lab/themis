@@ -4,1466 +4,253 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/Terminus-Lab/themis/internal/aggregator"
 	"github.com/Terminus-Lab/themis/internal/api"
-	"github.com/Terminus-Lab/themis/internal/executor"
-	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/setup"
-	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 )
 
-// Custom flag for running integration tests with real LLM calls
-var runIntegration = flag.Bool("integration", false, "Run integration tests with real LLM API calls")
-
-/*
-TEST 1: Health Check
-Purpose: Verify the API is running and responds to health checks
-*/
-func TestAPI_Health(t *testing.T) {
-	// Build real API with REAL LLM client
-	container := setupTestAPI(t)
-
-	// Create HTTP request
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
-
-	// Create recorder to capture response
-	recorder := httptest.NewRecorder()
-
-	// Execute: Send request through real API
-	container.ServeHTTP(recorder, req)
-
-	// Assert: Check response
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", recorder.Code)
+// TestMain loads .env and sets JUDGES_CONFIG_PATH before any test runs so that
+// LLM credentials and judge configuration are available to integration tests
+// regardless of working directory.
+func TestMain(m *testing.M) {
+	_ = godotenv.Load("../../.env")
+	if os.Getenv("JUDGES_CONFIG_PATH") == "" {
+		os.Setenv("JUDGES_CONFIG_PATH", "../../configs/judges.yaml")
 	}
-
-	var response api.HealthResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if response.Status != "ok" {
-		t.Errorf("Expected status 'ok', got '%s'", response.Status)
-	}
+	os.Exit(m.Run())
 }
 
-/*
-TEST 2: Full Evaluation - Happy Path
-Purpose: Test complete evaluation pipeline with all judges
-*/
-func TestAPI_Evaluate_FullPipeline(t *testing.T) {
-	// Setup
-	container := setupTestAPI(t)
-
-	// Create evaluation request (happy case: good answer)
-	evalRequest := models.EvaluationRequest{
-		EventID:        "test-001",
-		ConversationID: "conv-test-001",
-		Interaction: models.Interaction{
-			UserQuery: "What is the capital of France?",
-			Answer:    "The capital of France is Paris.",
-			Context:   "France is a country in Europe. Paris is its capital city.",
-		},
-	}
-
-	// Marshal to JSON
-	body, err := json.Marshal(evalRequest)
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Create HTTP request
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	// Create recorder
-	recorder := httptest.NewRecorder()
-
-	// Execute
-	container.ServeHTTP(recorder, req)
-
-	// Assert
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var result models.EvaluationResult
-	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	// Verify result structure
-	if result.ID != "test-001" {
-		t.Errorf("Expected ID 'test-001', got '%s'", result.ID)
-	}
-
-	if len(result.Stages) == 0 {
-		t.Error("Expected stages in result, got none")
-	}
-
-	// Verify both prechecks and judges ran
-	hasPrechecks := false
-	hasJudges := false
-	for _, stage := range result.Stages {
-		if stage.Name == "length-checker" || stage.Name == "overlap-checker" || stage.Name == "format-checker" {
-			hasPrechecks = true
-		}
-		if stage.Name == "relevance-judge" || stage.Name == "coherence-judge" {
-			hasJudges = true
-		}
-	}
-
-	if !hasPrechecks {
-		t.Error("Expected precheck stages")
-	}
-	if !hasJudges {
-		t.Error("Expected judge stages")
-	}
-
-	// Verify verdict is set
-	if result.Verdict == "" {
-		t.Error("Expected verdict to be set")
-	}
-
-	// Verify confidence is in valid range
-	if result.Confidence < 0 || result.Confidence > 1 {
-		t.Errorf("Expected confidence in [0,1], got %f", result.Confidence)
-	}
-
-	// Log results
-	t.Logf("Full Pipeline Result: verdict=%s, confidence=%.3f, stages=%d",
-		result.Verdict, result.Confidence, len(result.Stages))
-	t.Logf("Metrics: weighted_avg=%.3f, harmonic_mean=%.3f, median=%.3f, product=%.3f",
-		result.Metrics.Stage2WeightedAvg, result.Metrics.Stage2HarmonicMean,
-		result.Metrics.Stage2Median, result.Metrics.Stage2WeightedProduct)
-}
-
-/*
-TEST 3: Single Judge Evaluation
-Purpose: Test evaluating with only one judge (faster endpoint)
-*/
-func TestAPI_EvaluateSingleJudge_Relevance(t *testing.T) {
-	// Setup
-	container := setupTestAPI(t)
-
-	// Create evaluation request
-	evalRequest := models.EvaluationRequest{
-		EventID:        "test-002",
-		ConversationID: "conv-test-002",
-		Interaction: models.Interaction{
-			UserQuery: "What is AI?",
-			Answer:    "AI stands for Artificial Intelligence.",
-		},
-	}
-
-	body, _ := json.Marshal(evalRequest)
-
-	// Create HTTP request for relevance judge only
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/evaluate/judge/relevance?threshold=0.7",
-		bytes.NewReader(body),
-	)
-	req.Header.Set("Content-Type", "application/json")
-
-	recorder := httptest.NewRecorder()
-
-	// Execute
-	container.ServeHTTP(recorder, req)
-
-	// Assert
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var result models.EvaluationResult
-	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	// Verify only relevance judge ran
-	if len(result.Stages) != 1 {
-		t.Errorf("Expected 1 stage (relevance-judge), got %d", len(result.Stages))
-	}
-
-	if len(result.Stages) > 0 && result.Stages[0].Name != "relevance-judge" {
-		t.Errorf("Expected 'relevance-judge', got '%s'", result.Stages[0].Name)
-	}
-
-	// Log results
-	if len(result.Stages) > 0 {
-		t.Logf("Relevance Judge: verdict=%s, confidence=%.3f, score=%.3f",
-			result.Verdict, result.Confidence, result.Stages[0].Score)
-	}
-}
-
-/*
-TEST 4: Faithfulness Judge (requires context)
-Purpose: Test a judge that requires context field
-*/
-func TestAPI_EvaluateSingleJudge_Faithfulness(t *testing.T) {
-	// Setup
-	container := setupTestAPI(t)
-
-	// Create evaluation request WITH context
-	evalRequest := models.EvaluationRequest{
-		EventID:        "test-003",
-		ConversationID: "conv-test-003",
-		Interaction: models.Interaction{
-			UserQuery: "What does the documentation say about Redis?",
-			Answer:    "Redis is used for streaming messages.",
-			Context:   "The system uses Redis Streams for message queue functionality.", // Required!
-		},
-	}
-
-	body, _ := json.Marshal(evalRequest)
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/evaluate/judge/faithfulness",
-		bytes.NewReader(body),
-	)
-	req.Header.Set("Content-Type", "application/json")
-
-	recorder := httptest.NewRecorder()
-
-	// Execute
-	container.ServeHTTP(recorder, req)
-
-	// Assert
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var result models.EvaluationResult
-	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if len(result.Stages) != 1 {
-		t.Errorf("Expected 1 stage, got %d", len(result.Stages))
-	}
-
-	if len(result.Stages) > 0 && result.Stages[0].Name != "faithfulness-judge" {
-		t.Errorf("Expected 'faithfulness-judge', got '%s'", result.Stages[0].Name)
-	}
-
-	// Log results
-	if len(result.Stages) > 0 {
-		t.Logf("Faithfulness Judge: verdict=%s, confidence=%.3f, score=%.3f",
-			result.Verdict, result.Confidence, result.Stages[0].Score)
-	}
-}
-
-/*
-TEST 5: Multiple Judges at Once
-Purpose: Test evaluating with multiple specific judges
-*/
-func TestAPI_Evaluate_MultipleJudges(t *testing.T) {
-	// Setup
-	container := setupTestAPI(t)
-
-	// Test different judges with the same request
-	judges := []string{"relevance", "coherence", "completeness", "instruction"}
-
-	evalRequest := models.EvaluationRequest{
-		EventID:        "test-004",
-		ConversationID: "conv-test-004",
-		Interaction: models.Interaction{
-			UserQuery: "Explain Go interfaces in one sentence.",
-			Answer:    "Go interfaces define method signatures that types must implement.",
-		},
-	}
-
-	for _, judgeName := range judges {
-		body, _ := json.Marshal(evalRequest)
-
-		req := httptest.NewRequest(
-			http.MethodPost,
-			"/api/v1/evaluate/judge/"+judgeName,
-			bytes.NewReader(body),
-		)
-		req.Header.Set("Content-Type", "application/json")
-
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-
-		if recorder.Code != http.StatusOK {
-			t.Errorf("Judge %s failed with status %d", judgeName, recorder.Code)
-			continue
-		}
-
-		var result models.EvaluationResult
-		json.Unmarshal(recorder.Body.Bytes(), &result)
-
-		// Log results
-		if len(result.Stages) > 0 {
-			t.Logf("Judge %s: verdict=%s, confidence=%.3f, score=%.3f",
-				judgeName, result.Verdict, result.Confidence, result.Stages[0].Score)
-		}
-	}
-}
-
-/*
-TEST 6: Early Exit Scenario
-Purpose: Test that poor responses trigger early exit (skip LLM judges)
-*/
-func TestAPI_Evaluate_EarlyExit(t *testing.T) {
-	// Setup
-	container := setupTestAPI(t)
-
-	// Create request with very poor answer (should fail prechecks)
-	evalRequest := models.EvaluationRequest{
-		EventID:        "test-005",
-		ConversationID: "conv-test-005",
-		Interaction: models.Interaction{
-			UserQuery: "Explain quantum computing, its applications, and future implications?",
-			Answer:    "Yes.", // Very short answer = early exit
-		},
-	}
-
-	body, _ := json.Marshal(evalRequest)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	recorder := httptest.NewRecorder()
-
-	// Execute
-	container.ServeHTTP(recorder, req)
-
-	// Assert
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", recorder.Code)
-	}
-
-	var result models.EvaluationResult
-	json.Unmarshal(recorder.Body.Bytes(), &result)
-
-	// Verify early exit: should have prechecks but NO judges
-	hasPrechecks := false
-	hasJudges := false
-	for _, stage := range result.Stages {
-		if stage.Name == "length-checker" {
-			hasPrechecks = true
-		}
-		if stage.Name == "relevance-judge" {
-			hasJudges = true
-		}
-	}
-
-	if !hasPrechecks {
-		t.Error("Expected prechecks to run")
-	}
-
-	if hasJudges {
-		t.Error("Expected early exit - judges should NOT run for poor answer")
-	}
-
-	// Should be a fail verdict
-	if result.Verdict != models.VerdictFail {
-		t.Errorf("Expected 'fail' verdict for early exit, got '%s'", result.Verdict)
-	}
-
-	// Log results
-	t.Logf("Early Exit Result: verdict=%s, confidence=%.3f, stages=%d (prechecks only)",
-		result.Verdict, result.Confidence, len(result.Stages))
-}
-
-// setupTestAPI creates API with REAL LLM clients wired from configs/judges.yaml
-func setupTestAPI(t *testing.T) *restful.Container {
-	if !*runIntegration {
-		t.Skip("Skipping integration test - use 'go test -integration' to run with real LLM API calls")
-	}
-
-	if err := godotenv.Load("../../.env"); err != nil {
-		t.Logf("Warning: No .env file found, using environment variables")
-	}
-
-	os.Setenv("JUDGES_CONFIG_PATH", "../../configs/judges.yaml")
-	os.Setenv("IN_MEMORY_DB", "true") // always isolate integration tests from real DB
+// setupContainer wires an in-memory SQLite repo with a nil evaluator.
+// Use for tests that exercise routing, validation, and storage — no LLM calls.
+func setupContainer(t *testing.T) *restful.Container {
+	t.Helper()
 
 	ctx := context.Background()
 	logger := zerolog.Nop()
 
-	cfg := setup.LoadConfig()
-	deps, err := setup.Wire(ctx, cfg, &logger)
+	db, err := sqlite.New(ctx, ":memory:")
 	if err != nil {
-		t.Fatalf("Failed to wire dependencies: %v", err)
+		t.Fatalf("sqlite.New: %v", err)
 	}
+	if err := db.InitSchema(ctx); err != nil {
+		t.Fatalf("InitSchema: %v", err)
+	}
+	repo := sqlite.NewEvalRepository(db, &logger)
 
-	handler := api.NewHandler(deps.Executor, deps.JudgeExecutor, deps.ConversationExecutor, deps.Repository, &logger)
+	handler := api.NewHandler(nil, repo, &logger)
 	container := restful.NewContainer()
 	api.RegisterRoutes(container, handler)
-
 	return container
 }
 
-func setupTestRepository(t *testing.T, logger *zerolog.Logger) *sqlite.EvalRepository {
+// setupIntegrationDeps wires the full stack using .env credentials and an
+// in-memory SQLite database. Skips the calling test if OPEN_AI_KEY is not set
+// or if wiring fails (e.g. missing AWS credentials for Bedrock judges).
+func setupIntegrationDeps(t *testing.T) *setup.Dependencies {
 	t.Helper()
 
-	db, err := sqlite.New(context.Background(), ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to create in-memory database: %v", err)
+	cfg := setup.LoadConfig()
+	if cfg.OpenAIKey == "" {
+		t.Skip("OPEN_AI_KEY not set — skipping LLM integration test")
 	}
+	cfg.InMemoryDB = true
 
-	if err := db.InitSchema(context.Background()); err != nil {
-		t.Fatalf("Failed to initialize schema: %v", err)
-	}
-
-	return sqlite.NewEvalRepository(db, logger)
-}
-
-/*
-TEST 7: Query Results - Empty Database
-Purpose: Test querying when no results exist
-*/
-func TestAPI_QueryResults_Empty(t *testing.T) {
-	container := setupTestAPI(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results", nil)
-	recorder := httptest.NewRecorder()
-
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", recorder.Code)
-	}
-
-	var response api.QueryResultsResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if response.Total != 0 {
-		t.Errorf("Expected total=0, got %d", response.Total)
-	}
-
-	if len(response.Results) != 0 {
-		t.Errorf("Expected 0 results, got %d", len(response.Results))
-	}
-
-	if response.HasMore {
-		t.Error("Expected has_more=false for empty results")
-	}
-
-	t.Logf("Empty query result: total=%d, count=%d", response.Total, response.Count)
-}
-
-/*
-TEST 8: Query Results - With Data
-Purpose: Test querying after running some evaluations
-*/
-func TestAPI_QueryResults_WithData(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// First, create some evaluation data by running evaluations
-	evaluations := []models.EvaluationRequest{
-		{
-			EventID:        "query-test-001",
-			ConversationID: "conv-query-001",
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What is the capital of France?",
-				Answer:    "The capital of France is Paris.",
-			},
-		},
-		{
-			EventID:        "query-test-002",
-			ConversationID: "conv-query-002",
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What is AI?",
-				Answer:    "AI stands for Artificial Intelligence.",
-			},
-		},
-		{
-			EventID:        "query-test-003",
-			ConversationID: "conv-query-003",
-			Agent:          models.Agent{Name: "other-agent", Version: "2.0"},
-			Interaction: models.Interaction{
-				UserQuery: "Explain quantum computing?",
-				Answer:    "Yes.", // Short answer - likely to fail
-			},
-		},
-	}
-
-	// Run evaluations to populate database
-	for _, evalReq := range evaluations {
-		body, _ := json.Marshal(evalReq)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-
-		if recorder.Code != http.StatusOK {
-			t.Fatalf("Failed to run evaluation %s: status=%d", evalReq.EventID, recorder.Code)
-		}
-	}
-
-	// Now test query - get all results
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results?limit=10", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var response api.QueryResultsResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if response.Total != 3 {
-		t.Errorf("Expected total=3, got %d", response.Total)
-	}
-
-	if len(response.Results) != 3 {
-		t.Errorf("Expected 3 results, got %d", len(response.Results))
-	}
-
-	if response.HasMore {
-		t.Error("Expected has_more=false when all results fit in one page")
-	}
-
-	// Verify results contain expected fields
-	for _, result := range response.Results {
-		if result.EventID == "" {
-			t.Error("Expected event_id to be set")
-		}
-		if result.AgentName == "" {
-			t.Error("Expected agent_name to be set")
-		}
-		if result.Verdict == "" {
-			t.Error("Expected verdict to be set")
-		}
-		if len(result.StageScores) == 0 {
-			t.Error("Expected stage_scores to be populated")
-		}
-	}
-
-	t.Logf("Query with data: total=%d, count=%d, results=%d",
-		response.Total, response.Count, len(response.Results))
-}
-
-/*
-TEST 9: Query Results - Filter by Agent Name
-Purpose: Test filtering results by agent name
-*/
-func TestAPI_QueryResults_FilterByAgent(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// Create evaluations with different agents
-	evaluations := []models.EvaluationRequest{
-		{
-			EventID:        "filter-test-001",
-			ConversationID: "conv-filter-001",
-			Agent:          models.Agent{Name: "agent-a", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "Test query 1",
-				Answer:    "Test answer 1",
-			},
-		},
-		{
-			EventID:        "filter-test-002",
-			ConversationID: "conv-filter-002",
-			Agent:          models.Agent{Name: "agent-b", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "Test query 2",
-				Answer:    "Test answer 2",
-			},
-		},
-		{
-			EventID:        "filter-test-003",
-			ConversationID: "conv-filter-003",
-			Agent:          models.Agent{Name: "agent-a", Version: "2.0"},
-			Interaction: models.Interaction{
-				UserQuery: "Test query 3",
-				Answer:    "Test answer 3",
-			},
-		},
-	}
-
-	// Run evaluations
-	for _, evalReq := range evaluations {
-		body, _ := json.Marshal(evalReq)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-	}
-
-	// Query filtered by agent-a
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results?agent_name=agent-a", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", recorder.Code)
-	}
-
-	var response api.QueryResultsResponse
-	json.Unmarshal(recorder.Body.Bytes(), &response)
-
-	if response.Total != 2 {
-		t.Errorf("Expected 2 results for agent-a, got %d", response.Total)
-	}
-
-	// Verify all results are for agent-a
-	for _, result := range response.Results {
-		if result.AgentName != "agent-a" {
-			t.Errorf("Expected agent_name='agent-a', got '%s'", result.AgentName)
-		}
-	}
-
-	t.Logf("Filter by agent: agent_name=agent-a, total=%d", response.Total)
-}
-
-/*
-TEST 10: Query Results - Filter by Verdict
-Purpose: Test filtering results by verdict (pass, review, fail)
-*/
-func TestAPI_QueryResults_FilterByVerdict(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// Create evaluations that will produce different verdicts
-	goodAnswer := models.EvaluationRequest{
-		EventID:        "verdict-test-001",
-		ConversationID: "conv-verdict-001",
-		Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-		Interaction: models.Interaction{
-			UserQuery: "What is the capital of France?",
-			Answer:    "The capital of France is Paris, which is located in the north-central part of the country.",
-			Context:   "France is a country in Europe with Paris as its capital.",
-		},
-	}
-
-	poorAnswer := models.EvaluationRequest{
-		EventID:        "verdict-test-002",
-		ConversationID: "conv-verdict-002",
-		Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-		Interaction: models.Interaction{
-			UserQuery: "Explain the theory of relativity, its implications, and applications in modern physics?",
-			Answer:    "Ok.", // Very short - should fail
-		},
-	}
-
-	// Run evaluations
-	for _, evalReq := range []models.EvaluationRequest{goodAnswer, poorAnswer} {
-		body, _ := json.Marshal(evalReq)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-	}
-
-	// Query for "fail" verdicts
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results?verdict=fail", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", recorder.Code)
-	}
-
-	var response api.QueryResultsResponse
-	json.Unmarshal(recorder.Body.Bytes(), &response)
-
-	// Should have at least the poor answer (early exit with fail verdict)
-	if response.Total < 1 {
-		t.Errorf("Expected at least 1 'fail' verdict, got %d", response.Total)
-	}
-
-	// Verify all results have fail verdict
-	for _, result := range response.Results {
-		if result.Verdict != "fail" {
-			t.Errorf("Expected verdict='fail', got '%s'", result.Verdict)
-		}
-	}
-
-	t.Logf("Filter by verdict: verdict=fail, total=%d", response.Total)
-}
-
-/*
-TEST 11: Query Results - Pagination
-Purpose: Test pagination with limit and offset
-*/
-func TestAPI_QueryResults_Pagination(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// Create multiple evaluations
-	for i := 1; i <= 5; i++ {
-		evalReq := models.EvaluationRequest{
-			EventID:        fmt.Sprintf("page-test-%d", i),
-			ConversationID: fmt.Sprintf("conv-page-%d", i),
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "Test query",
-				Answer:    "Test answer with sufficient length to pass prechecks.",
-			},
-		}
-		body, _ := json.Marshal(evalReq)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-	}
-
-	// Query first page (limit=2, offset=0)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results?limit=2&offset=0", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	var page1 api.QueryResultsResponse
-	json.Unmarshal(recorder.Body.Bytes(), &page1)
-
-	if page1.Count != 2 {
-		t.Errorf("Expected count=2, got %d", page1.Count)
-	}
-
-	if page1.Total != 5 {
-		t.Errorf("Expected total=5, got %d", page1.Total)
-	}
-
-	if !page1.HasMore {
-		t.Error("Expected has_more=true for first page")
-	}
-
-	// Query second page (limit=2, offset=2)
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/results?limit=2&offset=2", nil)
-	recorder = httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	var page2 api.QueryResultsResponse
-	json.Unmarshal(recorder.Body.Bytes(), &page2)
-
-	if page2.Count != 2 {
-		t.Errorf("Expected count=2, got %d", page2.Count)
-	}
-
-	if !page2.HasMore {
-		t.Error("Expected has_more=true for second page")
-	}
-
-	t.Logf("Pagination: page1_count=%d, page2_count=%d, total=%d",
-		page1.Count, page2.Count, page1.Total)
-}
-
-/*
-TEST 12: Get Result by ID
-Purpose: Test retrieving a single evaluation by event ID
-*/
-func TestAPI_GetResultByID(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// Create an evaluation
-	evalReq := models.EvaluationRequest{
-		EventID:        "get-by-id-test",
-		ConversationID: "conv-get-by-id",
-		Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-		Interaction: models.Interaction{
-			UserQuery: "What is Go?",
-			Answer:    "Go is a programming language created by Google.",
-		},
-	}
-
-	body, _ := json.Marshal(evalReq)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	// Now get by ID
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/results/get-by-id-test", nil)
-	recorder = httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var response api.EvaluationResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if response.Evaluation.EventID != "get-by-id-test" {
-		t.Errorf("Expected event_id='get-by-id-test', got '%s'", response.Evaluation.EventID)
-	}
-
-	if response.Evaluation.AgentName != "test-agent" {
-		t.Errorf("Expected agent_name='test-agent', got '%s'", response.Evaluation.AgentName)
-	}
-
-	t.Logf("Get by ID: event_id=%s, verdict=%s, confidence=%.3f",
-		response.Evaluation.EventID, response.Evaluation.Verdict, response.Evaluation.Confidence)
-}
-
-/*
-TEST 13: Get Result by ID - Not Found
-Purpose: Test 404 when requesting non-existent event ID
-*/
-func TestAPI_GetResultByID_NotFound(t *testing.T) {
-	container := setupTestAPI(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results/non-existent-id", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusNotFound {
-		t.Errorf("Expected status 404, got %d", recorder.Code)
-	}
-
-	var errorResp map[string]string
-	json.Unmarshal(recorder.Body.Bytes(), &errorResp)
-
-	if errorResp["error"] != "result not found" {
-		t.Errorf("Expected error='result not found', got '%s'", errorResp["error"])
-	}
-
-	t.Log("Get by ID not found: returned 404 as expected")
-}
-
-/*
-TEST 14: List Conversations - Empty Database
-Purpose: Test listing conversations when no evaluations exist
-*/
-func TestAPI_ListConversations_Empty(t *testing.T) {
-	container := setupTestAPI(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations", nil)
-	recorder := httptest.NewRecorder()
-
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var response api.ConversationListResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	if response.Total != 0 {
-		t.Errorf("Expected total=0, got %d", response.Total)
-	}
-
-	if len(response.Conversations) != 0 {
-		t.Errorf("Expected 0 conversations, got %d", len(response.Conversations))
-	}
-
-	t.Logf("Empty conversations list: total=%d", response.Total)
-}
-
-/*
-TEST 15: List Conversations - With Data
-Purpose: Test listing conversations after running evaluations with conversation IDs
-*/
-func TestAPI_ListConversations_WithData(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// Create evaluations with different conversation IDs
-	evaluations := []models.EvaluationRequest{
-		{
-			EventID:        "conv-list-test-001",
-			ConversationID: "conv-alpha",
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What is the capital of France?",
-				Answer:    "The capital of France is Paris.",
-				Context:   "France is a country in Europe.",
-			},
-		},
-		{
-			EventID:        "conv-list-test-002",
-			ConversationID: "conv-alpha",
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What is the population?",
-				Answer:    "Paris has approximately 2.2 million inhabitants.",
-				Context:   "Paris is the capital of France.",
-			},
-		},
-		{
-			EventID:        "conv-list-test-003",
-			ConversationID: "conv-beta",
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What is AI?",
-				Answer:    "AI stands for Artificial Intelligence.",
-			},
-		},
-		{
-			EventID:        "conv-list-test-004",
-			ConversationID: "conv-beta",
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "How does it work?",
-				Answer:    "Yes.", // Short answer - should fail
-			},
-		},
-	}
-
-	// Run evaluations to populate database
-	for _, evalReq := range evaluations {
-		body, _ := json.Marshal(evalReq)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-
-		if recorder.Code != http.StatusOK {
-			t.Fatalf("Failed to run evaluation %s: status=%d", evalReq.EventID, recorder.Code)
-		}
-	}
-
-	// Now test list conversations
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var response api.ConversationListResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	// Should have 2 conversations (conv-alpha and conv-beta)
-	if response.Total != 2 {
-		t.Errorf("Expected total=2 conversations, got %d", response.Total)
-	}
-
-	if len(response.Conversations) != 2 {
-		t.Errorf("Expected 2 conversations, got %d", len(response.Conversations))
-	}
-
-	// Verify conversation summaries contain expected fields
-	for _, conv := range response.Conversations {
-		if conv.ConversationID == "" {
-			t.Error("Expected conversation_id to be set")
-		}
-		if conv.TurnCount == 0 {
-			t.Error("Expected turn_count > 0")
-		}
-		if conv.AvgConfidence < 0 || conv.AvgConfidence > 1 {
-			t.Errorf("Expected avg_confidence in [0,1], got %f", conv.AvgConfidence)
-		}
-		if conv.AgentName == "" {
-			t.Error("Expected agent_name to be set")
-		}
-
-		// Verify verdict counts sum to turn count
-		totalVerdicts := conv.VerdictCounts.Pass + conv.VerdictCounts.Review + conv.VerdictCounts.Fail
-		if totalVerdicts != conv.TurnCount {
-			t.Errorf("Verdict counts (%d) don't match turn_count (%d)", totalVerdicts, conv.TurnCount)
-		}
-
-		t.Logf("Conversation: id=%s, turns=%d, avg_confidence=%.3f, pass=%d, review=%d, fail=%d",
-			conv.ConversationID, conv.TurnCount, conv.AvgConfidence,
-			conv.VerdictCounts.Pass, conv.VerdictCounts.Review, conv.VerdictCounts.Fail)
-	}
-
-	t.Logf("List conversations: total=%d", response.Total)
-}
-
-/*
-TEST 16: Get Conversation by ID - Detail View
-Purpose: Test retrieving all turns in a specific conversation
-*/
-func TestAPI_GetConversationByID(t *testing.T) {
-	container := setupTestAPI(t)
-
-	conversationID := "conv-detail-test"
-
-	// Create multiple evaluations in the same conversation
-	evaluations := []models.EvaluationRequest{
-		{
-			EventID:        "conv-detail-001",
-			ConversationID: conversationID,
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What is Go?",
-				Answer:    "Go is a programming language created by Google.",
-			},
-		},
-		{
-			EventID:        "conv-detail-002",
-			ConversationID: conversationID,
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "What are its features?",
-				Answer:    "Go features include concurrency support, garbage collection, and fast compilation.",
-			},
-		},
-		{
-			EventID:        "conv-detail-003",
-			ConversationID: conversationID,
-			Agent:          models.Agent{Name: "test-agent", Version: "1.0"},
-			Interaction: models.Interaction{
-				UserQuery: "Who uses it?",
-				Answer:    "Go is used by companies like Google, Docker, and Kubernetes.",
-			},
-		},
-	}
-
-	// Run evaluations
-	for _, evalReq := range evaluations {
-		body, _ := json.Marshal(evalReq)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		recorder := httptest.NewRecorder()
-		container.ServeHTTP(recorder, req)
-
-		if recorder.Code != http.StatusOK {
-			t.Fatalf("Failed to run evaluation %s: status=%d", evalReq.EventID, recorder.Code)
-		}
-	}
-
-	// Now get conversation details
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/"+conversationID, nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
-	}
-
-	var response api.ConversationDetailResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	// Verify conversation details
-	if response.ConversationID != conversationID {
-		t.Errorf("Expected conversation_id='%s', got '%s'", conversationID, response.ConversationID)
-	}
-
-	if response.TurnCount != 3 {
-		t.Errorf("Expected turn_count=3, got %d", response.TurnCount)
-	}
-
-	if len(response.Turns) != 3 {
-		t.Errorf("Expected 3 turns, got %d", len(response.Turns))
-	}
-
-	// Verify turns contain full evaluation details
-	for i, turn := range response.Turns {
-		if turn.EventID == "" {
-			t.Errorf("Turn %d: Expected event_id to be set", i)
-		}
-		if turn.ConversationID != conversationID {
-			t.Errorf("Turn %d: Expected conversation_id='%s', got '%s'", i, conversationID, turn.ConversationID)
-		}
-		if turn.UserQuery == "" {
-			t.Errorf("Turn %d: Expected user_query to be set", i)
-		}
-		if turn.Answer == "" {
-			t.Errorf("Turn %d: Expected answer to be set", i)
-		}
-		if turn.Verdict == "" {
-			t.Errorf("Turn %d: Expected verdict to be set", i)
-		}
-		if len(turn.StageScores) == 0 {
-			t.Errorf("Turn %d: Expected stage_scores to be populated", i)
-		}
-
-		t.Logf("Turn %d: event_id=%s, query='%s', verdict=%s, confidence=%.3f",
-			i+1, turn.EventID, turn.UserQuery, turn.Verdict, turn.Confidence)
-	}
-
-	t.Logf("Get conversation: id=%s, turn_count=%d", response.ConversationID, response.TurnCount)
-}
-
-/*
-TEST 17: Get Conversation by ID - Not Found
-Purpose: Test 404 when requesting non-existent conversation ID
-*/
-func TestAPI_GetConversationByID_NotFound(t *testing.T) {
-	container := setupTestAPI(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/non-existent-conv", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusNotFound {
-		t.Errorf("Expected status 404, got %d", recorder.Code)
-	}
-
-	var response map[string]string
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse error response: %v", err)
-	}
-
-	// Should return error message
-	if response["error"] != "conversation not found" {
-		t.Errorf("Expected error='conversation not found', got '%s'", response["error"])
-	}
-
-	t.Log("Get conversation not found: returned 404 as expected")
-}
-
-/*
-TEST 18: Conversation Isolation
-Purpose: Test that conversations are properly isolated from each other
-*/
-func TestAPI_ConversationIsolation(t *testing.T) {
-	container := setupTestAPI(t)
-
-	// Create evaluations in different conversations
-	conversations := map[string][]models.EvaluationRequest{
-		"conv-isolation-a": {
-			{EventID: "iso-a-001", ConversationID: "conv-isolation-a", Agent: models.Agent{Name: "agent-a", Version: "1.0"},
-				Interaction: models.Interaction{UserQuery: "Question 1", Answer: "Answer 1"}},
-			{EventID: "iso-a-002", ConversationID: "conv-isolation-a", Agent: models.Agent{Name: "agent-a", Version: "1.0"},
-				Interaction: models.Interaction{UserQuery: "Question 2", Answer: "Answer 2"}},
-		},
-		"conv-isolation-b": {
-			{EventID: "iso-b-001", ConversationID: "conv-isolation-b", Agent: models.Agent{Name: "agent-b", Version: "1.0"},
-				Interaction: models.Interaction{UserQuery: "Question 3", Answer: "Answer 3"}},
-		},
-	}
-
-	// Run all evaluations
-	for _, evals := range conversations {
-		for _, evalReq := range evals {
-			body, _ := json.Marshal(evalReq)
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate", bytes.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			recorder := httptest.NewRecorder()
-			container.ServeHTTP(recorder, req)
-		}
-	}
-
-	// Verify conv-isolation-a has 2 turns
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/conv-isolation-a", nil)
-	recorder := httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	var responseA api.ConversationDetailResponse
-	json.Unmarshal(recorder.Body.Bytes(), &responseA)
-
-	if responseA.TurnCount != 2 {
-		t.Errorf("Expected conv-isolation-a to have 2 turns, got %d", responseA.TurnCount)
-	}
-
-	// Verify conv-isolation-b has 1 turn
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/conversations/conv-isolation-b", nil)
-	recorder = httptest.NewRecorder()
-	container.ServeHTTP(recorder, req)
-
-	var responseB api.ConversationDetailResponse
-	json.Unmarshal(recorder.Body.Bytes(), &responseB)
-
-	if responseB.TurnCount != 1 {
-		t.Errorf("Expected conv-isolation-b to have 1 turn, got %d", responseB.TurnCount)
-	}
-
-	// Verify turns only belong to their respective conversations
-	for _, turn := range responseA.Turns {
-		if turn.ConversationID != "conv-isolation-a" {
-			t.Errorf("Found turn with conversation_id='%s' in conv-isolation-a", turn.ConversationID)
-		}
-	}
-
-	for _, turn := range responseB.Turns {
-		if turn.ConversationID != "conv-isolation-b" {
-			t.Errorf("Found turn with conversation_id='%s' in conv-isolation-b", turn.ConversationID)
-		}
-	}
-
-	t.Logf("Conversation isolation: conv-a has %d turns, conv-b has %d turns", responseA.TurnCount, responseB.TurnCount)
-}
-
-/*
-TEST: EvaluateConversation - nil executor returns 503
-Purpose: Verify that if no conversation-scoped judges are configured the endpoint returns 503
-*/
-func TestAPI_EvaluateConversation_NilExecutor(t *testing.T) {
+	ctx := context.Background()
 	logger := zerolog.Nop()
-	repo := setupTestRepository(t, &logger)
-	handler := api.NewHandler(nil, nil, nil, repo, &logger)
-	container := restful.NewContainer()
-	api.RegisterRoutes(container, handler)
 
-	body := `{"conversation_id":"conv-x","turns":[{"turn_index":0,"user_query":"Q","answer":"A"}]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected 503, got %d: %s", rec.Code, rec.Body.String())
+	deps, err := setup.Wire(ctx, cfg, &logger)
+	if err != nil {
+		t.Skipf("setup.Wire failed (check credentials in .env): %v", err)
 	}
+	return deps
 }
 
-/*
-TEST: EvaluateConversation - missing conversation_id returns 400
-*/
-func TestAPI_EvaluateConversation_MissingConversationID(t *testing.T) {
-	// We need a non-nil conversationExecutor so the handler reaches the validation logic.
-	// Use a real executor wired with an empty judge runner stub.
-	container, _ := setupConversationContainer(t)
+// ─── Non-LLM tests ───────────────────────────────────────────────────────────
 
-	body := `{"turns":[{"turn_index":0,"user_query":"Q","answer":"A"}]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+func TestAPI_Health(t *testing.T) {
+	container := setupContainer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var errResp map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
-	}
-	if errResp["error"] != "conversation_id is required" {
-		t.Errorf("expected error='conversation_id is required', got '%s'", errResp["error"])
-	}
-}
-
-/*
-TEST: EvaluateConversation - empty turns returns 400
-*/
-func TestAPI_EvaluateConversation_EmptyTurns(t *testing.T) {
-	container, _ := setupConversationContainer(t)
-
-	body := `{"conversation_id":"conv-y","turns":[]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
-	}
-
-	var errResp map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
-	}
-	if errResp["error"] != "turns must not be empty" {
-		t.Errorf("expected error='turns must not be empty', got '%s'", errResp["error"])
-	}
-}
-
-/*
-TEST: EvaluateConversation - valid request returns 200 with conversation result
-*/
-func TestAPI_EvaluateConversation_ValidRequest(t *testing.T) {
-	container, _ := setupConversationContainer(t)
-
-	body := `{
-		"conversation_id": "conv-valid-001",
-		"agent": {"name": "test-agent", "version": "1.0"},
-		"turns": [
-			{"turn_index": 0, "user_query": "What is Go?", "answer": "Go is a programming language."},
-			{"turn_index": 1, "user_query": "Who made it?", "answer": "Go was created at Google."}
-		]
-	}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/evaluate/conversation", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
 	container.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		t.Errorf("expected 200, got %d", rec.Code)
 	}
 
-	var resp api.ConversationEvalResponse
+	var resp api.HealthResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
+		t.Fatalf("parse response: %v", err)
+	}
+	if resp.Status != "ok" {
+		t.Errorf("expected status 'ok', got '%s'", resp.Status)
+	}
+}
+
+func TestAPI_ListConversations_Empty(t *testing.T) {
+	container := setupContainer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations", nil)
+	rec := httptest.NewRecorder()
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d. body: %s", rec.Code, rec.Body.String())
 	}
 
-	if resp.ConversationID != "conv-valid-001" {
-		t.Errorf("expected conversation_id=conv-valid-001, got %s", resp.ConversationID)
+	var resp api.ConversationListResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse response: %v", err)
 	}
-	if resp.TurnCount != 2 {
-		t.Errorf("expected turn_count=2, got %d", resp.TurnCount)
+	if resp.Total != 0 {
+		t.Errorf("expected 0 conversations, got %d", resp.Total)
 	}
-	if resp.AgentName != "test-agent" {
-		t.Errorf("expected agent_name=test-agent, got %s", resp.AgentName)
+}
+
+func TestAPI_GetConversation_NotFound(t *testing.T) {
+	container := setupContainer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/conversations/does-not-exist", nil)
+	rec := httptest.NewRecorder()
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d. body: %s", rec.Code, rec.Body.String())
 	}
-	if resp.Verdict == "" {
+}
+
+func TestAPI_EvaluateConversation_ValidationErrors(t *testing.T) {
+	container := setupContainer(t)
+
+	cases := []struct {
+		name string
+		body string
+		code int
+	}{
+		{
+			name: "missing conversation_id",
+			body: `{"turns":[{"turn_index":1,"user_query":"hi","answer":"hello"}]}`,
+			code: http.StatusBadRequest,
+		},
+		{
+			name: "empty turns",
+			body: `{"conversation_id":"conv-1","turns":[]}`,
+			code: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/api/v1/conversations/evaluate",
+				bytes.NewBufferString(tc.body),
+			)
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			container.ServeHTTP(rec, req)
+
+			if rec.Code != tc.code {
+				t.Errorf("expected %d, got %d. body: %s", tc.code, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestAPI_HealthMetrics(t *testing.T) {
+	container := setupContainer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/health?window=7d", nil)
+	rec := httptest.NewRecorder()
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d. body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp api.HealthMetricsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+	if resp.Window != "7d" {
+		t.Errorf("expected window '7d', got '%s'", resp.Window)
+	}
+}
+
+func TestAPI_HealthMetrics_InvalidWindow(t *testing.T) {
+	container := setupContainer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/health?window=invalid", nil)
+	rec := httptest.NewRecorder()
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+// ─── LLM integration tests ───────────────────────────────────────────────────
+
+func TestAPI_EvaluateConversation_Integration(t *testing.T) {
+	deps := setupIntegrationDeps(t)
+
+	logger := zerolog.Nop()
+	handler := api.NewHandler(deps.ConversationEvaluator, deps.Repository, &logger)
+	container := restful.NewContainer()
+	api.RegisterRoutes(container, handler)
+
+	body := api.ConversationEvalRequest{
+		ConversationID: "integration-test-001",
+		Agent: struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		}{Name: "test-agent", Version: "1.0"},
+		Turns: []api.ConversationTurnRequest{
+			{TurnIndex: 1, UserQuery: "What is the capital of France?", Answer: "The capital of France is Paris."},
+			{TurnIndex: 2, UserQuery: "And Germany?", Answer: "The capital of Germany is Berlin."},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/conversations/evaluate", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	container.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d. body: %s", rec.Code, rec.Body.String())
+	}
+
+	var result api.ConversationEvalResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+
+	if result.ConversationID != "integration-test-001" {
+		t.Errorf("expected conversation_id 'integration-test-001', got '%s'", result.ConversationID)
+	}
+	if len(result.TurnResults) != 2 {
+		t.Errorf("expected 2 turn results, got %d", len(result.TurnResults))
+	}
+	if result.FinalScore < 0 || result.FinalScore > 1 {
+		t.Errorf("expected final_score in [0,1], got %f", result.FinalScore)
+	}
+	if result.Verdict == "" {
 		t.Error("expected verdict to be set")
 	}
-	if resp.Confidence < 0 || resp.Confidence > 1 {
-		t.Errorf("expected confidence in [0,1], got %.2f", resp.Confidence)
-	}
 
-	t.Logf("EvaluateConversation: conversation_id=%s, turn_count=%d, verdict=%s, confidence=%.3f",
-		resp.ConversationID, resp.TurnCount, resp.Verdict, resp.Confidence)
-}
-
-// setupConversationContainer builds a minimal API with a real ConversationExecutor backed by
-// stub (empty) judge runner and the aggregator. No LLM calls needed.
-func setupConversationContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
-	t.Helper()
-	logger := zerolog.Nop()
-	repo := setupTestRepository(t, &logger)
-
-	// Use a stub judge runner that returns an empty slice (no conversation judges configured)
-	stubRunner := &stubJudgeRunner{}
-
-	agg := aggregator.NewAggregator(
-		aggregator.Weights{PreChecks: 0.3, LLMJudge: 0.7},
-		aggregator.VerdictThresholds{Pass: 0.8, Review: 0.5},
-		aggregator.AggregationConfig{EnablePrecheck: false, JudgeAggregationMethod: models.MethodWeightedAverage},
-		&logger,
-	)
-
-	convExec := executor.NewConversationExecutor(stubRunner, repo, agg, &logger)
-	handler := api.NewHandler(nil, nil, convExec, repo, &logger)
-	container := restful.NewContainer()
-	api.RegisterRoutes(container, handler)
-	return container, repo
-}
-
-// stubJudgeRunner returns empty results (simulates no conversation judges configured).
-type stubJudgeRunner struct{}
-
-func (s *stubJudgeRunner) Run(_ context.Context, _ models.EvaluationContext) []models.StageResult {
-	return []models.StageResult{}
-}
-
-// setupSamplingContainer builds a minimal API container backed by an in-memory SQLite repo.
-// No LLM clients needed — used for validation/sampling endpoint tests only.
-func setupSamplingContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
-	t.Helper()
-	logger := zerolog.Nop()
-	repo := setupTestRepository(t, &logger)
-	handler := api.NewHandler(nil, nil, nil, repo, &logger)
-	container := restful.NewContainer()
-	api.RegisterRoutes(container, handler)
-	return container, repo
-}
-
-func seedSamplingData(t *testing.T, repo *sqlite.EvalRepository, n int) {
-	t.Helper()
-	for i := 0; i < n; i++ {
-		eval := &storage.Evaluation{
-			EventID:      fmt.Sprintf("sample-evt-%d", i),
-			AgentName:    "sample-agent",
-			AgentVersion: "v1",
-			UserQuery:    fmt.Sprintf("query %d", i),
-			Answer:       fmt.Sprintf("answer %d", i),
-			Confidence:   0.8,
-			Verdict:      "pass",
-			StageScores:  []models.StageResult{},
-		}
-		if err := repo.Store(context.Background(), eval); err != nil {
-			t.Fatalf("Failed to seed evaluation %d: %v", i, err)
-		}
-	}
-}
-
-/*
-TEST: Download Sample - returns JSONL with seeded records
-*/
-func TestAPI_DownloadSample_ReturnsJSONL(t *testing.T) {
-	container, repo := setupSamplingContainer(t)
-	seedSamplingData(t, repo, 10)
-
-	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":100}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("Expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/x-ndjson" {
-		t.Errorf("Expected Content-Type application/x-ndjson, got %s", ct)
-	}
-
-	// Count JSONL lines — each line is one evaluation
-	lines := 0
-	for _, line := range bytes.Split(rec.Body.Bytes(), []byte("\n")) {
-		if len(bytes.TrimSpace(line)) > 0 {
-			lines++
-		}
-	}
-	if lines != 10 {
-		t.Errorf("Expected 10 JSONL lines, got %d", lines)
-	}
-}
-
-/*
-TEST: Download Sample - empty DB returns 200 with no lines
-*/
-func TestAPI_DownloadSample_EmptyDB(t *testing.T) {
-	container, _ := setupSamplingContainer(t)
-
-	body := `{"start_date":"2020-01-01T00:00:00Z","end_date":"2099-01-01T00:00:00Z","percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("Expected 200, got %d", rec.Code)
-	}
-	if rec.Body.Len() != 0 {
-		t.Errorf("Expected empty body for empty DB, got: %s", rec.Body.String())
-	}
-}
-
-/*
-TEST: Download Sample - missing dates returns 400
-*/
-func TestAPI_DownloadSample_MissingDates(t *testing.T) {
-	container, _ := setupSamplingContainer(t)
-
-	body := `{"percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("Expected 400, got %d", rec.Code)
-	}
-}
-
-/*
-TEST: Download Sample - invalid date format returns 400
-*/
-func TestAPI_DownloadSample_InvalidDate(t *testing.T) {
-	container, _ := setupSamplingContainer(t)
-
-	body := `{"start_date":"not-a-date","end_date":"2099-01-01T00:00:00Z","percentage":25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/validation/sample/events/download", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	container.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("Expected 400, got %d", rec.Code)
-	}
+	t.Logf("verdict=%s turn_avg=%.3f holistic=%.3f final=%.3f",
+		result.Verdict, result.TurnAvg, result.HolisticScore, result.FinalScore)
 }

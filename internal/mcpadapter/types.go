@@ -1,32 +1,22 @@
 package mcpadapter
 
-// EvaluateInput is the MCP tool input schema for full pipeline evaluation.
-type EvaluateInput struct {
-	EventID        string `json:"event_id" jsonschema:"unique event identifier"`
-	ConversationID string `json:"conversation_id" jsonschema:"required conversation identifier to group multi-turn interactions"`
-	AgentName      string `json:"agent_name,omitempty" jsonschema:"optional name of the agent being evaluated"`
-	AgentVersion   string `json:"agent_version,omitempty" jsonschema:"optional version of the agent being evaluated"`
-	Query          string `json:"user_query" jsonschema:"user's original query"`
-	Answer         string `json:"answer" jsonschema:"agent response to evaluate"`
-	Context        string `json:"context,omitempty" jsonschema:"optional context or retrieved documents"`
-	ExpectedOutput string `json:"expected_output,omitempty" jsonschema:"optional ground truth for correctness evaluation"`
+// EvaluateConversationInput is the MCP tool input schema for conversation evaluation.
+type EvaluateConversationInput struct {
+	ConversationID string          `json:"conversation_id" jsonschema:"required,unique conversation identifier"`
+	AgentName      string          `json:"agent_name,omitempty" jsonschema:"optional name of the agent being evaluated"`
+	AgentVersion   string          `json:"agent_version,omitempty" jsonschema:"optional version of the agent being evaluated"`
+	Turns          []TurnInput     `json:"turns" jsonschema:"required,all turns in the conversation"`
 }
 
-// EvaluateSingleJudgeInput is the MCP tool input schema for single judge evaluation.
-type EvaluateSingleJudgeInput struct {
-	EventID        string  `json:"event_id" jsonschema:"unique event identifier"`
-	ConversationID string  `json:"conversation_id" jsonschema:"required conversation identifier to group multi-turn interactions"`
-	AgentName      string  `json:"agent_name,omitempty" jsonschema:"optional name of the agent being evaluated"`
-	AgentVersion   string  `json:"agent_version,omitempty" jsonschema:"optional version of the agent being evaluated"`
-	Query          string  `json:"user_query" jsonschema:"user's original query"`
-	Answer         string  `json:"answer" jsonschema:"agent response to evaluate"`
-	Context        string  `json:"context,omitempty" jsonschema:"optional context or retrieved documents"`
-	ExpectedOutput string  `json:"expected_output,omitempty" jsonschema:"optional ground truth for correctness evaluation"`
-	JudgeName      string  `json:"judge_name" jsonschema:"judge name: relevance, faithfulness, coherence, completeness, instruction, or correctness"`
-	Threshold      float64 `json:"threshold,omitempty" jsonschema:"pass/fail threshold (0.0-1.0, default: 0.7)"`
+// TurnInput is a single conversation turn in EvaluateConversationInput.
+type TurnInput struct {
+	TurnIndex int    `json:"turn_index"`
+	UserQuery string `json:"user_query"`
+	Answer    string `json:"answer"`
+	Context   string `json:"context,omitempty"`
 }
 
-// ConversationInput is the MCP tool input schema for retrieving conversation turns.
+// ConversationInput is the MCP tool input schema for retrieving a conversation.
 type ConversationInput struct {
-	ConversationID string `json:"conversation_id" jsonschema:"conversation identifier to retrieve all turns"`
+	ConversationID string `json:"conversation_id" jsonschema:"conversation identifier to retrieve"`
 }

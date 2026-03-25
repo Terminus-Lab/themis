@@ -1,144 +1,134 @@
 # Themis
 
-AI agent evaluation service using configurable LLM judges and statistical validation.
+AI agent conversation evaluation framework using configurable LLM judges.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Terminus-Lab/themis)
 
+## Overview
 
-**Build Commands**
+Themis evaluates multi-turn AI agent conversations through a two-phase pipeline:
+
+1. **Phase A — Per-turn judges** (`relevance`, `coherence`, `completeness`): each turn is scored independently, averaged into `turn_avg`
+2. **Phase B — Holistic judge** (`conversation-flow`): the full conversation is evaluated for context-awareness and flow, producing `holistic_score`
+3. **Final score**: `final_score = α × holistic_score + (1−α) × turn_avg` (α = `CONVERSATION_HOLISTIC_WEIGHT`, default 0.5)
+4. **Verdict**: `pass` / `review` / `fail` based on configurable thresholds
+
+Everything is a **conversation** — single-turn requests are represented as conversations with one turn.
+
+## Build
 
 ```bash
-# API Server (HTTP endpoints + web dashboard)
+# API server (HTTP endpoints + web dashboard)
 go build -o bin/themis-api cmd/api/main.go
 
-# MCP Server (Claude Code/Desktop integration)
-go build -o bin/themis-mcp cmd/mcp/main.go
-
-# CLI (batch processing)
+# CLI (batch evaluation)
 go build -o bin/themis-cli cmd/batch/main.go
 
-# Redis producer (test data generation for streaming mode)
-go build -o bin/themis-producer cmd/producer/main.go
+# MCP server (Claude Code / Claude Desktop integration)
+go build -o bin/themis-mcp cmd/mcp/main.go
 ```
-
-## Purpose
-
-Themis evaluates AI agent responses through a two-stage pipeline: fast prechecks (heuristics) followed by parallel LLM judge evaluation across six quality dimensions. The framework validates judge accuracy against human annotations using Kendall's τ correlation before production deployment.
-
-**Primary deployment modes:**
-- **API Mode**: HTTP server with REST endpoints, web dashboard, and optional Redis streaming for real-time evaluation of agent responses
-- **MCP Mode**: Model Context Protocol server that integrates with Claude Code, Claude Desktop, and Cursor for interactive evaluation during development
-
-Both modes share the same core evaluation engine and judge configuration, allowing teams to use API mode for production monitoring and MCP mode for development workflows.
-
-## Security Notice
-
-**Themis v1.2 is designed for internal/trusted network deployment.**
-For complete security guidance, see [SECURITY.md](SECURITY.md) and [API Deployment Guide](docs/deployment/api-mode.md).
-
-## Features
-
-- **Two-Stage Evaluation Pipeline**: Fast prechecks + parallel LLM judges with early exit optimization
-- **Conversation Evaluation**: Multi-turn conversation evaluation with `scope: conversation` judges via `POST /api/v1/evaluate/conversation`
-- **Statistical Validation**: Kendall's τ correlation against human annotations to ensure judge accuracy
-- **Multi-Provider LLM Support**: Mix AWS Bedrock, Azure OpenAI, and OpenAI Platform models in same pipeline
-- **YAML-Driven Configuration**: Edit judge prompts and models without code changes
-- **Multiple Deployment Options**: HTTP API, MCP server, CLI batch processor, Redis streaming consumer
-- **Validation Sampling APIs**: Sample events (`POST /api/v1/validation/sample/events/download`) or whole conversations (`POST /api/v1/validation/sample/conversations/download`) as JSONL for human annotation workflows
-- **Query & Storage**: SQLite (default) or PostgreSQL with filtering by agent, verdict, timestamp
-- **Web Dashboard**: Real-time visualization with dark terminal theme
 
 ## Getting Started
 
-### Download Pre-Built Binaries
-
-Download the latest release from [GitHub Releases](https://github.com/Terminus-Lab/themis/releases/latest).
-
-**Choose your platform:**
-- **macOS (Apple Silicon)**: `themis_1.2.0_darwin_arm64.tar.gz` - M1/M2/M3 Macs
-- **macOS (Intel)**: `themis_1.2.0_darwin_amd64.tar.gz` - Intel-based Macs
-- **Linux (x64)**: `themis_1.2.0_linux_amd64.tar.gz`
-- **Linux (ARM)**: `themis_1.2.0_linux_arm64.tar.gz`
-- **Windows (x64)**: `themis_1.2.0_windows_amd64.zip`
-
-**Extract and setup:**
 ```bash
-# macOS/Linux
-tar -xzf themis_1.2.0_darwin_arm64.tar.gz
-cd themis_1.2.0_darwin_arm64
-
-# Windows (PowerShell)
-Expand-Archive themis_1.2.0_windows_amd64.zip
-cd themis_1.2.0_windows_amd64
-
-# Configure environment
+# Clone and configure
 cp .env.example .env
-# Edit .env with your LLM provider credentials
+# Edit .env with your LLM provider credentials (see Configuration below)
+
+# Start the API server
+./bin/themis-api
+# Open http://localhost:18082 for the web dashboard
 ```
 
-**⚠️ Important:** Always run binaries from the extracted directory where `configs/judges.yaml` is located.
+## API
 
-**What's included:**
-- **themis-api**: HTTP REST API server with web dashboard at `http://localhost:18082`
-- **themis-mcp**: Model Context Protocol server for Claude Code/Desktop/Cursor integration
-- **themis-cli**: CLI for batch processing and validation
-- **configs/**: Judge configuration files (judges.yaml)
-- **docs/**: Complete documentation
-- **.env.example**: Environment template
+**Base URL**: `http://localhost:18082`
 
-**Prerequisites**: You'll need LLM provider credentials (AWS Bedrock, Azure OpenAI, or OpenAI Platform). Configure in `.env` file. See [Configuration](#configuration) section below.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/conversations/evaluate` | Evaluate a multi-turn conversation |
+| `GET` | `/api/v1/conversations` | List all evaluated conversations |
+| `GET` | `/api/v1/conversations/{id}` | Get conversation with turn-level detail |
+| `GET` | `/api/v1/metrics/health?window=7d` | Health metrics (window: 1d, 7d, 30d) |
+| `GET` | `/api/v1/health` | Service health check |
+| `GET` | `/` | Web dashboard |
 
-For detailed setup instructions, see [Installation Guide](docs/getting-started/installation.md) and [Quick Start Tutorial](docs/getting-started/quick-start.md).
+**Evaluate a conversation:**
 
-## Web Interface & API
-
-The API server provides both a web dashboard and REST endpoints for evaluation and querying results.
-
-**Start the server:**
 ```bash
-./themis-api
-# or with streaming: EVENTS_STREAMING_ENABLED=true ./themis-api
+curl -X POST http://localhost:18082/api/v1/conversations/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "conversation_id": "conv-001",
+    "agent": {"name": "my-agent", "version": "1.0"},
+    "turns": [
+      {"turn_index": 0, "user_query": "What is AI?", "answer": "AI stands for Artificial Intelligence..."},
+      {"turn_index": 1, "user_query": "Can you give an example?", "answer": "A common example is image recognition..."}
+    ]
+  }'
 ```
 
-**Web Dashboard**: Navigate to `http://localhost:18082` for real-time visualization of evaluation results with filtering, pagination, and detailed inspection.
+**Response:**
 
-**API Endpoints:**
-- `POST /api/v1/evaluate` - Full pipeline evaluation (single turn)
-- `POST /api/v1/evaluate/conversation` - Multi-turn conversation evaluation (all turns at once)
-- `POST /api/v1/evaluate/judge/{name}` - Single judge evaluation
-- `GET /api/v1/results` - Query results with filters (agent_name, verdict, limit, offset)
-- `GET /api/v1/results/{event_id}` - Get specific result by ID
-- `GET /api/v1/conversations` - List all conversations with summary metrics
-- `GET /api/v1/conversations/{id}` - Get all turns for a conversation
-- `GET /api/v1/metrics/health?window=7d` - Production health metrics (confidence, disagreement rate)
-- `POST /api/v1/validation/sample/events/download` - Sample individual events as JSONL for human annotation
-- `POST /api/v1/validation/sample/conversations/download` - Sample whole conversations as JSONL for conversation-level annotation
+```json
+{
+  "conversation_id": "conv-001",
+  "turn_avg": 0.87,
+  "holistic_score": 0.91,
+  "final_score": 0.89,
+  "verdict": "pass",
+  "holistic_reason": "The conversation flows naturally...",
+  "turn_results": [...]
+}
+```
 
-For detailed API examples and test cases, see [API Mode Documentation](docs/deployment/api-mode.md) and [API Test Cases](docs/testing/api-tests.md).
+## CLI Batch Evaluation
+
+```bash
+# Evaluate a JSONL file
+./bin/themis-cli evaluate -i resources/conversations.jsonl -o results.jsonl
+
+# Summary output (no per-conversation JSONL)
+./bin/themis-cli evaluate -i resources/conversations.jsonl -f summary
+
+# Summary + separate results file
+./bin/themis-cli evaluate -i resources/conversations.jsonl -o results.jsonl -s summary.json
+
+# Scale workers (default: 5)
+THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -o results.jsonl
+```
+
+**Input format** (`conversations.jsonl`):
+
+```json
+{"conversation_id":"conv-001","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":0,"user_query":"...","answer":"..."}]}
+```
+
+**Human annotation** — add `human_label` and/or `human_score` to get automatic correlation analysis:
+
+```json
+{"conversation_id":"conv-001","human_label":"pass","human_score":0.91,"agent":{...},"turns":[...]}
+```
+
+When annotations are present, the CLI appends a `correlation_report` line with Kendall's τ-b, Cohen's κ (unweighted + weighted), and a confusion matrix.
 
 ## MCP Integration
 
-The MCP server exposes Themis evaluation as tools for Claude Code, Claude Desktop, and Cursor. Use natural language to evaluate agent responses during development.
+The MCP server exposes Themis as tools for Claude Code and Claude Desktop.
 
-**Available Tools:**
-- `evaluate_response` - Full pipeline evaluation with all judges
-- `evaluate_single_judge` - Fast evaluation with single judge (relevance, faithfulness, etc.)
-- `get_conversation` - Retrieve all turns for a conversation ID
+**Available tools:**
+- `evaluate_conversation` — evaluate a multi-turn conversation
+- `get_conversation` — retrieve a stored evaluation by `conversation_id`
 
-**Conversation Tracking:**
-All evaluation tools accept optional `conversation_id`, `agent_name`, and `agent_version` fields to group multi-turn interactions. Use `get_conversation` to view all turns and metrics for a conversation.
+**Setup:**
 
-**Installation:**
 ```bash
-# Run MCP server
-./bin/themis-mcp
-
 # Add to Claude Code
 claude mcp add --transport stdio themis -- /absolute/path/to/bin/themis-mcp
 
-# Add to Claude Desktop (edit config.json)
+# Add to Claude Desktop (claude_desktop_config.json)
 {
   "mcpServers": {
     "themis": {
@@ -148,131 +138,108 @@ claude mcp add --transport stdio themis -- /absolute/path/to/bin/themis-mcp
 }
 ```
 
-**Usage Examples:**
-```
-# Basic evaluation
-"Evaluate this response: User asked 'What is AI?' and agent answered 'Artificial Intelligence is...'"
+**Docker:**
 
-# Multi-turn conversation tracking
-"Evaluate turn 1 for conversation conv-123: Query='What is Python?' Answer='Programming language'"
-"Evaluate turn 2 for conversation conv-123: Query='Is it hard?' Answer='Easy to learn'"
-"Show me conversation conv-123"
-```
-
-For setup details and advanced usage, see [MCP Test Cases](docs/testing/mcp-tests.md).
-
-## CLI Batch Processing
-
-Process datasets offline with concurrent workers and validate judge accuracy against human annotations.
-
-**Event evaluation (single-turn):**
 ```bash
-./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
-# scale workers via env var
-THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
+docker build -t themis-mcp .
+docker run --env-file .env themis-mcp
 ```
-
-**Conversation evaluation (multi-turn):**
-```bash
-./bin/themis-cli evaluate-conversations -i conversations.jsonl -o results.jsonl
-```
-Input: JSONL with `conversation_id`, `agent`, and `turns[]` per line.
-
-**Validation mode** (Kendall's τ):
-```bash
-./bin/themis-cli validate-events -i annotated.jsonl -c 0.3
-# or with long flags:
-./bin/themis-cli validate-events --input annotated.jsonl --correlation-threshold 0.3
-```
-
-Input format: JSONL with `event_id`, `agent`, `interaction`, and optional `human_annotation` fields. For detailed examples and validation workflows, see [Batch Test Cases](docs/testing/batch-tests.md).
 
 ## Configuration
 
-**Environment Variables** (`.env`):
+### Environment Variables (`.env`)
+
 ```env
-# LLM Provider (choose one or mix)
-OPEN_AI_KEY=sk-proj-...                    # OpenAI Platform
-AWS_REGION=us-east-1                       # AWS Bedrock
+# LLM Provider — choose at least one
+OPEN_AI_KEY=sk-proj-...                    # OpenAI Platform (simplest)
+AWS_REGION=us-east-1                       # AWS Bedrock (Claude models)
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 AZURE_OPENAI_ENDPOINT=https://...          # Azure OpenAI
 
-# Pipeline Settings
-ENABLE_PRECHECK=true                       # Stage 1 prechecks
-JUDGE_AGGREGATION_METHOD=weighted_average  # Stage 2 aggregation
-VERDICT_PASS_THRESHOLD=0.8                 # Pass if confidence > 0.8
-VERDICT_REVIEW_THRESHOLD=0.5               # Review if > 0.5, else fail
+# API server
+EVAL_AGENT_API_PORT=18082
+
+# Scoring
+CONVERSATION_HOLISTIC_WEIGHT=0.5           # α: weight for holistic score
+SCORING_FORMULA=linear                     # linear | geometric | min
+VERDICT_PASS_THRESHOLD=0.8
+VERDICT_REVIEW_THRESHOLD=0.5
+
+# Database
+IN_MEMORY_DB=true                          # SQLite in-memory (default)
+THEMIS_DB_URL=                             # PostgreSQL (if IN_MEMORY_DB=false)
+
+# Streaming (optional Redis consumer)
+CONVERSATION_STREAMING_ENABLED=false
+REDIS_ADDR=localhost:6379
+REDIS_CONVERSATION_STREAM_KEY=eval-conversations
+REDIS_CONVERSATION_GROUP=eval-conv-group
+REDIS_CONSUMER_NAME=consumer-1
+
+# CLI
+THEMIS_BATCH_WORKERS=5
 ```
 
-### ⚠️ Judge Weights Configuration
+See `.env.example` for the full reference.
 
-**Important**: Default judge weights are starting values that **must be tuned** for your specific use case.
+### Judge Configuration (`configs/judges.yaml`)
 
-**Recommended workflow**:
-1. **Collect human annotations** - Have domain experts label 25-50 sample evaluations
-2. **Run validation** - Use batch mode with `-validate` to compute Kendall's τ correlation
-3. **Adjust weights** - Modify judge weights in `configs/judges.yaml` based on correlation results
-4. **Iterate** - Repeat until Kendall's τ ≥ 0.3 (acceptable agreement with human judgment)
+Four judges are included out of the box:
 
-See [Batch Test Cases](docs/testing/batch-tests.md) for validation workflow examples.
+| Judge | Scope | Default Weight | Purpose |
+|-------|-------|---------------|---------|
+| `relevance` | turn | 0.35 | Is the answer relevant to the query? |
+| `coherence` | turn | 0.30 | Is the answer coherent and well-formed? |
+| `completeness` | turn | 0.35 | Does the answer fully address the query? |
+| `conversation-flow` | conversation | 1.0 | Does the conversation flow naturally? |
 
-**Judge Configuration** (`configs/judges.yaml`):
+To enable or disable a judge, set `enabled: true/false` in `judges.yaml`. Each judge can use a different LLM provider and model:
+
 ```yaml
 judges:
   default_model:
-    modelFamily: "openai_platform"
+    modelFamily: openai_platform
     modelID: gpt-4o-mini
   evaluators:
     - name: relevance
       enabled: true
-      weight: 0.25
-      model:
-        modelFamily: "anthropic"
-        modelID: claude-3-5-sonnet-20241022
-      prompt: "Evaluate if the answer addresses the query..."
+      scope: turn
+      weight: 0.35
+      prompt: "..."
 ```
 
-Each judge can use a different LLM provider and model. For complete configuration reference, see [Configuration Guide](docs/getting-started/configuration.md).
+**Weight normalization:** weights are normalized automatically per scope group at startup. If the enabled turn judges have weights `0.35, 0.30, 0.35` (sum = 1.0) they are used as-is. If they don't sum to 1.0 (e.g. `0.5, 0.3, 0.5`), they are scaled proportionally so that the sum becomes 1.0, preserving the ratios you expressed. If no weights are specified, each enabled judge within a scope gets an equal share (`1/n`). This means you can express relative priorities without worrying about exact values — `weight: 2` and `weight: 1` on two judges gives the first judge twice the influence.
 
-## `/evaluate` Slash Command for Claude Code and Codex
+## Database
 
-Themis ships an `evaluate.md` skill at the root of the repository. When registered as a slash command it evaluates the current conversation — extracting every user/assistant exchange as turns, running `themis-cli evaluate-conversations`, and reporting back the verdict and confidence score inline.
+**SQLite** (default, zero setup):
+```env
+IN_MEMORY_DB=true
+```
 
-**Setup — Claude Code:**
+**PostgreSQL** (persistent, production):
+```env
+IN_MEMORY_DB=false
+THEMIS_DB_URL=postgresql://user:password@localhost:5432/themis?sslmode=disable
+```
+
+Run migrations before first use:
+```bash
+migrate -path ./migrations -database "$THEMIS_DB_URL" up
+```
+
+## Testing
 
 ```bash
-# Copy the skill to your global commands directory
-cp evaluate.md ~/.claude/commands/evaluate.md
+# Unit and integration tests
+go test ./...
+
+# Smoke test (requires .env with valid LLM credentials)
+bash scripts/smoke-test.sh
 ```
 
-Then in any Claude Code session: `/evaluate` or `/evaluate 5` (last 5 turns only).
-
-**Setup — OpenAI Codex:**
-
-```bash
-# Copy to the Codex custom instructions directory
-cp evaluate.md ~/.codex/commands/evaluate.md
-```
-
-Then use `/evaluate` from the Codex CLI.
-
-**Where to put the binary and judges config:**
-
-The skill looks for `themis-cli` on your `PATH` first, then checks the `THEMIS_CLI` environment variable for the full path. The `configs/judges.yaml` file must live alongside the binary (or in the directory pointed to by `THEMIS_DIR`). The simplest setup:
-
-```bash
-# Recommended: install to a dedicated directory and export THEMIS_DIR
-mkdir -p ~/.themis/configs
-cp bin/themis-cli ~/.themis/
-cp configs/judges.yaml ~/.themis/configs/
-cp .env ~/.themis/
-
-export THEMIS_CLI="$HOME/.themis/themis-cli"
-export THEMIS_DIR="$HOME/.themis"
-```
-
-Add those two exports to your shell profile (`~/.zshrc`, `~/.bashrc`) so they persist across sessions.
+See [docs/testing/test-guide.md](docs/testing/test-guide.md) for the full test guide.
 
 ## License
 

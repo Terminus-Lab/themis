@@ -50,6 +50,7 @@ func TestJudgePool_BuildFromConfig_Success(t *testing.T) {
 				{
 					Name:    "judge1",
 					Enabled: true,
+					Scope:   "turn",
 					Prompt:  "Score: {{.Answer}}",
 					Model: &config.ModelConfig{
 						MaxTokens:   256,
@@ -60,6 +61,7 @@ func TestJudgePool_BuildFromConfig_Success(t *testing.T) {
 				{
 					Name:    "judge2",
 					Enabled: true,
+					Scope:   "turn",
 					Prompt:  "Score: {{.Query}}",
 					Model: &config.ModelConfig{
 						MaxTokens:   128,
@@ -71,7 +73,7 @@ func TestJudgePool_BuildFromConfig_Success(t *testing.T) {
 		},
 	}
 
-	judges, err := pool.BuildFromConfig(cfg)
+	judges, err := pool.BuildTurnJudgesFromConfig(cfg)
 	if err != nil {
 		t.Fatalf("BuildFromConfig failed: %v", err)
 	}
@@ -98,6 +100,7 @@ func TestJudgePool_BuildFromConfig_SkipsDisabledJudges(t *testing.T) {
 				{
 					Name:    "judge1",
 					Enabled: true,
+					Scope:   "turn",
 					Prompt:  "Score: {{.Answer}}",
 					Model: &config.ModelConfig{
 						MaxTokens:   256,
@@ -108,6 +111,7 @@ func TestJudgePool_BuildFromConfig_SkipsDisabledJudges(t *testing.T) {
 				{
 					Name:    "judge2",
 					Enabled: false, // Disabled
+					Scope:   "turn",
 					Prompt:  "Score: {{.Query}}",
 					Model: &config.ModelConfig{
 						MaxTokens:   128,
@@ -118,6 +122,7 @@ func TestJudgePool_BuildFromConfig_SkipsDisabledJudges(t *testing.T) {
 				{
 					Name:    "judge3",
 					Enabled: true,
+					Scope:   "turn",
 					Prompt:  "Score: {{.Context}}",
 					Model: &config.ModelConfig{
 						MaxTokens:   256,
@@ -129,7 +134,7 @@ func TestJudgePool_BuildFromConfig_SkipsDisabledJudges(t *testing.T) {
 		},
 	}
 
-	judges, err := pool.BuildFromConfig(cfg)
+	judges, err := pool.BuildTurnJudgesFromConfig(cfg)
 	if err != nil {
 		t.Fatalf("BuildFromConfig failed: %v", err)
 	}
@@ -145,7 +150,7 @@ func TestJudgePool_BuildFromConfig_NilConfig(t *testing.T) {
 
 	pool := NewJudgePool(registry, &logger)
 
-	_, err := pool.BuildFromConfig(nil)
+	_, err := pool.BuildTurnJudgesFromConfig(nil)
 	if err == nil {
 		t.Error("Expected error for nil config")
 	}
@@ -171,6 +176,7 @@ func TestJudgePool_BuildFromConfig_NoEnabledJudges(t *testing.T) {
 				{
 					Name:    "judge1",
 					Enabled: false,
+					Scope:   "turn",
 					Prompt:  "Score: {{.Answer}}",
 					Model: &config.ModelConfig{
 						MaxTokens:   256,
@@ -182,12 +188,12 @@ func TestJudgePool_BuildFromConfig_NoEnabledJudges(t *testing.T) {
 		},
 	}
 
-	_, err := pool.BuildFromConfig(cfg)
+	_, err := pool.BuildTurnJudgesFromConfig(cfg)
 	if err == nil {
 		t.Error("Expected error for no enabled judges")
 	}
 
-	expectedMsg := "no enabled event-scoped judges found in config"
+	expectedMsg := "no enabled turn-scoped judges found in config"
 	if err.Error() != expectedMsg {
 		t.Errorf("Expected '%s' error, got: %v", expectedMsg, err)
 	}
@@ -210,6 +216,7 @@ func TestJudgePool_BuildFromConfig_InvalidJudge(t *testing.T) {
 				{
 					Name:    "bad-judge",
 					Enabled: true,
+					Scope:   "turn",
 					Prompt:  "{{.Invalid", // Invalid template
 					Model: &config.ModelConfig{
 						MaxTokens:   256,
@@ -221,7 +228,7 @@ func TestJudgePool_BuildFromConfig_InvalidJudge(t *testing.T) {
 		},
 	}
 
-	_, err := pool.BuildFromConfig(cfg)
+	_, err := pool.BuildTurnJudgesFromConfig(cfg)
 	if err == nil {
 		t.Error("Expected error for invalid judge")
 	}

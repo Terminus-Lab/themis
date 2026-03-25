@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   redis:
-    container_name: kg-agent-redis
+    container_name: themis-redis
     image: redis:7-alpine
     ports:
       - "6379:6379"

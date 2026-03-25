@@ -1,181 +1,118 @@
-# Validation Interpretation Guide
+---
+title: Score Interpretation Guide
+description: How to read and act on Themis evaluation scores
+tags: [metrics, scores, verdict, interpretation]
+---
 
-How to read validation results, decide whether to deploy, and diagnose failures.
+# Score Interpretation Guide
+
+## Score Structure
+
+Every conversation evaluation produces four scores:
+
+| Field | What it measures | Range |
+|-------|-----------------|-------|
+| `turn_avg` | Average per-turn quality (relevance, coherence, completeness) | 0.0 – 1.0 |
+| `holistic_score` | Conversation-level flow and context-awareness across all turns | 0.0 – 1.0 |
+| `final_score` | Weighted combination of the two | 0.0 – 1.0 |
+| `verdict` | Classification derived from `final_score` | pass / review / fail |
+
+**Formula:**
+
+```
+final_score = α × holistic_score + (1 - α) × turn_avg
+```
+
+where `α = CONVERSATION_HOLISTIC_WEIGHT` (default 0.5).
 
 ---
 
-## Decision Framework
+## Verdicts
 
-```
-Step 1 — Kendall's τ (PRIMARY: pass/fail gate)
-  τ ≥ 0.3 → proceed to Step 2
-  τ < 0.3 → REJECT, do not deploy
+| Verdict | Condition | Meaning |
+|---------|-----------|---------|
+| `pass` | `final_score > VERDICT_PASS_THRESHOLD` (default 0.8) | Acceptable quality |
+| `review` | `final_score > VERDICT_REVIEW_THRESHOLD` (default 0.5) | Needs human review |
+| `fail` | `final_score ≤ VERDICT_REVIEW_THRESHOLD` | Poor quality |
 
-Step 2 — Cohen's Kappa (SECONDARY: credibility)
-  κ ≥ 0.6 → deploy immediately
-  κ = 0.4–0.6 → deploy with monitoring
-  κ < 0.4 → investigate confusion matrix before deploying
+### Tuning thresholds
 
-Step 3 — Confusion Matrix (DIAGNOSTIC: what to fix)
-  Used to understand error types, not as a gate
-```
+If your distribution skews too heavily in one direction:
 
-| τ | κ | Decision |
-|---|---|----------|
-| ≥ 0.3 | ≥ 0.6 | ✅ Deploy |
-| ≥ 0.3 | 0.4–0.6 | ⚠️ Deploy with monitoring |
-| ≥ 0.3 | < 0.4 | ⚠️ Deploy with caution — inspect matrix |
-| < 0.3 | any | ❌ Reject |
+- **Too many `pass`** → raise `VERDICT_PASS_THRESHOLD` (e.g. 0.85 or 0.90)
+- **Too many `fail`** → lower `VERDICT_REVIEW_THRESHOLD` (e.g. 0.40)
+- **Too many `review`** → narrow the band: raise pass threshold and raise review threshold together
 
 ---
 
-## When Metrics Disagree
+## Per-Turn Scores
 
-### High κ, Low τ (κ=0.75, τ=0.28)
+Each turn has a `turn_score` (weighted average of individual judge scores) and a `scores` array:
 
-Verdicts are correct but confidence scores don't reflect quality ranking.
+```json
+{
+  "turn_index": 1,
+  "turn_score": 0.87,
+  "scores": [
+    {"name": "relevance",    "score": 0.92, "weight": 0.35, "reason": "..."},
+    {"name": "coherence",    "score": 0.85, "weight": 0.30, "reason": "..."},
+    {"name": "completeness", "score": 0.83, "weight": 0.35, "reason": "..."}
+  ]
+}
+```
 
-**Cause**: Aggregation or weight issues.
-**Fix**:
-1. Try all 4 `JUDGE_AGGREGATION_METHOD` options
-2. Adjust `PRECHECK_WEIGHT` / `LLM_JUDGE_WEIGHT`
-3. Consider disabling Stage 1 if it's adding noise
+`turn_score = sum(score × weight)` across all enabled judges.
 
-### High τ, Low κ (τ=0.65, κ=0.42)
+### Reading judge reasons
 
-Scores correlate well but verdict thresholds are miscalibrated.
+The `reason` field is the LLM judge's natural-language explanation for its score. This is the most actionable output — it tells you *why* a score is low, not just that it is.
 
-**Fix**:
+---
+
+## Holistic Score
+
+The `holistic_score` captures what per-turn scores cannot: whether the agent builds on context from earlier turns, maintains consistency, and guides the user naturally through the conversation.
+
+- A conversation can have high `turn_avg` (each individual answer is fine in isolation) but low `holistic_score` (the agent ignores what was said two turns ago).
+- The `holistic_reason` field explains the holistic assessment in plain text.
+
+---
+
+## Score Variability
+
+LLM judges are non-deterministic. Expect ±0.05 variability between runs on the same input. To reduce noise:
+- Set `temperature: 0.0` in `judges.yaml` (already the default)
+- Use `retry: true` to recover from transient failures
+- For dataset-level analysis, individual score variance averages out across many evaluations
+
+---
+
+## Interpreting Dataset Results (Batch Output)
+
+After running `themis-cli evaluate`, the JSONL output can be analyzed:
+
 ```bash
-# Check score distribution vs human annotations
-jq -r '[.confidence, .human_annotation] | @csv' results.jsonl | sort -t, -k2
+# Verdict distribution
+jq -r '.verdict' results.jsonl | sort | uniq -c
 
-# Adjust thresholds
-VERDICT_PASS_THRESHOLD=0.75      # lower if too many passes→review
-VERDICT_REVIEW_THRESHOLD=0.45    # lower if too many reviews→fail
-```
+# Average final score
+jq -s 'map(.final_score) | add/length' results.jsonl
 
-### Both Low (τ=0.22, κ=0.35)
+# Conversations below threshold
+jq 'select(.final_score < 0.6) | {conversation_id, final_score, verdict}' results.jsonl
 
-Fundamental judge issue — do not deploy.
+# Per-agent average score
+jq -s 'group_by(.agent_name) | map({agent: .[0].agent_name, avg: (map(.final_score) | add/length)})' results.jsonl
 
-**Fix**: Check the confusion matrix for dominant failure pattern (see below), then tune `configs/judges.yaml`.
-
----
-
-## Failure Patterns
-
-### Style-over-substance bias
-
-**Signs**: τ ≈ 0.2, high fail→pass rate (30–40%). Polite but wrong answers rated as `pass`.
-
-```
-fail→pass: 15-20 cases
-fail→review: 10-15 cases
-```
-
-**Fix**:
-- Reduce coherence/instruction weight: 0.15 → 0.08
-- Increase correctness/completeness weight: 0.15 → 0.24
-
----
-
-### Boundary confusion (fail ↔ review)
-
-**Signs**: τ ≈ 0.45, errors go both directions (fail→review AND review→fail). Review F1 < 0.55.
-
-**Fix**:
-1. Add explicit review criteria to judge prompts:
-   ```
-   "review" when the answer is correct but incomplete, or adequate but improvable.
-   ```
-2. Widen the threshold gap:
-   ```env
-   VERDICT_PASS_THRESHOLD=0.75
-   VERDICT_REVIEW_THRESHOLD=0.50
-   ```
-
----
-
-### Conservative bias (review → fail)
-
-**Signs**: τ ≈ 0.50, short-but-correct answers rejected, review recall < 60%.
-
-**Fix**:
-1. Update completeness prompt: accept terse answers that are factually correct
-2. Lower review threshold:
-   ```env
-   VERDICT_REVIEW_THRESHOLD=0.45
-   ```
-
----
-
-### Leniency bias (fail → pass/review)
-
-**Signs**: τ ≈ 0.25, fail→review and fail→pass both high.
-
-**Fix**: Strengthen the correctness judge — increase weight, update prompt to penalize empty or evasive answers.
-
----
-
-## Per-Class Targets
-
-| Class | Recall target | Priority |
-|-------|--------------|----------|
-| **fail** | ≥ 75% | **Critical** — must catch bad answers |
-| **pass** | ≥ 90% | High — don't block good answers |
-| **review** | ≥ 65% | Acceptable — boundary cases are inherently hard |
-
-Fail→pass errors are the most dangerous. Zero is the goal; < 4% is acceptable.
-
----
-
-## Pre-Deployment Checklist
-
-```
-□ Kendall's τ ≥ 0.3
-□ Cohen's Kappa ≥ 0.6 (or documented reason for lower)
-□ Fail recall ≥ 75%
-□ Pass recall ≥ 90%
-□ Fail→pass rate < 4%
-□ Pass→fail rate < 6%
-```
-
-## Post-Deployment Monitoring
-
-```
-□ Spot-check random samples in first week
-□ Re-validate after any judge configuration change
-□ Re-validate quarterly with fresh human annotations
+# Lowest scoring turns across all conversations
+jq '.turn_results[] | {conversation_id: .conversation_id, turn_index, turn_score} | select(.turn_score < 0.5)' results.jsonl
 ```
 
 ---
 
-## Formulas Reference
+## See Also
 
-**Kendall's τ:**
-```
-τ = (C - D) / sqrt((C + D + T_x) × (C + D + T_y))
-C = concordant pairs, D = discordant, T_x/T_y = ties
-```
-
-**Cohen's κ:**
-```
-κ = (p_o - p_e) / (1 - p_e)
-p_o = observed agreement, p_e = expected by chance
-```
-
-**Per-class metrics:**
-```
-Precision = TP / (TP + FP)
-Recall    = TP / (TP + FN)
-F1        = 2 × (P × R) / (P + R)
-```
-
----
-
-## Resources
-
-- Sample datasets: `resources/validation_success_dataset.jsonl`, `resources/validation_failed_dataset.jsonl`
-- Judge configuration: `configs/judges.yaml`
-- CLI: `./bin/themis-cli validate-events -i dataset.jsonl -c 0.3`
+- [Kendall's Tau](kendalls-tau.md) — rank correlation with human judgment
+- [Cohen's Kappa](cohens-kappa.md) — verdict agreement with human labels
+- [Confusion Matrix](confusion-matrix.md) — verdict classification analysis
+- [Configuration](../getting-started/configuration.md) — tuning thresholds and weights

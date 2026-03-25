@@ -1,6 +1,6 @@
 # Quick Start
 
-End-to-end walkthrough covering CLI batch evaluation, judge validation, API server, dashboard, and sampling. Use this as a release verification checklist.
+End-to-end walkthrough: CLI batch evaluation, API server, dashboard, and streaming.
 
 ## Prerequisites
 
@@ -14,44 +14,29 @@ echo "OPEN_AI_KEY=sk-proj-YOUR_KEY_HERE" >> .env
 
 ---
 
-## Step 1 — CLI: Batch Evaluate
+## Step 1 — CLI: Batch Evaluate Conversations
+
+Use the annotated sample dataset (15 conversations spanning pass/review/fail quality tiers):
 
 ```bash
 ./bin/themis-cli evaluate \
-  -i resources/dataset.jsonl \
-  -o results.jsonl
+  -input resources/annotated_sample.jsonl \
+  -output /tmp/results.jsonl
 ```
 
 **Verify:**
-- `results.jsonl` has one line per input record
-- Each line has `verdict`, `confidence`, and `stage_scores`
-- No errors in logs
+- `/tmp/results.jsonl` has one line per conversation
+- Each line has `final_score`, `verdict`, `turn_avg`, `holistic_score`
+- The summary includes a `correlation_report` comparing Themis verdicts against the `human_label` annotations
 
 ```bash
 # Verdict distribution
-jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' results.jsonl
+jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' /tmp/results.jsonl
 ```
 
 ---
 
-## Step 2 — CLI: Validate Judge Accuracy
-
-```bash
-./bin/themis-cli validate-events \
-  -i resources/validation_success_dataset.jsonl \
-  -c 0.3
-```
-
-**Verify:**
-- `status=PASSED`
-- `kendall_tau` ≥ 0.3
-- Exit code 0
-
-> If this fails, do not proceed to release. Review and tune `configs/judges.yaml`.
-
----
-
-## Step 3 — API: Start Server
+## Step 2 — API: Start Server
 
 ```bash
 ./bin/themis-api
@@ -60,132 +45,85 @@ jq -s 'group_by(.verdict) | map({verdict: .[0].verdict, count: length})' results
 **Verify health:**
 ```bash
 curl -s http://localhost:18082/api/v1/health | jq .
-# {"status":"ok","version":"1.0.0"}
+# {"status":"ok"}
 ```
 
 ---
 
-## Step 4 — API: Seed Evaluation Data
+## Step 3 — API: Evaluate a Conversation
 
-**Good answer:**
+**Single-turn (good answer):**
 ```bash
-curl -s -X POST http://localhost:18082/api/v1/evaluate \
+curl -s -X POST http://localhost:18082/api/v1/conversations/evaluate \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "qs-001",
-    "conversation_id": "conv-qs-001",
-    "event_type": "agent_response",
+    "conversation_id": "qs-001",
     "agent": {"name": "my-agent", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is the capital of France?",
-      "context": "France is a country in Western Europe. Paris is its capital.",
-      "answer": "The capital of France is Paris."
-    }
-  }' | jq '{verdict, confidence}'
+    "turns": [
+      {
+        "turn_index": 1,
+        "user_query": "What is the capital of France?",
+        "answer": "The capital of France is Paris."
+      }
+    ]
+  }' | jq '{verdict, final_score, turn_avg, holistic_score}'
 ```
 
 **Multi-turn conversation:**
 ```bash
-for turn in 1 2 3; do
-  curl -s -X POST http://localhost:18082/api/v1/evaluate \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"event_id\": \"conv-turn-$turn\",
-      \"conversation_id\": \"conv-qs-001\",
-      \"event_type\": \"agent_response\",
-      \"agent\": {\"name\": \"my-agent\", \"version\": \"1.0\"},
-      \"interaction\": {
-        \"user_query\": \"Question $turn\",
-        \"context\": \"Some context.\",
-        \"answer\": \"Answer $turn with relevant information.\"
-      }
-    }" | jq '{verdict, confidence}'
-done
-```
-
-**Hallucination (should fail):**
-```bash
-curl -s -X POST http://localhost:18082/api/v1/evaluate \
+curl -s -X POST http://localhost:18082/api/v1/conversations/evaluate \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "qs-002",
-    "conversation_id": "conv-qs-002",
-    "event_type": "agent_response",
+    "conversation_id": "qs-002",
     "agent": {"name": "my-agent", "version": "1.0"},
-    "interaction": {
-      "user_query": "What is the population of Tokyo?",
-      "context": "Tokyo is the capital of Japan.",
-      "answer": "Tokyo has 50 million people and is the largest city in China."
-    }
-  }' | jq '{verdict, confidence}'
+    "turns": [
+      {"turn_index": 1, "user_query": "What is the capital of France?", "answer": "Paris."},
+      {"turn_index": 2, "user_query": "What is it known for?", "answer": "Paris is known for the Eiffel Tower, art, and cuisine."},
+      {"turn_index": 3, "user_query": "What is the population?", "answer": "Paris has about 2.1 million people in the city proper."}
+    ]
+  }' | jq '{verdict, final_score, turn_avg, holistic_score}'
+```
+
+**Low quality answer (should fail):**
+```bash
+curl -s -X POST http://localhost:18082/api/v1/conversations/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "conversation_id": "qs-003",
+    "agent": {"name": "my-agent", "version": "1.0"},
+    "turns": [
+      {"turn_index": 1, "user_query": "Explain quantum computing.", "answer": "Yes."}
+    ]
+  }' | jq '{verdict, final_score}'
 ```
 
 Expected: `verdict: "fail"`.
 
 ---
 
-## Step 5 — API: Download a 25% Sample
+## Step 4 — API: Query Results
 
 ```bash
-curl -s -X POST http://localhost:18082/api/v1/validation/sample/events/download \
-  -H "Content-Type: application/json" \
-  -d '{
-    "start_date": "2020-01-01T00:00:00Z",
-    "end_date": "2099-01-01T00:00:00Z",
-    "percentage": 25
-  }' -o sample.jsonl
+# List all conversations
+curl -s http://localhost:18082/api/v1/conversations | jq .
 
-echo "Sampled $(wc -l < sample.jsonl) records"
-head -1 sample.jsonl | jq .
+# Get specific conversation details
+curl -s http://localhost:18082/api/v1/conversations/qs-002 | jq .
+
+# Health metrics
+curl -s "http://localhost:18082/api/v1/metrics/health?window=7d" | jq .
 ```
-
-**Verify:**
-- Status 200
-- `Content-Type: application/x-ndjson`
-- Each line contains `event_id`, `agent`, `interaction` fields — no evaluation scores (by design, to avoid biasing human annotators)
 
 ---
 
-## Step 6 — Dashboard: Verify the UI
+## Step 5 — Dashboard: Verify the UI
 
 Open `http://localhost:18082` and check:
 
-**Results tab:**
-- [ ] Rows load with verdict badges
-- [ ] Filter by `agent_name=my-agent` works
-- [ ] Click a row to expand stage scores
-
-**Conversations tab:**
-- [ ] `conv-qs-001` appears with 3 turns
-- [ ] Click conversation to see turn detail
-
-**Monitoring tab:**
-- [ ] Metrics table loads (`total_evaluations`, `avg_confidence`, `avg_judge_disagreement`)
-- [ ] Window switcher (7d / 24h) updates values
-
----
-
-## Step 7 — API: Live Evaluation
-
-```bash
-curl -s -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "qs-live-001",
-    "event_type": "agent_response",
-    "agent": {"name": "my-agent", "version": "1.0"},
-    "interaction": {
-      "user_query": "Explain what machine learning is.",
-      "context": "Machine learning is a subset of AI that enables systems to learn from data.",
-      "answer": "Machine learning allows computers to improve their performance on tasks by learning patterns from data, without being explicitly programmed for each scenario."
-    }
-  }' | jq '{verdict, confidence, stage_count: (.stage_scores | length)}'
-```
-
-**Expected:**
-- `verdict: "pass"`
-- `confidence` > 0.8
-- `stage_count` = 8 (3 prechecks + 5 LLM judges)
+- [ ] Conversation list loads with verdict badges and scores
+- [ ] Click a conversation to see per-turn scores
+- [ ] Monitoring tab shows `total_evaluations` and `avg_confidence`
+- [ ] Window switcher (7d / 1d) updates values
 
 ---
 
@@ -194,14 +132,10 @@ curl -s -X POST http://localhost:18082/api/v1/evaluate \
 | Step | What to verify | Pass? |
 |------|----------------|-------|
 | 1 — CLI evaluate | `results.jsonl` produced, no errors | |
-| 2 — CLI validate | Kendall's τ ≥ 0.3, `status=PASSED` | |
-| 3 — API start | All judges initialized, health returns `ok` | |
-| 4 — Seed data | Evaluations stored, conversation created | |
-| 5 — Sample download | JSONL response, interaction-only fields | |
-| 6 — Dashboard | All 3 tabs load and display correct data | |
-| 7 — Live evaluation | 8 stages, pass verdict | |
-
-All steps must pass before tagging a release.
+| 2 — API start | All judges initialized, health returns `ok` | |
+| 3 — Evaluate | Conversations stored, verdicts correct | |
+| 4 — Query | List and get endpoints return correct data | |
+| 5 — Dashboard | Conversations and metrics display correctly | |
 
 ---
 
@@ -210,4 +144,4 @@ All steps must pass before tagging a release.
 - [Configuration](configuration.md) — Tune thresholds and judge weights
 - [API Mode](../deployment/api-mode.md) — Production deployment
 - [API Tests](../testing/api-tests.md) — Full API test reference
-- [Batch Tests](../testing/batch-tests.md) — CLI and validation test cases
+- [Batch Tests](../testing/batch-tests.md) — CLI test cases

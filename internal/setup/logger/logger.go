@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 )
@@ -12,10 +13,9 @@ func New(level string) zerolog.Logger {
 		lvl = zerolog.InfoLevel
 	}
 
-	return zerolog.New(os.Stdout).
+	return zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).
 		Level(lvl).
 		With().
 		Timestamp().
-		Caller().
 		Logger()
 }

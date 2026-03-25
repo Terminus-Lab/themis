@@ -3,39 +3,24 @@ package sqlite
 import "context"
 
 const schema = `
-  CREATE TABLE IF NOT EXISTS eval_results (
-      id TEXT PRIMARY KEY,
-      event_id TEXT NOT NULL,
-      agent_name TEXT NOT NULL,
-      agent_version TEXT NOT NULL,
-      user_query TEXT NOT NULL,
-      answer TEXT NOT NULL,
-      context TEXT,
-      confidence REAL NOT NULL,
-      verdict TEXT NOT NULL,
-      stage_scores TEXT NOT NULL,
-      conversation_id TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_agent_name ON eval_results(agent_name, created_at);
-  CREATE INDEX IF NOT EXISTS idx_verdict ON eval_results(verdict, created_at);
-  CREATE INDEX IF NOT EXISTS idx_created_at ON eval_results(created_at);
-  CREATE INDEX IF NOT EXISTS idx_conversation_id ON eval_results(conversation_id, created_at);
-
-  CREATE TABLE IF NOT EXISTS conversation_eval_results (
+  CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
       agent_name TEXT NOT NULL,
-      agent_version TEXT NOT NULL,
+      agent_version TEXT,
       turn_count INTEGER NOT NULL,
-      confidence REAL NOT NULL,
+      turn_avg REAL NOT NULL,
+      holistic_score REAL NOT NULL,
+      holistic_reason TEXT,
+      final_score REAL NOT NULL,
       verdict TEXT NOT NULL,
-      stage_scores TEXT NOT NULL,
+      turn_results TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_conv_eval_conversation_id ON conversation_eval_results(conversation_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_conversations_conversation_id ON conversations(conversation_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_conversations_agent_name ON conversations(agent_name, created_at);
+  CREATE INDEX IF NOT EXISTS idx_conversations_verdict ON conversations(verdict, created_at);
 `
 
 func (d *DB) InitSchema(ctx context.Context) error {

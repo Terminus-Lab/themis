@@ -1,8 +1,8 @@
 ---
 title: CLI Test Cases
-description: Test scenarios for Themis CLI
-version: 1.0.0
-tags: [testing, batch, cli, offline, validation, kendall]
+description: Test scenarios for Themis CLI batch evaluation
+version: 0.0.1
+tags: [testing, batch, cli, offline, conversations]
 related:
   - testing/api-tests.md
   - testing/mcp-tests.md
@@ -12,15 +12,15 @@ related:
 
 # CLI Test Cases
 
-Test scenarios for processing multiple evaluation requests from JSONL files using concurrent workers.
+Test scenarios for processing multiple conversation evaluation requests from JSONL files using concurrent workers.
 
 ## Overview
 
-The batch CLI enables offline evaluation of datasets without running the API server. Useful for:
-- Testing prompt variations on large datasets
+The batch CLI enables offline evaluation of conversation datasets without running the API server. Useful for:
+- Evaluating large datasets of multi-turn conversations
 - A/B testing different judge configurations
-- Generating evaluation reports for dataset quality assessment
-- Research workflows and correlation analysis
+- Validating judge accuracy against human-annotated ground truth
+- Generating evaluation reports
 
 ## Setup
 
@@ -36,695 +36,246 @@ AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 
-# Pipeline configuration
-ENABLE_PRECHECK=true
-EARLY_EXIT_THRESHOLD=0.2
+CONVERSATION_HOLISTIC_WEIGHT=0.5
 ```
 
 ## Command Line Flags
 
-**Evaluate-Events Command Flags:**
+**evaluate Command Flags:**
 | Flag | Shorthand | Type | Default | Description |
 |------|-----------|------|---------|-------------|
 | `--input` | `-i` | string | **required** | Input JSONL file path |
-| `--output` | `-o` | string | **required** | Output file path |
-| `--format` | `-f` | string | "jsonl" | Output format: "jsonl" or "summary" |
-| `--summary` | `-s` | string | "" | Optional separate summary file |
-| `--save-to-db` | `-d` | bool | false | Save results to database |
+| `--output` | `-o` | string | — | Output JSONL file path (required unless `-f summary`) |
+| `--format` | `-f` | string | `jsonl` | Output format: `jsonl` or `summary` |
+| `--summary` | `-s` | string | — | Optional separate summary JSON file |
+| `--save-to-db` | `-d` | bool | `false` | Persist results to database (requires `IN_MEMORY_DB=false`) |
 
 **Environment Variables:**
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `THEMIS_BATCH_WORKERS` | int | 5 | Number of concurrent evaluation workers |
 
-**Evaluate-Conversations Command Flags:**
-| Flag | Shorthand | Type | Default | Description |
-|------|-----------|------|---------|-------------|
-| `--input` | `-i` | string | **required** | Input JSONL file path (conversation records) |
-| `--output` | `-o` | string | — | Output JSONL file path (required unless `-f summary`) |
-| `--format` | `-f` | string | "jsonl" | Output format: "jsonl" or "summary" |
-| `--summary` | `-s` | string | "" | Optional separate summary file alongside JSONL output |
-| `--save-to-db` | `-d` | bool | false | Save results to database |
+## Input Format
 
-**Validate-Events Command Flags:**
-| Flag | Shorthand | Type | Default | Description |
-|------|-----------|------|---------|-------------|
-| `--input` | `-i` | string | **required** | Input file path with human annotations |
-| `--correlation-threshold` | `-c` | float | 0.3 | Kendall's tau threshold for validation |
-| `--save-to-db` | `-d` | bool | false | Save results to database |
+### Plain Evaluation Input
 
-**Validate-Conversations Command Flags:**
-| Flag | Shorthand | Type | Default | Description |
-|------|-----------|------|---------|-------------|
-| `--input` | `-i` | string | **required** | Input file path with human annotations |
-| `--correlation-threshold` | `-c` | float | 0.3 | Kendall's tau threshold for validation |
-
-## Input Format (JSONL)
-
-Each line is a JSON object with the same structure as the API request:
-
-```jsonl
-{"event_id":"eval-001","conversation_id":"conv-batch-001","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country in Western Europe. Paris is its capital.","answer":"The capital of France is Paris."}}
-{"event_id":"eval-002","conversation_id":"conv-batch-002","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"AI stands for Artificial Intelligence.","answer":"AI is the simulation of human intelligence by machines."}}
-```
-
-**Required fields:**
-- `conversation_id` - Groups related evaluations into multi-turn conversations. Every evaluation must have a conversation ID.
-
-**Optional fields:**
-- `expected_output` - For correctness evaluation (ground truth comparison). Only used if correctness judge is enabled in `judges.yaml`.
-
-**Example with expected_output:**
-```jsonl
-{"event_id":"eval-003","conversation_id":"conv-batch-003","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is 2+2?","context":"Basic math.","answer":"Four","expected_output":"4"}}
-```
-
-**Example of a multi-turn conversation:**
-```jsonl
-{"event_id":"turn-001","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country in Europe.","answer":"The capital of France is Paris."}}
-{"event_id":"turn-002","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the population?","context":"Paris is the capital of France.","answer":"Paris has approximately 2.2 million inhabitants."}}
-{"event_id":"turn-003","conversation_id":"conv-abc123","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"Tell me more about its history.","context":"Paris is an ancient city.","answer":"Paris was founded in the 3rd century BC by a Celtic people called the Parisii."}}
-```
-
-This groups 3 evaluations as turns in conversation `conv-abc123`, enabling conversation-level analysis.
-
-### Conversations Input Format (evaluate-conversations)
-
-For `evaluate-conversations`, each line is a conversation object with all turns bundled together:
-
-```jsonl
-{"conversation_id":"conv-001","agent":{"name":"assistant-v1","version":"1.0"},"turns":[{"turn_index":0,"user_query":"What is the capital of France?","answer":"The capital of France is Paris.","context":"France is a country in Western Europe."},{"turn_index":1,"user_query":"What is the population of that city?","answer":"Paris has an estimated population of 2.2 million people within city limits.","context":"Paris is the capital and most populous city of France."},{"turn_index":2,"user_query":"What are some famous landmarks there?","answer":"Famous landmarks in Paris include the Eiffel Tower, Louvre Museum, Notre-Dame Cathedral, and Arc de Triomphe.","context":"Paris is known for its architecture and cultural landmarks."}]}
-{"conversation_id":"conv-002","agent":{"name":"assistant-v1","version":"1.0"},"turns":[{"turn_index":0,"user_query":"What is machine learning?","answer":"Machine learning is a method of data analysis that automates analytical model building using algorithms that learn from data.","context":"Machine learning is a subset of artificial intelligence."},{"turn_index":1,"user_query":"Can you give me an example?","answer":"An example is email spam filtering, where the algorithm learns to identify spam based on patterns in labeled training data.","context":"Machine learning has many practical applications."}]}
-```
-
-**Required fields:**
-- `conversation_id` - Unique conversation identifier
-- `agent` - Agent metadata (`name`, `version`)
-- `turns` - Array of turns, each with `turn_index`, `user_query`, `answer`
-
-**Optional turn fields:**
-- `context` - Retrieved context for RAG evaluation
-- `expected_output` - Ground truth for correctness judge
-
-An example dataset is provided at `resources/conversations.jsonl` with 3 conversations covering geography, machine learning, and Python debugging.
-
-## Output Formats
-
-### JSONL Output (Default)
-
-One evaluation result per line (can be processed with `jq`):
-
-```jsonl
-{"id":"eval-001","stages":[{"name":"length-checker","score":1.0,"reason":"Answer Length is acceptable","duration_ns":12500},{"name":"overlap-checker","score":0.85,"duration_ns":10000},{"name":"format-checker","score":1.0,"duration_ns":8500},{"name":"relevance-judge","score":0.95,"duration_ns":1850000000}],"confidence":0.92,"verdict":"pass"}
-```
-
-### Summary Output
-
-Aggregate statistics in JSON format:
+Each line is a `ConversationEvaluationRequest`:
 
 ```json
-{
-  "total": 20,
-  "pass_count": 15,
-  "fail_count": 3,
-  "review_count": 2,
-  "avg_confidence": 0.847
-}
+{"conversation_id":"conv-001","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is Go?","answer":"Go is a statically typed programming language."},{"turn_index":2,"user_query":"Who created it?","answer":"Go was created by Google engineers."}]}
+{"conversation_id":"conv-002","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is Paris?","answer":"Paris is the capital of France."}]}
 ```
+
+### Annotated Input (Human Ground Truth)
+
+Add `human_label` and/or `human_score` fields to any conversation to enable correlation metrics:
+
+```json
+{"conversation_id":"conv-001","human_label":"pass","human_score":0.92,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-002","human_label":"review","human_score":0.61,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-003","human_label":"fail","human_score":0.20,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+```
+
+When annotations are present, the CLI automatically computes:
+
+| Metric | Measures | When useful |
+|--------|----------|-------------|
+| Kendall's τ | Score rank correlation (continuous) | Is Themis score ordering consistent with human score ordering? |
+| Cohen's κ | Label agreement (fail/review/pass) | Overall verdict match rate, chance-corrected |
+| Weighted κ | Label agreement, severity-penalized | Distinguishes small errors (review↔pass) from large ones (fail↔pass) — useful for cross-version tracking |
+| Confusion matrix | Per-class breakdown | Where exactly are the disagreements? |
+
+A ready-to-use annotated dataset is included at `resources/annotated_sample.jsonl` (15 conversations: 5 pass, 5 review, 5 fail).
 
 ## Test Cases
 
-### Test Case 1: Valid JSONL Input
+### Test Case 1: Basic Batch Evaluation
 
-**Input:** `test-valid.jsonl`
-```jsonl
-{"event_id":"t1","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is 2+2?","context":"Math basics","answer":"4"}}
-{"event_id":"t2","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"Capital of Spain?","context":"Spain is in Europe","answer":"Madrid"}}
+**Setup:**
+```bash
+cat > /tmp/conversations.jsonl << 'EOF'
+{"conversation_id":"conv-001","agent":{"name":"test-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is the capital of France?","answer":"The capital of France is Paris."},{"turn_index":2,"user_query":"And Germany?","answer":"The capital of Germany is Berlin."}]}
+{"conversation_id":"conv-002","agent":{"name":"test-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is 2+2?","answer":"2+2 equals 4."}]}
+EOF
 ```
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate-events -i test-valid.jsonl -o results.jsonl
-```
-
-**Expected Output:**
-- Exit code: 0
-- `results.jsonl` contains 2 lines (one per evaluation)
-- Both records have `verdict` field (`pass`, `review`, or `fail`)
-- Logs show: "Input file parsed", "Starting worker pool", "Processing complete"
-
-### Test Case 2: Invalid JSON Lines
-
-**Input:** `test-invalid.jsonl`
-```jsonl
-{"event_id":"t1","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"Valid","context":"","answer":"Valid"}}
-{invalid json}
-{"event_id":"t3","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"Valid","context":"","answer":"Valid"}}
-```
-
-**Command:**
-```bash
-./bin/themis-cli evaluate-events -i test-invalid.jsonl -o results.jsonl
-```
-
-**Expected Output:**
-- Exit code: 0 (continues on parse errors)
-- Warning log: "Skipping record with parse error" for line 2
-- `results.jsonl` contains 2 lines (valid records only)
-
-### Test Case 3: Summary Format
-
-When `-f summary` is used without `-o`, results are printed to stdout. With `-o`, they're written to the specified file.
-
-**Command (stdout):**
-```bash
-./bin/themis-cli evaluate-events -i test-valid.jsonl -f summary
-```
-
-**Command (file):**
-```bash
-./bin/themis-cli evaluate-events -i test-valid.jsonl -f summary -o summary.json
-```
-
-**Expected Output:**
-```json
-{
-  "total": 2,
-  "pass_count": 2,
-  "fail_count": 0,
-  "review_count": 0,
-  "avg_confidence": 0.91
-}
-```
-
-### Test Case 4: Graceful Shutdown (SIGINT)
-
-**Command:**
-```bash
-# Start processing large file
-./bin/themis-cli evaluate-events -i large-dataset.jsonl -o results.jsonl
-
-# Press Ctrl+C after 2 seconds
-```
-
-**Expected Behavior:**
-- Warning log: "Received interrupt signal, finishing current work..."
-- In-flight evaluations complete
-- Partial results written to `results.jsonl`
-- Files properly closed
-- Exit code: 0 or signal exit code
-
-### Test Case 5: High Concurrency
-
-**Command:**
-```bash
-THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o results.jsonl
-```
-
-**Expected Output:**
-- All 100 records processed
-- Logs show "Starting worker pool" with workers=20
-- Processing time < sequential execution time
-- All results written correctly
-
-### Test Case 6: Invalid Format Flag
-
-**Command:**
-```bash
-./bin/themis-cli evaluate-events -i test.jsonl -f csv
-```
-
-**Expected Output:**
-- Exit code: 1
-- Fatal error: "Invalid format. Supported: jsonl, summary"
-- No processing occurs
-
-### Test Case 7: Validation Mode (Human Annotation Correlation)
-
-**Input:** `resources/annotated_sample.jsonl` (20 records with human annotations)
-
-```jsonl
-{"event_id":"val-001","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is the capital of France?","context":"France is a country...","answer":"The capital of France is Paris."},"human_annotation":"pass"}
-```
-
-**Command:**
-```bash
-./bin/themis-cli validate-events -i resources/annotated_sample.jsonl -c 0.3
-# or with long flags:
-./bin/themis-cli validate-events --input resources/annotated_sample.jsonl --correlation-threshold 0.3
-```
-
-**Expected Output (if correlation passes):**
-- Exit code: 0
-- Validation report with comprehensive metrics:
-  - **Kendall's τ** (PRIMARY) - Pass/fail decision
-  - **Cohen's Kappa** (REPORT) - Industry standard agreement metric
-  - **Confusion Matrix** (DEBUG) - Per-class breakdown
-  - **Per-class metrics** - Precision/Recall/F1 for each label
-- Status: "PASSED"
-- Message: "LLM judge validated against human annotations"
-
-**Console output (JSON structured logging):**
-```
-INFO Starting validation records=25 threshold=0.3
-INFO Evaluation complete duration=12.3s
-INFO Validation complete records=25 kendall_tau=0.42 tau_interpretation="Moderate agreement" cohens_kappa=0.38 kappa_interpretation="Fair agreement" threshold=0.3 status=PASSED
-INFO LLM judge validated against human annotations
-INFO Safe to evaluate full dataset with these judge prompts
-```
-
-**Validation summary JSON** (can save with `> validation-report.json`):
-```json
-{
-  "passed": true,
-  "total_records": 25,
-  "threshold": 0.3,
-  "correlation_metrics": {
-    "kendalls_tau": 0.42,
-    "interpretation": "Moderate agreement",
-    "passed_threshold": true
-  },
-  "agreement_metrics": {
-    "cohens_kappa": 0.38,
-    "interpretation": "Fair agreement"
-  },
-  "confusion_matrix": {
-    "fail": {"fail": 6, "review": 2, "pass": 1},
-    "review": {"fail": 1, "review": 5, "pass": 2},
-    "pass": {"fail": 0, "review": 1, "pass": 7}
-  },
-  "per_class_metrics": {
-    "fail": {"precision": 0.857, "recall": 0.667, "f1": 0.750, "support": 9},
-    "review": {"precision": 0.625, "recall": 0.625, "f1": 0.625, "support": 8},
-    "pass": {"precision": 0.700, "recall": 0.875, "f1": 0.778, "support": 8}
-  }
-}
-```
-
-**Expected Output (if correlation fails):**
-- Exit code: 1
-- Validation report with:
-  - Kendall's τ < 0.3
-  - Status: "FAILED"
-- Error message about threshold
-- Guidance to review judge prompts
-
-**Test with missing annotations:**
-```bash
-# Create test file with missing human_annotation
-echo '{"event_id":"t1","interaction":{"user_query":"Test","answer":"Test"}}' > test-no-annotation.jsonl
-
-./bin/themis-cli validate-events -i test-no-annotation.jsonl
+go run cmd/batch/main.go evaluate \
+  --input /tmp/conversations.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
-- Exit code: 1
-- Error: "validation requires all records to have 'human_annotation' field"
-- Lists records missing annotations
-
----
-
-### Test Case 7.1: Validation with Passing Dataset (Production-Ready Judge)
-
-**Input:** `resources/validation_test_dataset.jsonl` (150 records - 50 fail, 50 pass, 50 review)
-
-This dataset tests a well-calibrated judge with clear category boundaries and strong correctness enforcement.
-
-**Command:**
-```bash
-go run cmd/batch/main.go validate-events \
-  -i resources/validation_success_dataset.jsonl \
-  -c 0.3
-```
-
-**Expected Output:**
 - Exit code: 0
-- Status: ✓ PASSED
-- **Kendall's τ**: 0.632 (Moderate to strong agreement)
-- **Cohen's Kappa**: 0.910 (Almost perfect)
-- **Overall Accuracy**: 94% (141/150 correct)
+- `/tmp/results.jsonl` contains 2 lines
+- Each line is a valid JSON `ConversationEvaluationResult`
+- Results include `conversation_id`, `turn_avg`, `holistic_score`, `final_score`, `verdict`
 
-**Key Metrics:**
+**Sample output line:**
 ```json
 {
-  "passed": true,
-  "total_records": 150,
-  "correlation_metrics": {
-    "kendalls_tau": 0.6315883668903803,
-    "interpretation": "Moderate to strong agreement",
-    "passed_threshold": true
-  },
-  "agreement_metrics": {
-    "cohens_kappa": 0.9099999999999999,
-    "interpretation": "Almost perfect"
-  },
-  "confusion_matrix": {
-    "fail": {"fail": 49, "pass": 0, "review": 1},
-    "pass": {"fail": 0, "pass": 50, "review": 0},
-    "review": {"fail": 0, "pass": 8, "review": 42}
-  },
-  "per_class_metrics": {
-    "fail": {"precision": 1.0, "recall": 0.98, "f1": 0.99, "support": 50},
-    "pass": {"precision": 0.86, "recall": 1.0, "f1": 0.93, "support": 50},
-    "review": {"precision": 0.98, "recall": 0.84, "f1": 0.90, "support": 50}
-  }
+  "conversation_id": "conv-001",
+  "agent_name": "test-agent",
+  "agent_version": "1.0",
+  "turn_count": 2,
+  "turn_avg": 0.91,
+  "holistic_score": 0.88,
+  "final_score": 0.895,
+  "verdict": "pass",
+  "turn_results": [...]
 }
 ```
 
-**Interpretation:**
-- ✅ Judge exceeds threshold by 2.1x (0.63 vs 0.3)
-- ✅ Near-perfect categorical agreement (κ = 0.91)
-- ✅ Zero critical errors (no fail→pass)
-- ✅ Strong performance across all classes
-- ✅ **Recommendation**: Deploy to production
+### Test Case 2: Summary Format (stdout)
 
-**Full analysis:** See [resources/validation_test_dataset_interpretation.md](../../resources/validation_test_dataset_interpretation.md)
+Print a human-readable summary to stdout without writing a JSONL file:
 
-**Use case:** Baseline validation to confirm judge configuration is production-ready.
-
----
-
-### Test Case 7.2: Validation with Failing Dataset (Judge Issue Detection)
-
-**Input:** `resources/validation_failed_dataset.jsonl` (150 records - designed to expose common judge failure modes)
-
-This dataset contains:
-- **Fail cases (1-30)**: Verbose but empty answers (tests style-over-substance bias)
-- **Fail cases (31-50)**: Confidently wrong answers (tests correctness detection)
-- **Pass cases (51-100)**: Correct comprehensive answers
-- **Review cases (101-150)**: Terse but correct answers (tests brevity penalty)
-
-**Command:**
 ```bash
-go run cmd/batch/main.go validate-events \
-  -i resources/validation_failed_dataset.jsonl \
-  -c 0.3
-```
-
-**Expected Output (with poorly calibrated judge):**
-- Exit code: 1
-- Status: ✗ FAILED
-- **Kendall's τ**: < 0.3 (Below threshold)
-- **Cohen's Kappa**: < 0.6 (Below industry standard)
-
-**Hypothetical Failed Results:**
-```json
-{
-  "passed": false,
-  "total_records": 150,
-  "correlation_metrics": {
-    "kendalls_tau": 0.22,
-    "interpretation": "Weak agreement",
-    "passed_threshold": false
-  },
-  "agreement_metrics": {
-    "cohens_kappa": 0.35,
-    "interpretation": "Fair agreement"
-  }
-}
-```
-
-**Common Failure Patterns Detected:**
-1. **Style-over-substance**: Judge promotes polite but empty answers (fail→pass)
-2. **Weak correctness**: Judge doesn't catch factually wrong answers (fail→review)
-3. **Penalizes brevity**: Judge rejects short but correct answers (review→fail)
-
-**Full failure analysis and fixes:** See [resources/validation_failed_dataset_interpretation.md](../../resources/validation_failed_dataset_interpretation.md)
-
-**Use case:**
-- Test judge robustness against adversarial cases
-- Identify systematic biases before production deployment
-- Validate judge improvements after configuration changes
-
----
-
-**Metric Interpretation Resources:**
-
-For comprehensive guidance on interpreting validation results:
-- **Kendall's τ**: [docs/metrics/kendalls-tau.md](../metrics/kendalls-tau.md)
-- **Cohen's Kappa**: [docs/metrics/cohens-kappa.md](../metrics/cohens-kappa.md)
-- **Confusion Matrix**: [docs/metrics/confusion-matrix.md](../metrics/confusion-matrix.md)
-- **Interpretation Guide**: [docs/metrics/interpretation-guide.md](../metrics/interpretation-guide.md) - Decision framework and troubleshooting
-
-### Test Case 8: Combined Results + Summary
-
-**Command:**
-```bash
-./bin/themis-cli evaluate-events \
-  -i resources/dataset.jsonl \
-  -o resources/results.jsonl \
-  -s resources/summary.json
-```
-
-**Expected:**
-- `results.jsonl` contains detailed evaluation results
-- `summary.json` contains aggregate statistics
-- Both files created successfully
-
-## Performance Tests
-
-### Test Case 9: Large Dataset Performance
-
-**Input:** 1000 records
-
-**Command:**
-```bash
-time THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate-events \
-  -i dataset-1000.jsonl \
-  -o results-1000.jsonl
-```
-
-**Expected:**
-- **Throughput**: ~5-10 evaluations/second with 10 workers
-- **Memory**: Loads all records into memory (suitable for datasets up to ~10K records)
-- **Cost**: Each evaluation = 1 precheck + 5 LLM calls (unless early exit)
-- Processing time significantly faster than sequential
-
-### Test Case 10: Conversation Tracking
-
-**Input:** `conversation-dataset.jsonl`
-```jsonl
-{"event_id":"conv-a-turn-1","conversation_id":"conv-a","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"","answer":"AI stands for Artificial Intelligence."}}
-{"event_id":"conv-a-turn-2","conversation_id":"conv-a","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"How does it work?","context":"","answer":"It uses machine learning algorithms."}}
-{"event_id":"conv-b-turn-1","conversation_id":"conv-b","event_type":"agent_response","agent":{"name":"test","type":"rag","version":"1.0"},"interaction":{"user_query":"What is Python?","context":"","answer":"Python is a programming language."}}
-```
-
-**Command:**
-```bash
-./bin/themis-cli evaluate-events -i conversation-dataset.jsonl -o results.jsonl
-```
-
-**Expected Output:**
-- All 3 evaluations include `conversation_id` in stored results
-- Evaluations can be queried by conversation via API: `GET /api/v1/conversations/conv-a`
-- Enables conversation-level metrics (average confidence per conversation, verdict distribution across turns)
-
-**Analyzing with jq:**
-```bash
-# Group results by conversation_id
-jq -s 'group_by(.conversation_id) | map({conversation: .[0].conversation_id, turns: length, avg_confidence: (map(.confidence) | add / length)})' results.jsonl
-
-# Expected output:
-# [
-#   {"conversation": "conv-a", "turns": 2, "avg_confidence": 0.85},
-#   {"conversation": "conv-b", "turns": 1, "avg_confidence": 0.92}
-# ]
-```
-
-### Test Case 10.1: Evaluate Conversations — Summary Format
-
-Uses the example dataset at `resources/conversations.jsonl` (3 conversations: geography, machine learning, Python debugging).
-
-**Command (stdout):**
-```bash
-./bin/themis-cli evaluate-conversations \
-  -i resources/conversations.jsonl \
+go run cmd/batch/main.go evaluate \
+  -i /tmp/conversations.jsonl \
   -f summary
 ```
 
-**Command (file):**
+**Expected:**
+- Exit code: 0
+- Structured summary printed to stdout
+- No `-o` flag required
+
+### Test Case 3: JSONL Results + Separate Summary File
+
 ```bash
-./bin/themis-cli evaluate-conversations \
-  -i resources/conversations.jsonl \
-  -f summary \
-  -o conv-summary.json
+go run cmd/batch/main.go evaluate \
+  -i /tmp/conversations.jsonl \
+  -o /tmp/results.jsonl \
+  -s /tmp/summary.json
 ```
 
-**Expected Output:**
+**Expected:**
+- `/tmp/results.jsonl` — one JSON result per line
+- `/tmp/summary.json` — aggregated summary object
+
+### Test Case 4: Annotated Dataset — Correlation Metrics
+
+Uses the bundled annotated sample to measure how well Themis agrees with human labels:
+
+```bash
+go run cmd/batch/main.go evaluate \
+  -i resources/annotated_sample.jsonl \
+  -f summary
+```
+
+**Expected:**
+- Exit code: 0
+- JSON summary printed to stdout, e.g.:
+
 ```json
 {
-  "total": 2,
-  "pass_count": 1,
-  "fail_count": 0,
-  "review_count": 1,
-  "avg_confidence": 0.74,
-  "avg_turn_count": 2.5
+  "total": 15,
+  "verdict_counts": {
+    "fail": 5,
+    "pass": 5,
+    "review": 5
+  },
+  "correlation_report": {
+    "annotated_count": 15,
+    "kendall_tau": 0.72,
+    "cohens_kappa": 0.65,
+    "weighted_kappa": 0.71,
+    "confusion_matrix": {
+      "labels": ["fail", "review", "pass"],
+      "matrix": [
+        [4, 1, 0],
+        [0, 4, 1],
+        [0, 1, 4]
+      ]
+    }
+  }
 }
 ```
 
-Note: `avg_turn_count` is unique to conversation summaries — it is not present in event-level summaries.
+To save both JSONL results and a separate summary in one pass:
 
-### Test Case 10.2: Evaluate Conversations — JSONL + Separate Summary
+```bash
+go run cmd/batch/main.go evaluate \
+  -i resources/annotated_sample.jsonl \
+  -o /tmp/annotated_results.jsonl \
+  -s /tmp/annotated_summary.json
+```
+
+The final line of the JSONL output (`-o`) will contain the correlation report:
+
+```json
+{"_type":"correlation_report","annotated_count":15,"kendall_tau":0.72,"cohens_kappa":0.65,"weighted_kappa":0.71,"confusion_matrix":{...}}
+```
+
+### Test Case 5: Custom Worker Count
+
+```bash
+THEMIS_BATCH_WORKERS=10 go run cmd/batch/main.go evaluate \
+  --input /tmp/conversations.jsonl \
+  --output /tmp/results.jsonl
+```
+
+**Expected:**
+- Same output as Test Case 1
+- Faster processing for large datasets (10 workers instead of 5)
+
+### Test Case 6: Empty Input File
+
+**Setup:**
+```bash
+touch /tmp/empty.jsonl
+```
 
 **Command:**
 ```bash
-./bin/themis-cli evaluate-conversations \
-  -i resources/conversations.jsonl \
-  -o conv-results.jsonl \
-  -s conv-summary.json
+go run cmd/batch/main.go evaluate \
+  --input /tmp/empty.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
-- `conv-results.jsonl` contains one JSON line per conversation with `conversation_id`, `verdict`, `confidence`, `turn_count`, `stages`
-- `conv-summary.json` contains aggregate stats: `total`, `pass_count`, `fail_count`, `review_count`, `avg_confidence`, `avg_turn_count`
-- Both files created successfully
+- Exit code: 0
+- `/tmp/results.jsonl` is empty or contains 0 results
+- No error output
 
-### Test Case 11: Worker Pool Scaling
+### Test Case 7: Invalid JSON in Input
 
-Test with different worker counts:
-
+**Setup:**
 ```bash
-# 1 worker (sequential)
-time THEMIS_BATCH_WORKERS=1 ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o /dev/null
+cat > /tmp/bad.jsonl << 'EOF'
+{"conversation_id":"conv-ok","agent":{"name":"test","version":"1.0"},"turns":[{"turn_index":1,"user_query":"Q","answer":"A"}]}
+{invalid json line}
+{"conversation_id":"conv-ok-2","agent":{"name":"test","version":"1.0"},"turns":[{"turn_index":1,"user_query":"Q","answer":"A"}]}
+EOF
+```
 
-# 5 workers (default)
-time ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o /dev/null
-
-# 20 workers (high concurrency)
-time THEMIS_BATCH_WORKERS=20 ./bin/themis-cli evaluate-events -i dataset-100.jsonl -o /dev/null
+**Command:**
+```bash
+go run cmd/batch/main.go evaluate \
+  --input /tmp/bad.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
-- Performance improves with more workers (up to a point)
-- Diminishing returns after ~10-15 workers (LLM API rate limits)
-- No errors or race conditions
+- Exit code: 0
+- `/tmp/results.jsonl` contains 2 valid results (bad line is skipped with a warning log)
 
-## Integration with Analysis Tools
-
-### Filter Failed Evaluations with jq
+### Test Case 8: Missing Required Flags
 
 ```bash
-# Run evaluation first
-./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
-
-# Then analyze results
-jq 'select(.verdict=="fail")' results.jsonl
+go run cmd/batch/main.go evaluate --input /tmp/conversations.jsonl
 ```
 
-### Calculate Average Confidence with jq
+**Expected:**
+- Exit code: non-zero
+- Error: `required flag "output" not set` (omitting `-o` is only valid with `-f summary`)
 
-```bash
-# Run evaluation first
-./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
-
-# Calculate average confidence
-jq -s 'map(.confidence) | add/length' results.jsonl
-```
-
-### Import to pandas (Python)
-
-```python
-import pandas as pd
-
-# Read JSONL output
-df = pd.read_json('results.jsonl', lines=True)
-print(df.describe())
-
-# Filter by verdict
-fails = df[df['verdict'] == 'fail']
-print(fails[['id', 'confidence', 'verdict']])
-```
-
-## Troubleshooting
-
-### Issue: "required flag -input not provided"
-
-**Solution:** Ensure you specify `-i` (or `--input`) flag with a valid file path.
-
-```bash
-./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
-```
-
-### Issue: "Failed to open input file"
-
-**Solution:** Check file exists and has read permissions.
-
-```bash
-ls -la dataset.jsonl
-chmod 644 dataset.jsonl
-```
-
-### Issue: Worker Pool Processes 0 Records
-
-**Solution:** Check for parse errors in input JSONL. Check the logs during evaluation - invalid records will show warnings but evaluation continues.
-
-### Issue: High Memory Usage
-
-**Solution:** Dataset is loaded into memory. For very large datasets (>100K), consider splitting into smaller batches.
-
-```bash
-split -l 10000 large-dataset.jsonl batch-
-# Process each batch separately
-```
-
-### Issue: LLM API Rate Limits
-
-**Solution:** Reduce worker count to stay within rate limits.
-
-```bash
-THEMIS_BATCH_WORKERS=3 ./bin/themis-cli evaluate-events -i dataset.jsonl -o results.jsonl
-```
-
-## Validation Mode Details
-
-### Kendall's Tau Correlation
-
-Validation mode computes Kendall's tau (τ) correlation between LLM verdicts and human annotations:
-
-- **τ ≥ 0.3**: Judge prompts validated (proceed to production)
-- **τ < 0.3**: Judge prompts need improvement
-
-### Confusion Matrix
-
-Shows agreement between human and LLM verdicts:
-
-```
-                Human
-          pass  review  fail
-   pass    12      2     0
-   review   1      3     1    LLM
-   fail     0      2     4
-```
-
-### Workflow
-
-1. **Collect human annotations** - Sample 25+ records from your dataset
-2. **Add `human_annotation` field** - "pass", "review", or "fail"
-3. **Run validation** - Compute correlation with LLM judges
-4. **Iterate prompts** - If τ < 0.3, improve judge prompts in `judges.yaml`
-5. **Deploy** - Once τ ≥ 0.3, safe to evaluate full dataset
-
-See [CLAUDE.md](../../CLAUDE.md) for complete validation details.
-
-## Performance Benchmarks
-
-**Test environment**: MacBook Pro M1, 10 workers
-
-| Dataset Size | Processing Time | Throughput |
-|--------------|-----------------|------------|
-| 10 records   | ~5 seconds      | 2 eval/s   |
-| 100 records  | ~45 seconds     | 2.2 eval/s |
-| 1000 records | ~7 minutes      | 2.4 eval/s |
-
-**Notes**:
-- Early exit significantly improves throughput for low-quality responses
-- Performance limited by LLM API latency (not CPU)
-- Memory usage: ~1MB per 1000 records
+---
 
 ## Next Steps
 
 - [API Test Cases](api-tests.md) - HTTP endpoint testing
-- [MCP Test Cases](mcp-tests.md) - Claude Code integration testing
-- [Streaming Test Cases](streaming-tests.md) - Redis consumer testing
-- [Configuration](../getting-started/configuration.md) - Tune pipeline settings
-- [CLAUDE.md](../../CLAUDE.md) - Complete documentation including validation
+- [MCP Test Cases](mcp-tests.md) - Claude Code integration
+- [Configuration](../getting-started/configuration.md) - Tune judges and thresholds

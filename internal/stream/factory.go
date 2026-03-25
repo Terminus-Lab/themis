@@ -15,30 +15,17 @@ type StreamConfig struct {
 	RedisConfig *streamredis.RedisStreamConfig
 }
 
-func NewStreamConsumer(
-	ctx context.Context,
-	cfg *StreamConfig,
-	exec *executor.Executor,
-	logger *zerolog.Logger,
-) (StreamConsumer, error) {
-	client, err := connectRedis(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	return streamredis.NewConsumer(client, cfg.RedisConfig.Stream, cfg.RedisConfig.Group, cfg.RedisConfig.ConsumerName, exec, logger), nil
-}
-
 func NewConversationStreamConsumer(
 	ctx context.Context,
 	cfg *StreamConfig,
-	exec *executor.ConversationExecutor,
+	eval *executor.ConversationEvaluator,
 	logger *zerolog.Logger,
 ) (StreamConsumer, error) {
 	client, err := connectRedis(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	return streamredis.NewConversationConsumer(client, cfg.RedisConfig.Stream, cfg.RedisConfig.Group, cfg.RedisConfig.ConsumerName, exec, logger), nil
+	return streamredis.NewConversationConsumer(client, cfg.RedisConfig.Stream, cfg.RedisConfig.Group, cfg.RedisConfig.ConsumerName, eval, logger), nil
 }
 
 func connectRedis(ctx context.Context, cfg *StreamConfig) (*goredis.Client, error) {
@@ -52,9 +39,6 @@ func connectRedis(ctx context.Context, cfg *StreamConfig) (*goredis.Client, erro
 			return nil, fmt.Errorf("redis config required")
 		}
 		return streamredis.ConnectRedis(ctx, cfg.RedisConfig.RedisAddr, cfg.RedisConfig.RedisPassword, 5)
-	// Future providers:
-	// case "kafka":
-	// case "sqs":
 	default:
 		return nil, fmt.Errorf("unsupported stream provider: %s", provider)
 	}

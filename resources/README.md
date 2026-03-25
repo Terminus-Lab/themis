@@ -1,137 +1,54 @@
-# Eval Agent Resources
+# Themis Resources
 
-This directory contains test datasets and example payloads for testing the eval-agent.
+Sample datasets for testing Themis conversation evaluation.
 
 ## Files
 
-### dataset.jsonl
+### conversations.jsonl
 
-A comprehensive test dataset with 20 evaluation requests in JSONL format (one JSON object per line). Each request includes:
-- Various query types (technical, conceptual, troubleshooting, etc.)
-- Different answer qualities (perfect, partial, irrelevant)
-- Edge cases (vague queries, follow-ups, multi-part questions)
+Three sample multi-turn conversations in the current evaluation format. Use this for basic smoke testing of the API and CLI.
 
-**Use with batch CLI:**
 ```bash
-cd eval-agent
-go run cmd/batch/main.go -input resources/dataset.jsonl -output results.jsonl
+./bin/themis-cli evaluate -i resources/conversations.jsonl -o /tmp/results.jsonl
 ```
-
-**Sample records:**
-- High quality answers (expected: pass)
-- Partial/incomplete answers (expected: review)
-- Irrelevant/hallucinated answers (expected: fail)
-- Edge cases (greetings, follow-ups, ambiguous queries)
-
-**Total:** 20 test cases
 
 ### annotated_sample.jsonl
 
-A validation dataset with 20 evaluation requests that include human annotations. Used for testing validation mode and computing Kendall's correlation between LLM judges and human judgment.
+Fifteen conversations with `human_label` (pass/review/fail) and `human_score` (0.0–1.0) annotations. When evaluated with the CLI, Themis automatically computes Kendall's τ-b, Cohen's κ (unweighted and weighted), and a confusion matrix.
 
-**Use with validation mode:**
 ```bash
-cd eval-agent
-go run cmd/batch/main.go \
-  -input resources/annotated_sample.jsonl \
-  -validate \
-  -correlation-threshold 0.3
+./bin/themis-cli evaluate -i resources/annotated_sample.jsonl -o /tmp/results.jsonl
+# Correlation report is appended as the last line of results.jsonl
+
+# Or get summary + correlation in one file:
+./bin/themis-cli evaluate -i resources/annotated_sample.jsonl -f summary
 ```
 
-**Features:**
-- Each record includes `human_annotation` field: "pass", "review", or "fail"
-- Designed to test correlation analysis
-- Mix of perfect, moderate, and poor answers
-- Expected Kendall's τ > 0.5 (moderate to strong agreement)
+**Distribution:** 5 pass · 5 review · 5 fail
 
-**Sample record:**
+## Input Format
+
+Each line in a JSONL file must be a valid conversation:
+
 ```json
 {
-  "event_id": "val-001",
-  "interaction": {
-    "user_query": "What is the capital of France?",
-    "context": "France is a country...",
-    "answer": "The capital of France is Paris."
-  },
-  "human_annotation": "pass"
+  "conversation_id": "conv-001",
+  "agent": {"name": "my-agent", "version": "1.0"},
+  "turns": [
+    {"turn_index": 0, "user_query": "What is AI?", "answer": "AI is..."},
+    {"turn_index": 1, "user_query": "Can you elaborate?", "answer": "Sure..."}
+  ]
 }
 ```
 
-**Distribution:**
-- Pass: 8 records
-- Review: 6 records
-- Fail: 6 records
+Optional fields for human annotation workflows:
 
-### conversation_example.jsonl
-
-Multi-turn conversation dataset with 10 evaluation requests grouped into 3 conversations.
-
-**Conversation structure:**
-- Conversation 001: 4 turns (Paris/French landmarks)
-- Conversation 002: 3 turns (Machine learning)
-- Conversation 003: 3 turns (Quantum computing)
-
-**Usage:**
-```bash
-go run cmd/batch/main.go \
-  -input resources/conversation_example.jsonl \
-  -output results.jsonl
+```json
+{
+  "conversation_id": "conv-001",
+  "human_label": "pass",
+  "human_score": 0.91,
+  "agent": {"name": "my-agent", "version": "1.0"},
+  "turns": [...]
+}
 ```
-
-**Important**: By default, batch CLI uses in-memory database. Data is stored during processing but NOT persisted after execution. The JSONL output file is what persists.
-
-**To persist in database for API queries:**
-```bash
-IN_MEMORY_DB=false THEMIS_DB_URL=postgresql://... \
-  go run cmd/batch/main.go -input resources/conversation_example.jsonl
-```
-
-**See also**: [Batch Test Cases - Conversation Tracking](../docs/testing/batch-tests.md#test-case-12-conversation-tracking) for detailed examples and conversation-level analysis.
-
-### payloads/
-
-Directory containing individual JSON payload examples for testing the HTTP API:
-
-- `pass.json` - Example request that should return `pass` verdict
-- `review.json` - Example request that should return `review` verdict
-- `fail-early.json` - Example that triggers early exit (precheck failure)
-- `README.md` - Documentation for payloads
-
-**Use with API:**
-```bash
-curl -X POST http://localhost:18082/api/v1/evaluate \
-  -H "Content-Type: application/json" \
-  -d @resources/payloads/pass.json
-```
-
-## Creating Your Own Test Dataset
-
-To create a custom JSONL dataset:
-
-```bash
-# Each line is a separate JSON object
-cat > my-dataset.jsonl << 'EOF'
-{"event_id":"test-1","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is AI?","context":"AI stands for Artificial Intelligence.","answer":"AI is the simulation of human intelligence by machines."}}
-{"event_id":"test-2","event_type":"agent_response","agent":{"name":"my-agent","type":"rag","version":"1.0"},"interaction":{"user_query":"What is ML?","context":"ML is machine learning.","answer":"ML is a subset of AI that learns from data."}}
-EOF
-
-# Test it
-go run cmd/batch/main.go -input my-dataset.jsonl -dry-run
-```
-
-## Dataset Statistics
-
-**Current dataset.jsonl breakdown:**
-- Perfect relevance (0.8-1.0): 10 test cases
-- Medium relevance (0.4-0.7): 5 test cases
-- Low/No relevance (0.0-0.4): 5 test cases
-
-**Query types covered:**
-- Technical how-to questions
-- Conceptual explanations
-- Troubleshooting scenarios
-- Multi-part questions
-- Follow-up questions with context
-- Yes/No questions
-- Comparison questions
-- Greetings and clarifications

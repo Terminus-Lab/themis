@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/Terminus-Lab/themis/internal/env"
@@ -30,15 +29,13 @@ type Judges struct {
 
 // JudgeConfiguration defines a single judge configuration
 type JudgeConfiguration struct {
-	Name                   string       `yaml:"name"`
-	Enabled                bool         `yaml:"enabled"`
-	Description            string       `yaml:"description"`
-	Scope                  string       `yaml:"scope,omitempty"`           // "event" (default) or "conversation"
-	RequiresContext        bool         `yaml:"requires_context"`
-	RequiresExpectedOutput bool         `yaml:"requires_expected_output"` // For correctness evaluation
-	Prompt                 string       `yaml:"prompt"`
-	Model                  *ModelConfig `yaml:"model,omitempty"`  // Optional override
-	Weight                 float64      `yaml:"weight,omitempty"` // Weight for this judge (0.0-1.0)
+	Name        string       `yaml:"name"`
+	Enabled     bool         `yaml:"enabled"`
+	Description string       `yaml:"description"`
+	Scope       string       `yaml:"scope,omitempty"` // "turn" (default) or "conversation"
+	Prompt      string       `yaml:"prompt"`
+	Model       *ModelConfig `yaml:"model,omitempty"`  // Optional override
+	Weight      float64      `yaml:"weight,omitempty"` // Weight for this judge (0.0-1.0)
 }
 
 // ModelConfig defines LLM model parameters
@@ -174,9 +171,9 @@ func applyDefaults(cfg *JudgesConfig) {
 }
 
 func normalizeJudgeWeights(cfg *JudgesConfig) {
-	// Normalize weights independently per scope group ("event" and "conversation").
-	// Judges with no scope default to "event".
-	normalizeForScope(cfg, "event")
+	// Normalize weights independently per scope group ("turn" and "conversation").
+	// Judges with no scope default to "turn".
+	normalizeForScope(cfg, "turn")
 	normalizeForScope(cfg, "conversation")
 }
 
@@ -189,7 +186,7 @@ func normalizeForScope(cfg *JudgesConfig, scope string) {
 		judge := &cfg.Judges.Evaluators[i]
 		judgeScope := judge.Scope
 		if judgeScope == "" {
-			judgeScope = "event"
+			judgeScope = "turn"
 		}
 		if judge.Enabled && judgeScope == scope {
 			enabledCount++
@@ -259,15 +256,6 @@ func (cfg *JudgesConfig) Validate() error {
 
 		if _, err := template.New(judge.Name).Parse(judge.Prompt); err != nil {
 			return fmt.Errorf("judge %s has invalid prompt template: %w", judge.Name, err)
-		}
-
-		// Validate that required fields are referenced in the prompt
-		if judge.RequiresContext && !strings.Contains(judge.Prompt, "{{.Context}}") {
-			return fmt.Errorf("judge %s requires context but prompt does not reference {{.Context}}", judge.Name)
-		}
-
-		if judge.RequiresExpectedOutput && !strings.Contains(judge.Prompt, "{{.ExpectedOutput}}") {
-			return fmt.Errorf("judge %s requires expected_output but prompt does not reference {{.ExpectedOutput}}", judge.Name)
 		}
 
 		if judge.Model != nil {

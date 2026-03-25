@@ -23,7 +23,7 @@ func TestConversationProcessor_Process_AllValid(t *testing.T) {
 	exec := &mockConversationExecutor{
 		result: models.ConversationEvaluationResult{
 			Verdict:    models.VerdictPass,
-			Confidence: 0.9,
+			FinalScore: 0.9,
 		},
 	}
 
@@ -69,7 +69,7 @@ func TestConversationProcessor_Process_SkipsErrorRecords(t *testing.T) {
 	exec := &mockConversationExecutor{
 		result: models.ConversationEvaluationResult{
 			Verdict:    models.VerdictPass,
-			Confidence: 0.9,
+			FinalScore: 0.9,
 		},
 	}
 

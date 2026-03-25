@@ -18,11 +18,11 @@ type ConversationConsumer struct {
 	stream       string
 	groupID      string
 	consumerName string
-	executor     *executor.ConversationExecutor
+	executor     *executor.ConversationEvaluator
 	logger       *zerolog.Logger
 }
 
-func NewConversationConsumer(client *redis.Client, stream string, groupID string, consumerName string, exec *executor.ConversationExecutor, logger *zerolog.Logger) *ConversationConsumer {
+func NewConversationConsumer(client *redis.Client, stream string, groupID string, consumerName string, exec *executor.ConversationEvaluator, logger *zerolog.Logger) *ConversationConsumer {
 	return &ConversationConsumer{
 		client:       client,
 		stream:       stream,
@@ -98,7 +98,7 @@ func (c *ConversationConsumer) process(ctx context.Context, msg redis.XMessage) 
 		Str("id", msg.ID).
 		Str("conversation_id", result.ConversationID).
 		Str("verdict", string(result.Verdict)).
-		Float64("confidence", result.Confidence).
+		Float64("final_score", result.FinalScore).
 		Msg("Conversation evaluation complete")
 
 	c.ack(ctx, msg.ID)
