@@ -9,54 +9,12 @@ import (
 	"testing"
 
 	"github.com/Terminus-Lab/themis/internal/api"
-	"github.com/Terminus-Lab/themis/internal/executor"
 	"github.com/Terminus-Lab/themis/internal/models"
 	"github.com/Terminus-Lab/themis/internal/setup"
 	"github.com/Terminus-Lab/themis/internal/storage/sqlite"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/rs/zerolog"
 )
-
-// setupTestContainer builds an in-memory API container with a mock evaluator and SQLite repo.
-func setupTestContainer(t *testing.T) *restful.Container {
-	t.Helper()
-
-	ctx := context.Background()
-	logger := zerolog.Nop()
-
-	db, err := sqlite.New(ctx, ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create sqlite: %v", err)
-	}
-	if err := db.InitSchema(ctx); err != nil {
-		t.Fatalf("failed to init schema: %v", err)
-	}
-	repo := sqlite.NewEvalRepository(db, &logger)
-
-	eval := newMockConversationEvaluator(repo)
-
-	handler := api.NewHandler(eval, repo, &logger)
-	container := restful.NewContainer()
-	api.RegisterRoutes(container, handler)
-	return container
-}
-
-// mockConversationEvaluator is a test double that returns a fixed result without LLM calls.
-type mockConversationEvaluator struct {
-	repo *sqlite.EvalRepository
-}
-
-func newMockConversationEvaluator(repo *sqlite.EvalRepository) *executor.ConversationEvaluator {
-	// Use an actual ConversationEvaluator with nop dependencies, or just cast via interface.
-	// Here we use setup to wire with no judges — but for unit tests we want a pure mock.
-	// We return nil to force setupTestAPI to use a real (thin) evaluator that won't call LLMs.
-	//
-	// Since executor.ConversationEvaluator is a concrete type, we can't substitute it with a
-	// test double without wrapping. Instead we build a minimal evaluator that uses an in-process
-	// no-op judge runner that always returns a fixed score.
-	_ = repo
-	return nil
-}
 
 // setupRealContainer wires a full in-memory setup (requires no LLM env vars).
 func setupRealContainer(t *testing.T) (*restful.Container, *sqlite.EvalRepository) {
@@ -228,7 +186,7 @@ func TestAPI_EvaluateConversation_Integration(t *testing.T) {
 
 	body := api.ConversationEvalRequest{
 		ConversationID: "integration-test-001",
-		Agent:          struct {
+		Agent: struct {
 			Name    string `json:"name"`
 			Version string `json:"version"`
 		}{Name: "test-agent", Version: "1.0"},
