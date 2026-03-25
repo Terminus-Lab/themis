@@ -16,26 +16,18 @@ echo "OPEN_AI_KEY=sk-proj-YOUR_KEY_HERE" >> .env
 
 ## Step 1 — CLI: Batch Evaluate Conversations
 
-Create a sample JSONL dataset:
-
-```bash
-cat > /tmp/dataset.jsonl << 'EOF'
-{"conversation_id":"conv-001","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is the capital of France?","answer":"The capital of France is Paris."},{"turn_index":2,"user_query":"And Germany?","answer":"The capital of Germany is Berlin."}]}
-{"conversation_id":"conv-002","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is 2+2?","answer":"4."}]}
-EOF
-```
-
-Run batch evaluation:
+Use the annotated sample dataset (15 conversations spanning pass/review/fail quality tiers):
 
 ```bash
 ./bin/themis-cli evaluate \
-  -input /tmp/dataset.jsonl \
+  -input resources/annotated_sample.jsonl \
   -output /tmp/results.jsonl
 ```
 
 **Verify:**
 - `/tmp/results.jsonl` has one line per conversation
 - Each line has `final_score`, `verdict`, `turn_avg`, `holistic_score`
+- The summary includes a `correlation_report` comparing Themis verdicts against the `human_label` annotations
 
 ```bash
 # Verdict distribution

@@ -19,6 +19,7 @@ Test scenarios for processing multiple conversation evaluation requests from JSO
 The batch CLI enables offline evaluation of conversation datasets without running the API server. Useful for:
 - Evaluating large datasets of multi-turn conversations
 - A/B testing different judge configurations
+- Validating judge accuracy against human-annotated ground truth
 - Generating evaluation reports
 
 ## Setup
@@ -44,7 +45,10 @@ CONVERSATION_HOLISTIC_WEIGHT=0.5
 | Flag | Shorthand | Type | Default | Description |
 |------|-----------|------|---------|-------------|
 | `--input` | `-i` | string | **required** | Input JSONL file path |
-| `--output` | `-o` | string | **required** | Output file path |
+| `--output` | `-o` | string | — | Output JSONL file path (required unless `-f summary`) |
+| `--format` | `-f` | string | `jsonl` | Output format: `jsonl` or `summary` |
+| `--summary` | `-s` | string | — | Optional separate summary JSON file |
+| `--save-to-db` | `-d` | bool | `false` | Persist results to database (requires `IN_MEMORY_DB=false`) |
 
 **Environment Variables:**
 | Variable | Type | Default | Description |
@@ -53,12 +57,32 @@ CONVERSATION_HOLISTIC_WEIGHT=0.5
 
 ## Input Format
 
-Each line in the input JSONL file is a `ConversationEvaluationRequest`:
+### Plain Evaluation Input
+
+Each line is a `ConversationEvaluationRequest`:
 
 ```json
 {"conversation_id":"conv-001","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is Go?","answer":"Go is a statically typed programming language."},{"turn_index":2,"user_query":"Who created it?","answer":"Go was created by Google engineers."}]}
 {"conversation_id":"conv-002","agent":{"name":"my-agent","version":"1.0"},"turns":[{"turn_index":1,"user_query":"What is Paris?","answer":"Paris is the capital of France."}]}
 ```
+
+### Annotated Input (Human Ground Truth)
+
+Add `human_label` and/or `human_score` fields to any conversation to enable correlation metrics:
+
+```json
+{"conversation_id":"conv-001","human_label":"pass","human_score":0.92,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-002","human_label":"review","human_score":0.61,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-003","human_label":"fail","human_score":0.20,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+```
+
+When annotations are present, the CLI automatically computes:
+- **Kendall's τ-b** — rank correlation between Themis scores and human scores
+- **Cohen's κ** — unweighted label agreement (fail/review/pass)
+- **Weighted κ** — linear-weighted label agreement (penalises fail↔pass more than fail↔review)
+- **Confusion matrix** — 3×3 matrix (human rows, Themis columns)
+
+A ready-to-use annotated dataset is included at `resources/annotated_sample.jsonl` (15 conversations: 5 pass, 5 review, 5 fail).
 
 ## Test Cases
 
@@ -75,8 +99,8 @@ EOF
 **Command:**
 ```bash
 go run cmd/batch/main.go evaluate \
-  -input /tmp/conversations.jsonl \
-  -output /tmp/results.jsonl
+  --input /tmp/conversations.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
@@ -100,19 +124,89 @@ go run cmd/batch/main.go evaluate \
 }
 ```
 
-### Test Case 2: Custom Worker Count
+### Test Case 2: Summary Format (stdout)
+
+Print a human-readable summary to stdout without writing a JSONL file:
+
+```bash
+go run cmd/batch/main.go evaluate \
+  -i /tmp/conversations.jsonl \
+  -f summary
+```
+
+**Expected:**
+- Exit code: 0
+- Structured summary printed to stdout
+- No `-o` flag required
+
+### Test Case 3: JSONL Results + Separate Summary File
+
+```bash
+go run cmd/batch/main.go evaluate \
+  -i /tmp/conversations.jsonl \
+  -o /tmp/results.jsonl \
+  -s /tmp/summary.json
+```
+
+**Expected:**
+- `/tmp/results.jsonl` — one JSON result per line
+- `/tmp/summary.json` — aggregated summary object
+
+### Test Case 4: Annotated Dataset — Correlation Metrics
+
+Uses the bundled annotated sample to measure how well Themis agrees with human labels:
+
+```bash
+go run cmd/batch/main.go evaluate \
+  -i resources/annotated_sample.jsonl \
+  -f summary
+```
+
+**Expected:**
+- Exit code: 0
+- Per-conversation scores and verdicts printed
+- Correlation report appended to output, e.g.:
+
+```
+annotated_count=15
+kendall_tau=0.72
+cohens_kappa=0.65
+weighted_kappa=0.71
+confusion_matrix:
+         fail  review  pass
+fail        4       1     0
+review      0       4     1
+pass        0       1     4
+```
+
+To save both JSONL and a summary in one pass:
+
+```bash
+go run cmd/batch/main.go evaluate \
+  -i resources/annotated_sample.jsonl \
+  -o /tmp/annotated_results.jsonl \
+  -s /tmp/annotated_summary.json
+```
+
+The final line of the JSONL output will contain the correlation report:
+
+```json
+{"_type":"correlation_report","annotated_count":15,"kendall_tau":0.72,"cohens_kappa":0.65,"weighted_kappa":0.71,"confusion_matrix":{...}}
+```
+
+### Test Case 5: Custom Worker Count
 
 ```bash
 THEMIS_BATCH_WORKERS=10 go run cmd/batch/main.go evaluate \
-  -input /tmp/conversations.jsonl \
-  -output /tmp/results.jsonl
+  --input /tmp/conversations.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
 - Same output as Test Case 1
 - Faster processing for large datasets (10 workers instead of 5)
 
-### Test Case 3: Empty Input File
+### Test Case 6: Empty Input File
 
 **Setup:**
 ```bash
@@ -122,8 +216,8 @@ touch /tmp/empty.jsonl
 **Command:**
 ```bash
 go run cmd/batch/main.go evaluate \
-  -input /tmp/empty.jsonl \
-  -output /tmp/results.jsonl
+  --input /tmp/empty.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
@@ -131,7 +225,7 @@ go run cmd/batch/main.go evaluate \
 - `/tmp/results.jsonl` is empty or contains 0 results
 - No error output
 
-### Test Case 4: Invalid JSON in Input
+### Test Case 7: Invalid JSON in Input
 
 **Setup:**
 ```bash
@@ -145,23 +239,23 @@ EOF
 **Command:**
 ```bash
 go run cmd/batch/main.go evaluate \
-  -input /tmp/bad.jsonl \
-  -output /tmp/results.jsonl
+  --input /tmp/bad.jsonl \
+  --output /tmp/results.jsonl
 ```
 
 **Expected:**
 - Exit code: 0
 - `/tmp/results.jsonl` contains 2 valid results (bad line is skipped with a warning log)
 
-### Test Case 5: Missing Required Flags
+### Test Case 8: Missing Required Flags
 
 ```bash
-go run cmd/batch/main.go evaluate -input /tmp/conversations.jsonl
+go run cmd/batch/main.go evaluate --input /tmp/conversations.jsonl
 ```
 
 **Expected:**
 - Exit code: non-zero
-- Error: missing required `-output` flag
+- Error: `required flag "output" not set` (omitting `-o` is only valid with `-f summary`)
 
 ---
 

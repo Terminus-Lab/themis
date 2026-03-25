@@ -6,8 +6,9 @@
 judges:
   # Default model configuration applied to all judges unless overridden
   default_model:
-    modelFamily: "openai"  # Using Azure OpenAI
-    modelID: gpt-4.1-mini
+    # modelFamily: "openai"  # Using Azure OpenAI
+    modelFamily: "openai_platform"  # Using OpenAI Platform
+    modelID: gpt-4o-mini
     max_tokens: 256
     temperature: 0.0
     retry: true
@@ -17,7 +18,7 @@ judges:
     - name: relevance
       enabled: true
       scope: turn
-      weight: 0.35
+      weight: 0.5
       description: "Evaluates if the answer addresses the query"
       requires_context: false
       prompt: |
@@ -35,7 +36,7 @@ judges:
 
     # Coherence Judge: Evaluates internal logical consistency
     - name: coherence
-      enabled: true
+      enabled: false
       scope: turn
       weight: 0.30
       description: "Evaluates if the answer is internally logically consistent"
@@ -58,7 +59,7 @@ judges:
     - name: completeness
       enabled: true
       scope: turn
-      weight: 0.35
+      weight: 0.5
       description: "Evaluates whether the answer fully addresses all parts of the query"
       requires_context: false
       prompt: |

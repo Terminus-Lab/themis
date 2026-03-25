@@ -209,6 +209,8 @@ judges:
       prompt: "..."
 ```
 
+**Weight normalization:** weights are normalized automatically per scope group at startup. If the enabled turn judges have weights `0.35, 0.30, 0.35` (sum = 1.0) they are used as-is. If they don't sum to 1.0 (e.g. `0.5, 0.3, 0.5`), they are scaled proportionally so that the sum becomes 1.0, preserving the ratios you expressed. If no weights are specified, each enabled judge within a scope gets an equal share (`1/n`). This means you can express relative priorities without worrying about exact values — `weight: 2` and `weight: 1` on two judges gives the first judge twice the influence.
+
 ## Database
 
 **SQLite** (default, zero setup):
