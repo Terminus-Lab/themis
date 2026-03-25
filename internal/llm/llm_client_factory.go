@@ -8,6 +8,7 @@ const (
 	FamilyAnthropic      LLMFamily = "anthropic"
 	FamilyOpenAI         LLMFamily = "openai"
 	FamilyOpenAIPlatform LLMFamily = "openai_platform"
+	FamilyOllama         LLMFamily = "ollama"
 )
 
 // LLMClientRegistry stores LLM clients organized by family and model ID

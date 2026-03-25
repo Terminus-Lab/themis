@@ -11,6 +11,7 @@ import (
 	"github.com/Terminus-Lab/themis/internal/llm"
 	"github.com/Terminus-Lab/themis/internal/llm/aws"
 	"github.com/Terminus-Lab/themis/internal/llm/azure"
+	"github.com/Terminus-Lab/themis/internal/llm/ollama"
 	"github.com/Terminus-Lab/themis/internal/llm/openaiplatform"
 	"github.com/Terminus-Lab/themis/internal/storage"
 	"github.com/Terminus-Lab/themis/internal/storage/postgres"
@@ -22,6 +23,7 @@ type Config struct {
 	AWSRegion              string
 	OpenAIKey              string
 	AzureOpenAIEndpoint    string
+	OllamaBaseURL          string
 	HolisticWeight         float64
 	VerdictPassThreshold   float64
 	VerdictReviewThreshold float64
@@ -41,6 +43,7 @@ func LoadConfig() *Config {
 		AWSRegion:              env.GetString("AWS_REGION", "us-east-1"),
 		OpenAIKey:              env.GetString("OPEN_AI_KEY", ""),
 		AzureOpenAIEndpoint:    env.GetString("AZURE_OPENAI_ENDPOINT", ""),
+		OllamaBaseURL:          env.GetString("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
 		HolisticWeight:         env.GetFloat("CONVERSATION_HOLISTIC_WEIGHT", 0.5),
 		VerdictPassThreshold:   env.GetFloat("VERDICT_PASS_THRESHOLD", 0.8),
 		VerdictReviewThreshold: env.GetFloat("VERDICT_REVIEW_THRESHOLD", 0.5),
@@ -164,6 +167,16 @@ func createLLMClientRegistry(ctx context.Context, cfg *Config, judgesConfig *con
 			client, err := openaiplatform.NewClient(ctx, cfg.OpenAIKey, model.modelID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create OpenAI Platform client for model %s: %w", model.modelID, err)
+			}
+			if clients[family] == nil {
+				clients[family] = make(map[string]llm.LLMClient)
+			}
+			clients[family][model.modelID] = client
+
+		case llm.FamilyOllama:
+			client, err := ollama.NewClient(ctx, cfg.OllamaBaseURL, model.modelID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Ollama client for model %s: %w", model.modelID, err)
 			}
 			if clients[family] == nil {
 				clients[family] = make(map[string]llm.LLMClient)
