@@ -174,37 +174,23 @@ func TestEvalRepository_HealthMetrics_WithData(t *testing.T) {
 	}
 }
 
-func TestEvalRepository_GetConversation_ReturnsLatest(t *testing.T) {
+func TestEvalRepository_StoreConversation_DuplicateConversationID(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	repo := sqlite.NewEvalRepository(db, newTestLogger())
 	ctx := context.Background()
 
-	// Store two records with same conversation_id, second with higher final_score
 	rec1 := sampleRecord("conv-dup")
 	rec1.ID = "rec-first"
-	rec1.FinalScore = 0.5
-	rec1.Verdict = "review"
 	if err := repo.StoreConversation(ctx, rec1); err != nil {
 		t.Fatalf("StoreConversation failed: %v", err)
 	}
 
 	rec2 := sampleRecord("conv-dup")
 	rec2.ID = "rec-second"
-	rec2.FinalScore = 0.9
-	rec2.Verdict = "pass"
-	if err := repo.StoreConversation(ctx, rec2); err != nil {
-		t.Fatalf("StoreConversation failed: %v", err)
-	}
-
-	// GetConversation returns latest (DESC by created_at)
-	got, err := repo.GetConversation(ctx, "conv-dup")
-	if err != nil {
-		t.Fatalf("GetConversation failed: %v", err)
-	}
-	// The latest stored should be returned
-	if got.ConversationID != "conv-dup" {
-		t.Errorf("ConversationID mismatch: got %s", got.ConversationID)
+	err := repo.StoreConversation(ctx, rec2)
+	if err == nil {
+		t.Fatal("expected error on duplicate conversation_id, got nil")
 	}
 }
