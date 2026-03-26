@@ -2,6 +2,9 @@
 # Two-phase conversation evaluation:
 #   Phase A (per-turn): scope: "turn"  — relevance, coherence, completeness
 #   Phase B (holistic): scope: "conversation" — conversation-flow
+#
+# Scores: judges return integers 1–5, normalized to 0.0–1.0 internally.
+#   1→0.00  2→0.25  3→0.50  4→0.75  5→1.00
 
 judges:
   # Default model configuration applied to all judges unless overridden
@@ -24,13 +27,20 @@ judges:
       description: "Evaluates if the answer addresses the query"
       requires_context: false
       prompt: |
-        You are an evaluation judge. Score how relevant the answer is to the query on a scale from 0.0 to 1.0.
+        You are an evaluation judge. Score how relevant the answer is to the query.
 
         Query: {{.Query}}
         Answer: {{.Answer}}
 
+        Return an integer score from 1 to 5:
+        5 - Perfect: fully addresses the query, no issues
+        4 - Good: minor gaps or slight issues, usable
+        3 - Acceptable: partially addresses query, needs review
+        2 - Poor: significant problems, mostly unhelpful
+        1 - Bad: wrong, empty, or completely off-topic
+
         Output ONLY valid JSON (no markdown, no explanation):
-        {"score": <float>, "reason": "<string>"}
+        {"score": <integer 1-5>, "reason": "<string>"}
       model:
         max_tokens: 200
         temperature: 0.0
@@ -45,13 +55,20 @@ judges:
       requires_context: false
       prompt: |
         You are an evaluation judge.
-        Score how logically coherent and internally consistent the answer is, on a scale from 0.0 to 1.0.
+        Score how logically coherent and internally consistent the answer is.
         Do NOT consider whether the answer is correct or relevant — only evaluate its internal logic.
 
         Answer: {{.Answer}}
 
+        Return an integer score from 1 to 5:
+        5 - Perfect: fully coherent, no contradictions
+        4 - Good: minor inconsistencies, generally sound
+        3 - Acceptable: some logical gaps but followable
+        2 - Poor: significant internal contradictions
+        1 - Bad: incoherent or self-contradictory throughout
+
         Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
-        {"score": <float>, "reason": "<string>"}
+        {"score": <integer 1-5>, "reason": "<string>"}
       model:
         max_tokens: 256
         temperature: 0.0
@@ -65,21 +82,22 @@ judges:
       description: "Evaluates whether the answer fully addresses all parts of the query"
       requires_context: false
       prompt: |
-        You are a completeness judge.
-        You are evaluating answer completeness.
+        You are a completeness judge. Evaluate whether the answer fully addresses all parts of the query.
 
         Query: {{.Query}}
         Answer: {{.Answer}}
 
-        Task: Identify all distinct questions/requests in the query.
-        Does the answer address EACH one?
-        Score:
-          - 1.0: All parts fully addressed
-          - 0.5: Some parts missing or incomplete
-          - 0.0: Major parts ignored
+        Identify all distinct questions or requests in the query, then score how completely the answer addresses them.
+
+        Return an integer score from 1 to 5:
+        5 - Perfect: every part fully addressed
+        4 - Good: minor omissions, core parts covered
+        3 - Acceptable: some parts missing or incomplete
+        2 - Poor: major parts ignored or only superficially addressed
+        1 - Bad: answer does not address the query at all
 
         Respond ONLY in raw JSON with no markdown, no code blocks, no explanation:
-        {"score": <float>, "reason": "<which parts were addressed>"}
+        {"score": <integer 1-5>, "reason": "<which parts were addressed>"}
       model:
         max_tokens: 256
         temperature: 0.0
@@ -102,20 +120,21 @@ judges:
         Agent: {{.Answer}}
         {{end}}
 
-        Score 0.0 to 1.0 based on:
+        Evaluate based on:
         - Flow: Does the conversation progress naturally turn-by-turn?
         - Context-awareness: Does the agent reference and build on prior turns?
         - Consistency: Are the agent's responses consistent with each other?
         - Engagement: Does the agent address the user's evolving needs?
 
-        Scoring guidelines:
-          - 1.0: Excellent flow, highly context-aware, fully consistent
-          - 0.7-0.9: Good quality with minor issues
-          - 0.4-0.6: Moderate quality, some context gaps or inconsistencies
-          - 0.0-0.3: Poor quality, ignores prior turns or contradicts itself
+        Return an integer score from 1 to 5:
+        5 - Excellent: natural flow, highly context-aware, fully consistent
+        4 - Good: minor issues, mostly coherent and context-aware
+        3 - Acceptable: some context gaps or inconsistencies, needs review
+        2 - Poor: frequently ignores prior turns or contradicts itself
+        1 - Bad: no coherence, each turn treated as isolated
 
         Output ONLY valid JSON (no markdown, no explanation):
-        {"score": <float>, "reason": "<string>"}
+        {"score": <integer 1-5>, "reason": "<string>"}
       model:
         max_tokens: 300
         temperature: 0.0

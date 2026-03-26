@@ -87,7 +87,7 @@ func TestLLMJudge_Evaluate_Success(t *testing.T) {
 
 	mockClient := &MockLLMClient{
 		ResponseToReturn: &llm.LLMResponse{
-			Content: `{"score": 0.85, "reason": "Good match"}`,
+			Content: `{"score": 4, "reason": "Good match"}`,
 		},
 	}
 
@@ -103,8 +103,9 @@ func TestLLMJudge_Evaluate_Success(t *testing.T) {
 
 	result := judge.Evaluate(context.Background(), evalCtx)
 
-	if result.Score != 0.85 {
-		t.Errorf("Expected score=0.85, got %f", result.Score)
+	// score 4 normalizes to (4-1)/4 = 0.75
+	if result.Score != 0.75 {
+		t.Errorf("Expected score=0.75 (normalized from 4), got %f", result.Score)
 	}
 	if result.Reason != "Good match" {
 		t.Errorf("Expected reason='Good match', got '%s'", result.Reason)
@@ -194,7 +195,7 @@ func TestLLMJudge_Evaluate_WithRetry(t *testing.T) {
 
 	mockClient := &MockLLMClient{
 		ResponseToReturn: &llm.LLMResponse{
-			Content: `{"score": 0.9, "reason": "test"}`,
+			Content: `{"score": 5, "reason": "test"}`,
 		},
 	}
 
@@ -206,8 +207,9 @@ func TestLLMJudge_Evaluate_WithRetry(t *testing.T) {
 
 	result := judge.Evaluate(context.Background(), evalCtx)
 
-	if result.Score != 0.9 {
-		t.Errorf("Expected score=0.9, got %f", result.Score)
+	// score 5 normalizes to (5-1)/4 = 1.0
+	if result.Score != 1.0 {
+		t.Errorf("Expected score=1.0 (normalized from 5), got %f", result.Score)
 	}
 	// Note: Cannot verify InvokeModelWithRetry was called vs InvokeModel
 	// without modifying the existing MockLLMClient
@@ -290,8 +292,8 @@ func TestLLMJudge_Evaluate_ScoreOutOfRange(t *testing.T) {
 		name  string
 		score float64
 	}{
-		{"negative", -0.5},
-		{"too high", 1.5},
+		{"below range", 0.5},
+		{"above range", 6.0},
 	}
 
 	for _, tt := range tests {
@@ -323,8 +325,8 @@ func TestLLMJudge_Evaluate_ScoreOutOfRange(t *testing.T) {
 			if result.Score != 0.0 {
 				t.Errorf("Expected score=0.0 for out of range score, got %f", result.Score)
 			}
-			if !contains(result.Reason, "out of range") {
-				t.Errorf("Expected out of range error, got '%s'", result.Reason)
+			if !contains(result.Error, "out of range") {
+				t.Errorf("Expected out of range error in Error field, got '%s'", result.Error)
 			}
 			if result.Error == "" {
 				t.Error("Expected Error field to be set for out-of-range score")
@@ -371,6 +373,39 @@ func containsHelper(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestLLMJudge_Evaluate_Normalization(t *testing.T) {
+	tests := []struct {
+		raw        float64
+		normalized float64
+	}{
+		{1, 0.0},
+		{2, 0.25},
+		{3, 0.5},
+		{4, 0.75},
+		{5, 1.0},
+	}
+
+	logger := zerolog.Nop()
+	cfg := config.JudgeConfiguration{
+		Name:   "test",
+		Prompt: "Score: {{.Answer}}",
+		Model:  &config.ModelConfig{MaxTokens: 256},
+	}
+
+	for _, tt := range tests {
+		mockClient := &MockLLMClient{
+			ResponseToReturn: &llm.LLMResponse{
+				Content: fmt.Sprintf(`{"score": %v, "reason": "test"}`, tt.raw),
+			},
+		}
+		judge, _ := NewLLMJudge(cfg, mockClient, &logger)
+		result := judge.Evaluate(context.Background(), models.EvaluationContext{Answer: "test"})
+		if result.Score != tt.normalized {
+			t.Errorf("raw=%v: expected normalized=%v, got %v", tt.raw, tt.normalized, result.Score)
+		}
+	}
 }
 
 func TestStripMarkdownCodeBlock(t *testing.T) {
@@ -455,7 +490,7 @@ func TestLLMJudge_Evaluate_MarkdownWrappedJSON(t *testing.T) {
 	// Simulate LLM returning markdown-wrapped JSON (common behavior)
 	mockClient := &MockLLMClient{
 		ResponseToReturn: &llm.LLMResponse{
-			Content: "```json\n{\"score\": 0.85, \"reason\": \"Good answer\"}\n```",
+			Content: "```json\n{\"score\": 4, \"reason\": \"Good answer\"}\n```",
 		},
 	}
 
@@ -467,9 +502,9 @@ func TestLLMJudge_Evaluate_MarkdownWrappedJSON(t *testing.T) {
 
 	result := judge.Evaluate(context.Background(), evalCtx)
 
-	// Should successfully parse despite markdown wrapping
-	if result.Score != 0.85 {
-		t.Errorf("Expected score=0.85, got %f", result.Score)
+	// score 4 normalizes to (4-1)/4 = 0.75
+	if result.Score != 0.75 {
+		t.Errorf("Expected score=0.75 (normalized from 4), got %f", result.Score)
 	}
 	if result.Reason != "Good answer" {
 		t.Errorf("Expected reason='Good answer', got '%s'", result.Reason)
