@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
-    conversation_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL UNIQUE,
     agent_name TEXT NOT NULL,
     agent_version TEXT,
     turn_count INTEGER NOT NULL,
