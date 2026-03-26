@@ -114,6 +114,89 @@ THEMIS_BATCH_WORKERS=10 ./bin/themis-cli evaluate -i dataset.jsonl -o results.js
 
 When annotations are present, the CLI appends a `correlation_report` line with Kendall's τ-b, Cohen's κ (unweighted + weighted), and a confusion matrix.
 
+## Judge Calibration Workflow
+
+Themis judges are LLM-based, which means their scores can drift as your agent evolves or as model behavior changes over time. The calibration workflow lets you measure how well judges agree with human judgment and detect drift before it affects your production metrics.
+
+### Why annotation is at the conversation level
+
+Human annotators label each **conversation** with a single verdict (`pass` / `review` / `fail`) and optionally a score (1–5). There is no per-turn annotation because:
+
+- Annotating every turn in a 10-turn conversation is expensive and tedious
+- The final deliverable is a conversation verdict, not a per-turn verdict
+- The confusion matrix and Kendall's τ compare verdicts, which are conversation-level by definition
+
+Turn-level scores (`relevance`, `coherence`, `completeness`) are an implementation detail of how Themis arrives at the final score. The human doesn't need to agree or disagree at that granularity — they just judge the overall outcome, which is what matters for calibrating the system.
+
+### Initial calibration
+
+```
+1. Collect a dataset of real conversations
+2. Annotate ~25% with human_label and human_score (1–5)
+3. Run batch evaluation
+4. Inspect Kendall's τ and the confusion matrix
+5. Tune judge prompts until τ > 0.3 and the confusion matrix looks reasonable
+6. Deploy
+```
+
+**Step 3 — run evaluation with annotations:**
+
+```bash
+./bin/themis-cli evaluate \
+  -i annotated_sample.jsonl \
+  -o results.jsonl \
+  -s summary.json
+```
+
+The CLI automatically computes the correlation report when `human_label` or `human_score` fields are present:
+
+```json
+{
+  "annotated_count": 120,
+  "kendall_tau": 0.41,
+  "cohens_kappa": 0.38,
+  "weighted_kappa": 0.52,
+  "confusion_matrix": {
+    "labels": ["fail", "review", "pass"],
+    "matrix": [[18, 3, 1], [4, 22, 6], [2, 5, 59]]
+  }
+}
+```
+
+**Step 5 — what to look for:**
+
+| Metric | Target | What it means |
+|--------|--------|---------------|
+| Kendall's τ | > 0.3 | Judge score ranking correlates with human score ranking |
+| Weighted κ | > 0.4 | Judge verdicts agree with human verdicts (severity-weighted) |
+| Confusion matrix diagonal | Dominant | Most conversations land in the correct verdict bucket |
+
+If τ is low, the judge prompt is not discriminating well — revisit the scoring rubric in `judges.yaml`. If the confusion matrix shows systematic misclassification (e.g. judges always over-scoring `review` as `pass`), adjust `VERDICT_PASS_THRESHOLD`.
+
+**Annotated input format:**
+
+```json
+{"conversation_id":"conv-001","human_label":"pass","human_score":4,"agent":{...},"turns":[...]}
+{"conversation_id":"conv-002","human_label":"fail","human_score":2,"agent":{...},"turns":[...]}
+```
+
+`human_score` accepts integers 1–5 (same scale as the judges). The CLI normalizes them automatically before computing Kendall's τ.
+
+### Drift detection
+
+After deployment, agent behavior and underlying model outputs can shift. Run the calibration loop again periodically:
+
+```
+1. Fetch a sample of recent production conversations
+2. Annotate ~25%
+3. Re-run batch evaluation on the annotated sample
+4. Compare Kendall's τ and confusion matrix against your baseline
+5. If metrics degrade — inspect the confusion matrix to determine root cause:
+   - Scores drifting high → agent quality improved, or judges are lenient (re-tune prompts)
+   - Scores drifting low → agent regression, or prompt drift in the judges (re-tune or re-evaluate)
+   - κ drops but τ holds → verdict thresholds need recalibration (adjust VERDICT_PASS_THRESHOLD)
+```
+
 ## MCP Integration
 
 The MCP server exposes Themis as tools for Claude Code and Claude Desktop.
