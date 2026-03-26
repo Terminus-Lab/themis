@@ -12,6 +12,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// normalizeHumanScore converts a 1–5 human score to 0.0–1.0.
+// If score is nil or already in [0, 1], it is returned unchanged.
+func normalizeHumanScore(score *float64) *float64 {
+	if score == nil || *score <= 1.0 {
+		return score
+	}
+	normalized := (*score - 1.0) / 4.0
+	return &normalized
+}
+
 // ConversationReader reads conversation evaluation records from a JSONL file.
 type ConversationReader struct {
 	file   io.Reader
@@ -60,7 +70,7 @@ func (r *ConversationReader) ReadAll(ctx context.Context) <-chan ConversationInp
 				LineNumber: lineNum,
 				Request:    raw.ConversationEvaluationRequest,
 				HumanLabel: raw.HumanLabel,
-				HumanScore: raw.HumanScore,
+				HumanScore: normalizeHumanScore(raw.HumanScore),
 			}
 		}
 

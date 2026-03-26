@@ -125,19 +125,18 @@ func (j *LLMJudge) Evaluate(ctx context.Context, evalCtx models.EvaluationContex
 		return result
 	}
 
-	if llmResponse.Score < 0.0 || llmResponse.Score > 1.0 {
+	if llmResponse.Score < 1.0 || llmResponse.Score > 5.0 {
 		j.logger.Error().
 			Str("judge", j.name).
 			Float64("score", llmResponse.Score).
 			Msg("LLM returned invalid score")
-		result.Error = fmt.Sprintf("invalid LLM response: score %f out of range [0.0, 1.0]", llmResponse.Score)
-		result.Reason = fmt.Sprintf("Invalid LLM response: score %f out of range [0.0, 1.0]", llmResponse.Score)
+		result.Error = fmt.Sprintf("invalid LLM response: score %f out of range [1, 5]", llmResponse.Score)
 		result.Duration = time.Since(now)
 		return result
 	}
 
-	// Success
-	result.Score = llmResponse.Score
+	// Normalize 1–5 → 0.0–1.0: maps 1→0.0, 3→0.5, 5→1.0
+	result.Score = (llmResponse.Score - 1.0) / 4.0
 	result.Reason = llmResponse.Reason
 	result.Duration = time.Since(now)
 
