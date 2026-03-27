@@ -57,8 +57,9 @@ func (r *ConversationReader) ReadAll(ctx context.Context) <-chan ConversationInp
 
 			type rawRecord struct {
 				models.ConversationEvaluationRequest
-				HumanLabel string   `json:"human_label"`
-				HumanScore *float64 `json:"human_score"`
+				HumanAnnotation string   `json:"human_annotation"`
+				HumanScore      *float64 `json:"human_score"`
+				HumanReason     string   `json:"human_reason"`
 			}
 			var raw rawRecord
 			if err := json.Unmarshal([]byte(line), &raw); err != nil {
@@ -67,10 +68,11 @@ func (r *ConversationReader) ReadAll(ctx context.Context) <-chan ConversationInp
 			}
 
 			ch <- ConversationInputRecord{
-				LineNumber: lineNum,
-				Request:    raw.ConversationEvaluationRequest,
-				HumanLabel: raw.HumanLabel,
-				HumanScore: normalizeHumanScore(raw.HumanScore),
+				LineNumber:  lineNum,
+				Request:     raw.ConversationEvaluationRequest,
+				HumanLabel:  raw.HumanAnnotation,
+				HumanScore:  normalizeHumanScore(raw.HumanScore),
+				HumanReason: raw.HumanReason,
 			}
 		}
 

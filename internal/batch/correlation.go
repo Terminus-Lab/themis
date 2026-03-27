@@ -8,8 +8,9 @@ import (
 
 // Annotation holds human-provided ground truth for a single conversation.
 type Annotation struct {
-	HumanLabel string   // "pass", "review", "fail" — empty = not provided
-	HumanScore *float64 // 0.0–1.0 — nil = not provided
+	HumanLabel  string   // "pass", "review", "fail" — empty = not provided
+	HumanScore  *float64 // 0.0–1.0 — nil = not provided
+	HumanReason string   // free-text explanation from annotator — empty = not provided
 }
 
 // ConfusionMatrixResult is a 3-class confusion matrix for fail/review/pass.
