@@ -128,12 +128,32 @@ Human annotators label each **conversation** with a single verdict (`pass` / `re
 
 Turn-level scores (`relevance`, `coherence`, `completeness`) are an implementation detail of how Themis arrives at the final score. The human doesn't need to agree or disagree at that granularity — they just judge the overall outcome, which is what matters for calibrating the system.
 
+### Human annotation with Stamper
+
+[Stamper](https://github.com/Terminus-Lab/stamper) is a lightweight annotation tool built specifically for Themis. It reads a JSONL file of conversations, presents each one to a human reviewer, and writes `human_label` and `human_score` fields directly into the output file — ready to drop into the batch evaluation pipeline.
+
+```bash
+# Install
+go install github.com/Terminus-Lab/stamper@latest
+
+# Annotate a sample (opens an interactive TUI)
+stamper annotate -i sampled_conversations.jsonl -o annotated_sample.jsonl
+```
+
+The output is a JSONL file where each annotated record includes:
+
+```json
+{"conversation_id":"conv-001","human_label":"pass","human_score":4,"agent":{...},"turns":[...]}
+```
+
+Pass the annotated file directly to `themis-cli evaluate` — no preprocessing needed.
+
 ### Initial calibration
 
 ```
 1. Collect a dataset of real conversations
-2. Annotate ~25% with human_label and human_score (1–5)
-3. Run batch evaluation
+2. Sample ~25% and annotate with Stamper (human_label and human_score 1–5)
+3. Run batch evaluation on the annotated sample
 4. Inspect Kendall's τ and the confusion matrix
 5. Tune judge prompts until τ > 0.3 and the confusion matrix looks reasonable
 6. Deploy
@@ -188,7 +208,7 @@ After deployment, agent behavior and underlying model outputs can shift. Run the
 
 ```
 1. Fetch a sample of recent production conversations
-2. Annotate ~25%
+2. Annotate ~25% with Stamper
 3. Re-run batch evaluation on the annotated sample
 4. Compare Kendall's τ and confusion matrix against your baseline
 5. If metrics degrade — inspect the confusion matrix to determine root cause:
