@@ -162,8 +162,9 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 		records = append(records, record)
 		if record.Error == nil && (record.HumanLabel != "" || record.HumanScore != nil) {
 			annotations[record.Request.ConversationID] = batch.Annotation{
-				HumanLabel: record.HumanLabel,
-				HumanScore: record.HumanScore,
+				HumanLabel:  record.HumanLabel,
+				HumanScore:  record.HumanScore,
+				HumanReason: record.HumanReason,
 			}
 		}
 	}
