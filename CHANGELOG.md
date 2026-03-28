@@ -29,7 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Flags: `-i/--input`, `-o/--output`, `-f/--format` (`jsonl` or `summary`), `-s/--summary`, `-d/--save-to-db`
 - **Human annotation correlation** — when input records include `human_label` and/or `human_score`, the CLI automatically computes and appends a correlation report:
   - Kendall's τ-b (score rank correlation)
-  - Cohen's κ (label agreement, chance-corrected)
   - Weighted κ (ordinal severity — penalises fail↔pass more than adjacent-class errors)
   - 3×3 confusion matrix (human rows, Themis columns)
 - **Annotated sample dataset** (`resources/annotated_sample.jsonl`): 15 conversations (5 pass / 5 review / 5 fail) for smoke-testing correlation metrics

@@ -31,11 +31,7 @@ This is an **offline, dataset-level metric** — not part of the per-conversatio
 
 ## Input Format
 
-To compute τ, your dataset needs a `human_score` (float) or `human_label` (verdict string) at the conversation level.
-
-> **Status:** The batch CLI does not yet compute τ automatically. The field `human_score` is not yet part of `ConversationEvaluationRequest`. When implemented, it will be added as an optional field and the CLI will output a correlation report when annotations are present.
-
-Planned input format:
+To compute τ, your dataset needs a `human_score` (float, 0.0–1.0) at the conversation level. Supports 1–5 scale scores too — the CLI normalizes them automatically.
 
 ```json
 {"conversation_id":"conv-001","human_score":0.90,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
@@ -43,41 +39,15 @@ Planned input format:
 {"conversation_id":"conv-003","human_score":0.72,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
 ```
 
+The CLI computes τ automatically when `human_score` fields are present:
+
+```bash
+go run cmd/batch/main.go evaluate -i annotated-dataset.jsonl -f summary
+```
+
 ---
 
-## Computing Manually (Current Approach)
-
-Until the batch CLI supports this natively, compute τ from the batch output:
-
-**Step 1 — Run batch evaluation:**
-```bash
-./bin/themis-cli evaluate -input annotated-dataset.jsonl -output results.jsonl
-```
-
-**Step 2 — Join human scores with Themis scores:**
-```python
-import json
-from scipy.stats import kendalltau
-
-# Load results
-themis = {r['conversation_id']: r['final_score']
-          for r in (json.loads(l) for l in open('results.jsonl'))}
-
-# Load human annotations (separate file or inline)
-human = {r['conversation_id']: r['human_score']
-         for r in (json.loads(l) for l in open('annotated-dataset.jsonl'))
-         if 'human_score' in r}
-
-# Align
-ids = sorted(set(themis) & set(human))
-themis_scores = [themis[i] for i in ids]
-human_scores  = [human[i]  for i in ids]
-
-tau, p_value = kendalltau(themis_scores, human_scores)
-print(f"Kendall's τ = {tau:.3f}  (p = {p_value:.4f}, n = {len(ids)})")
-```
-
-**Step 3 — Interpret:**
+## Interpreting the Output
 
 | τ | Interpretation |
 |---|----------------|

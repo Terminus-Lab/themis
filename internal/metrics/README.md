@@ -5,7 +5,7 @@ Validation metrics for evaluating LLM judge accuracy against human annotations.
 **3 Core Metrics:**
 1. **Kendall's τ (PRIMARY)** - Pass/fail decision (τ ≥ 0.3 = deploy)
 2. **Confusion Matrix (DEBUG)** - Shows WHERE judge fails (actionable insights)
-3. **Cohen's Kappa (REPORT)** - Industry standard for stakeholder communication
+3. **Weighted Kappa (REPORT)** - Ordinal label agreement, penalises fail↔pass more than adjacent-class errors
 
 ---
 
@@ -79,7 +79,7 @@ All 3 pairs concordant:
 
 **Limitations:**
 - Doesn't show WHERE judge fails (use confusion matrix)
-- Doesn't account for class imbalance (use Cohen's Kappa for reporting)
+- Doesn't account for class imbalance (use Weighted Kappa for reporting)
 - Only measures rank correlation, not exact agreement
 
 **Decision flow:**
@@ -234,17 +234,18 @@ Actual negative   43        10     ← 81% caught
 
 ---
 
-## Cohen's Kappa
+## Weighted Kappa
 
 ### Why It's Required
 
 **Problem with accuracy:** A judge that always predicts "pass" gets 90% accuracy if 90% of data is "pass" (useless!)
 
-**Cohen's Kappa corrects for chance agreement:**
+**Weighted Kappa corrects for chance agreement and penalizes severity:**
 - Accuracy = "How often do we agree?"
 - Kappa = "How often do we agree, **minus expected agreement by random guessing**?"
+- Weighted = "Disagreements between `fail` and `pass` count more than `fail` vs `review`"
 
-**Use case:** Validating judges for research papers, stakeholder reporting
+**Use case:** Validating judges for research papers, stakeholder reporting, cross-version tracking
 
 ---
 
@@ -301,14 +302,14 @@ Where:
 
 Judge always predicts "pass":
 - Accuracy = 90% (looks good!)
-- Cohen's Kappa = 0.0 (no better than random)
+- Weighted Kappa = 0.0 (no better than random)
 - **Verdict:** Judge is useless
 
 **Scenario 2: Balanced errors**
 
 Judge agrees 75% of time on balanced dataset:
 - Accuracy = 75%
-- Cohen's Kappa = 0.62 (substantial agreement)
+- Weighted Kappa = 0.62 (substantial agreement)
 - **Verdict:** Judge is reliable
 
 **Key insight:** Kappa tells you if judge is actually evaluating or just exploiting class distribution

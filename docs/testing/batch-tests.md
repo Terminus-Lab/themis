@@ -68,12 +68,12 @@ Each line is a `ConversationEvaluationRequest`:
 
 ### Annotated Input (Human Ground Truth)
 
-Add `human_label` and/or `human_score` fields to any conversation to enable correlation metrics:
+Add `human_annotation` and/or `human_score` fields to any conversation to enable correlation metrics:
 
 ```json
-{"conversation_id":"conv-001","human_label":"pass","human_score":0.92,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
-{"conversation_id":"conv-002","human_label":"review","human_score":0.61,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
-{"conversation_id":"conv-003","human_label":"fail","human_score":0.20,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-001","human_annotation":"pass","human_score":0.92,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-002","human_annotation":"review","human_score":0.61,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-003","human_annotation":"fail","human_score":0.20,"agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
 ```
 
 When annotations are present, the CLI automatically computes:
@@ -81,7 +81,6 @@ When annotations are present, the CLI automatically computes:
 | Metric | Measures | When useful |
 |--------|----------|-------------|
 | Kendall's τ | Score rank correlation (continuous) | Is Themis score ordering consistent with human score ordering? |
-| Cohen's κ | Label agreement (fail/review/pass) | Overall verdict match rate, chance-corrected |
 | Weighted κ | Label agreement, severity-penalized | Distinguishes small errors (review↔pass) from large ones (fail↔pass) — useful for cross-version tracking |
 | Confusion matrix | Per-class breakdown | Where exactly are the disagreements? |
 
@@ -173,23 +172,31 @@ go run cmd/batch/main.go evaluate \
 {
   "total": 15,
   "verdict_counts": {
-    "fail": 5,
+    "fail": 6,
     "pass": 5,
-    "review": 5
+    "review": 4
   },
   "correlation_report": {
     "annotated_count": 15,
-    "kendall_tau": 0.72,
-    "cohens_kappa": 0.65,
-    "weighted_kappa": 0.71,
+    "kendall_tau": 0.79,
+    "weighted_kappa": 0.93,
     "confusion_matrix": {
       "labels": ["fail", "review", "pass"],
       "matrix": [
-        [4, 1, 0],
-        [0, 4, 1],
-        [0, 1, 4]
+        [5, 0, 0],
+        [1, 4, 0],
+        [0, 0, 5]
       ]
-    }
+    },
+    "disagreements": [
+      {
+        "conversation_id": "ann-006",
+        "human_label": "review",
+        "themis_label": "fail",
+        "human_score": 0.62,
+        "themis_score": 0.3125
+      }
+    ]
   }
 }
 ```
@@ -206,7 +213,7 @@ go run cmd/batch/main.go evaluate \
 The final line of the JSONL output (`-o`) will contain the correlation report:
 
 ```json
-{"_type":"correlation_report","annotated_count":15,"kendall_tau":0.72,"cohens_kappa":0.65,"weighted_kappa":0.71,"confusion_matrix":{...}}
+{"_type":"correlation_report","annotated_count":15,"kendall_tau":0.79,"weighted_kappa":0.93,"confusion_matrix":{...},"disagreements":[...]}
 ```
 
 ### Test Case 5: Custom Worker Count

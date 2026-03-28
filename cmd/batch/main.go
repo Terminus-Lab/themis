@@ -212,6 +212,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 		if len(annotations) > 0 {
 			report := batch.ComputeCorrelationReport(allResults, annotations)
 			logCorrelationReport(&report)
+			logDisagreements(&report)
 			summaryWriter.SetCorrelationReport(&report)
 		}
 		if err := summaryWriter.Close(); err != nil {
@@ -231,6 +232,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 		if len(annotations) > 0 {
 			report := batch.ComputeCorrelationReport(allResults, annotations)
 			logCorrelationReport(&report)
+			logDisagreements(&report)
 			// Write correlation report as a final JSON line with a marker field
 			type correlationReportLine struct {
 				Type string `json:"_type"`
@@ -279,13 +281,24 @@ func writeSummary(path string, results []models.ConversationEvaluationResult, an
 	return summaryWriter.Close()
 }
 
+func logDisagreements(report *batch.CorrelationReport) {
+	for _, d := range report.Disagreements {
+		evt := log.Info().
+			Str("conversation_id", d.ConversationID).
+			Str("human", d.HumanLabel).
+			Str("themis", d.ThemisLabel).
+			Float64("themis_score", d.ThemisScore)
+		if d.HumanScore != nil {
+			evt = evt.Float64("human_score", *d.HumanScore)
+		}
+		evt.Msg("judge disagreement")
+	}
+}
+
 func logCorrelationReport(report *batch.CorrelationReport) {
 	evt := log.Info().Int("annotated_count", report.AnnotatedCount)
 	if report.KendallTau != nil {
 		evt = evt.Float64("kendall_tau", *report.KendallTau)
-	}
-	if report.CohensKappa != nil {
-		evt = evt.Float64("cohens_kappa", *report.CohensKappa)
 	}
 	if report.WeightedKappa != nil {
 		evt = evt.Float64("weighted_kappa", *report.WeightedKappa)

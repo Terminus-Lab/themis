@@ -29,70 +29,55 @@ Off-diagonal cells = disagreements.
 
 ## When to Use It
 
-The confusion matrix is the first thing to look at after computing Cohen's κ. κ gives you a single number; the matrix tells you *where* the errors are.
-
-> **Status:** The batch CLI does not yet generate a confusion matrix automatically. When `human_label` fields are added to `ConversationEvaluationRequest` and the CLI is updated, the matrix will be emitted as part of the output report.
+The confusion matrix is the first thing to look at after computing weighted κ. κ gives you a single number; the matrix tells you *where* the errors are.
 
 ---
 
 ## Input Format
 
-Same as for Cohen's κ — a `human_label` field at the conversation level:
+Add a `human_annotation` field at the conversation level (compatible with [stamper](https://github.com/Terminus-Lab/stamper) output):
 
 ```json
-{"conversation_id":"conv-001","human_label":"pass","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
-{"conversation_id":"conv-002","human_label":"fail","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-001","human_annotation":"pass","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-002","human_annotation":"fail","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
 ```
 
----
+The CLI computes the confusion matrix automatically when annotations are present:
 
-## Computing Manually (Current Approach)
-
-**Step 1 — Run batch evaluation:**
 ```bash
-./bin/themis-cli evaluate -input annotated-dataset.jsonl -output results.jsonl
+go run cmd/batch/main.go evaluate -i annotated-dataset.jsonl -f summary
 ```
 
-**Step 2 — Build the matrix:**
-```python
-import json
-from sklearn.metrics import confusion_matrix, classification_report
+Example output:
 
-themis = {r['conversation_id']: r['verdict']
-          for r in (json.loads(l) for l in open('results.jsonl'))}
-human  = {r['conversation_id']: r['human_label']
-          for r in (json.loads(l) for l in open('annotated-dataset.jsonl'))
-          if 'human_label' in r}
-
-ids = sorted(set(themis) & set(human))
-y_true = [human[i]  for i in ids]
-y_pred = [themis[i] for i in ids]
-
-labels = ['fail', 'review', 'pass']
-cm = confusion_matrix(y_true, y_pred, labels=labels)
-
-# Print matrix
-print(f"{'':10}", *[f'{l:>8}' for l in labels])
-for i, row_label in enumerate(labels):
-    print(f"{row_label:10}", *[f'{cm[i][j]:>8}' for j in range(len(labels))])
-
-# Detailed per-class metrics
-print(classification_report(y_true, y_pred, labels=labels))
+```json
+{
+  "correlation_report": {
+    "annotated_count": 15,
+    "kendall_tau": 0.79,
+    "weighted_kappa": 0.93,
+    "confusion_matrix": {
+      "labels": ["fail", "review", "pass"],
+      "matrix": [
+        [5, 0, 0],
+        [1, 4, 0],
+        [0, 0, 5]
+      ]
+    },
+    "disagreements": [
+      {
+        "conversation_id": "ann-006",
+        "human_label": "review",
+        "themis_label": "fail",
+        "human_score": 0.62,
+        "themis_score": 0.3125
+      }
+    ]
+  }
+}
 ```
 
-**Example output:**
-```
-            fail   review     pass
-fail          18        2        0
-review         3       12        5
-pass           0        4       56
-
-              precision  recall  f1-score  support
-fail               0.86    0.90      0.88       20
-review             0.67    0.60      0.63       20
-pass               0.92    0.93      0.93       60
-accuracy                            0.86      100
-```
+The `disagreements` array lists every per-conversation mismatch, including the Themis score (and human score when provided), making it easy to audit borderline cases.
 
 ---
 

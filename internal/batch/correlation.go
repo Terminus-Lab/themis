@@ -19,13 +19,23 @@ type ConfusionMatrixResult struct {
 	Matrix [][]int  `json:"matrix"` // [true][predicted]
 }
 
+// DisagreementEntry records a single per-conversation label mismatch between
+// the human annotator and Themis.
+type DisagreementEntry struct {
+	ConversationID string   `json:"conversation_id"`
+	HumanLabel     string   `json:"human_label"`
+	ThemisLabel    string   `json:"themis_label"`
+	HumanScore     *float64 `json:"human_score,omitempty"`
+	ThemisScore    float64  `json:"themis_score"`
+}
+
 // CorrelationReport holds all computed correlation metrics.
 type CorrelationReport struct {
 	AnnotatedCount  int                    `json:"annotated_count"`
 	KendallTau      *float64               `json:"kendall_tau,omitempty"`
-	CohensKappa     *float64               `json:"cohens_kappa,omitempty"`
 	WeightedKappa   *float64               `json:"weighted_kappa,omitempty"`
 	ConfusionMatrix *ConfusionMatrixResult `json:"confusion_matrix,omitempty"`
+	Disagreements   []DisagreementEntry    `json:"disagreements,omitempty"`
 }
 
 // ComputeCorrelationReport joins results with annotations by ConversationID and computes
@@ -34,11 +44,12 @@ func ComputeCorrelationReport(results []models.ConversationEvaluationResult, ann
 	labels := []string{"fail", "review", "pass"}
 
 	var (
-		themisScores []float64
-		humanScores  []float64
-		themisLabels []string
-		humanLabels  []string
-		annotated    int
+		themisScores  []float64
+		humanScores   []float64
+		themisLabels  []string
+		humanLabels   []string
+		disagreements []DisagreementEntry
+		annotated     int
 	)
 
 	for _, r := range results {
@@ -56,11 +67,21 @@ func ComputeCorrelationReport(results []models.ConversationEvaluationResult, ann
 		if ann.HumanLabel != "" {
 			themisLabels = append(themisLabels, string(r.Verdict))
 			humanLabels = append(humanLabels, ann.HumanLabel)
+			if ann.HumanLabel != string(r.Verdict) {
+				disagreements = append(disagreements, DisagreementEntry{
+					ConversationID: r.ConversationID,
+					HumanLabel:     ann.HumanLabel,
+					ThemisLabel:    string(r.Verdict),
+					ThemisScore:    r.FinalScore,
+					HumanScore:     ann.HumanScore,
+				})
+			}
 		}
 	}
 
 	report := CorrelationReport{
 		AnnotatedCount: annotated,
+		Disagreements:  disagreements,
 	}
 
 	if len(themisScores) >= 2 {
@@ -69,9 +90,6 @@ func ComputeCorrelationReport(results []models.ConversationEvaluationResult, ann
 	}
 
 	if len(themisLabels) > 0 {
-		kappa := cohensKappa(themisLabels, humanLabels, labels)
-		report.CohensKappa = &kappa
-
 		wkappa := weightedCohensKappa(themisLabels, humanLabels, labels)
 		report.WeightedKappa = &wkappa
 
@@ -107,54 +125,6 @@ func kendallTauB(x, y []float64) float64 {
 		return 0
 	}
 	return float64(concordant-discordant) / denom
-}
-
-// cohensKappa computes unweighted Cohen's κ.
-func cohensKappa(predicted, actual []string, labels []string) float64 {
-	n := len(predicted)
-	if n == 0 {
-		return 0
-	}
-	labelIdx := make(map[string]int, len(labels))
-	for i, l := range labels {
-		labelIdx[l] = i
-	}
-	k := len(labels)
-	cm := make([][]int, k)
-	for i := range cm {
-		cm[i] = make([]int, k)
-	}
-	valid := 0
-	for i := range predicted {
-		pi, ok1 := labelIdx[predicted[i]]
-		ai, ok2 := labelIdx[actual[i]]
-		if ok1 && ok2 {
-			cm[ai][pi]++
-			valid++
-		}
-	}
-	if valid == 0 {
-		return 0
-	}
-	po := 0
-	for i := 0; i < k; i++ {
-		po += cm[i][i]
-	}
-	pe := 0.0
-	for i := 0; i < k; i++ {
-		rowSum, colSum := 0, 0
-		for j := 0; j < k; j++ {
-			rowSum += cm[i][j]
-			colSum += cm[j][i]
-		}
-		pe += float64(rowSum) * float64(colSum)
-	}
-	pe /= float64(valid * valid)
-	poF := float64(po) / float64(valid)
-	if 1-pe == 0 {
-		return 1
-	}
-	return (poF - pe) / (1 - pe)
 }
 
 // weightedCohensKappa computes linear-weighted Cohen's κ.
