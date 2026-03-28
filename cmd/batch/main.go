@@ -282,26 +282,16 @@ func writeSummary(path string, results []models.ConversationEvaluationResult, an
 }
 
 func logDisagreements(report *batch.CorrelationReport) {
-	if report.ConfusionMatrix == nil {
-		return
-	}
-	labels := report.ConfusionMatrix.Labels
-	matrix := report.ConfusionMatrix.Matrix
-	for i, humanLabel := range labels {
-		for j, themisLabel := range labels {
-			if i == j {
-				continue
-			}
-			count := matrix[i][j]
-			if count == 0 {
-				continue
-			}
-			log.Info().
-				Str("human", humanLabel).
-				Str("themis", themisLabel).
-				Int("count", count).
-				Msg("judge disagreement")
+	for _, d := range report.Disagreements {
+		evt := log.Info().
+			Str("conversation_id", d.ConversationID).
+			Str("human", d.HumanLabel).
+			Str("themis", d.ThemisLabel).
+			Float64("themis_score", d.ThemisScore)
+		if d.HumanScore != nil {
+			evt = evt.Float64("human_score", *d.HumanScore)
 		}
+		evt.Msg("judge disagreement")
 	}
 }
 
@@ -309,9 +299,6 @@ func logCorrelationReport(report *batch.CorrelationReport) {
 	evt := log.Info().Int("annotated_count", report.AnnotatedCount)
 	if report.KendallTau != nil {
 		evt = evt.Float64("kendall_tau", *report.KendallTau)
-	}
-	if report.CohensKappa != nil {
-		evt = evt.Float64("cohens_kappa", *report.CohensKappa)
 	}
 	if report.WeightedKappa != nil {
 		evt = evt.Float64("weighted_kappa", *report.WeightedKappa)

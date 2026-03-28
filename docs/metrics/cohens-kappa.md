@@ -1,16 +1,16 @@
 ---
-title: Cohen's Kappa — Verdict Agreement
-description: Measuring agreement between Themis verdicts and human labels
-tags: [metrics, validation, cohens-kappa, agreement, human-annotation]
+title: Weighted Kappa — Verdict Agreement
+description: Measuring agreement between Themis verdicts and human labels using severity-weighted kappa
+tags: [metrics, validation, cohens-kappa, weighted-kappa, agreement, human-annotation]
 ---
 
-# Cohen's Kappa — Verdict Agreement
+# Weighted Kappa — Verdict Agreement
 
 ## What It Is
 
-Cohen's κ (kappa) measures the agreement between Themis verdict labels (`pass`/`review`/`fail`) and human-assigned labels, **correcting for chance agreement**.
+Weighted κ (kappa) measures the agreement between Themis verdict labels (`pass`/`review`/`fail`) and human-assigned labels, **correcting for chance agreement** and **penalizing larger mismatches more**.
 
-Raw accuracy (percentage match) is misleading — if 80% of conversations are `pass`, a system that always predicts `pass` achieves 80% accuracy without learning anything. κ corrects for this.
+Raw accuracy (percentage match) is misleading — if 80% of conversations are `pass`, a system that always predicts `pass` achieves 80% accuracy without learning anything. κ corrects for this. The weighted variant goes further: predicting `fail` when the human said `pass` (2 steps apart) is penalized more than predicting `review` when the human said `pass` (1 step apart).
 
 - κ = **1.0** — perfect agreement
 - κ = **0.0** — agreement no better than chance
@@ -30,67 +30,31 @@ A production-ready judge setup should achieve κ > 0.60.
 
 ## When to Use It
 
-Use κ when your dataset has human-assigned verdict labels (not scores). It directly measures whether Themis's `pass`/`review`/`fail` classification matches human expert judgment on the same conversations.
-
-> **Status:** The batch CLI does not yet compute κ automatically. The field `human_label` is not yet part of `ConversationEvaluationRequest`. When implemented, it will be added as an optional field and the CLI will output a kappa report when human labels are present.
+Use weighted κ when your dataset has human-assigned verdict labels (not scores). It directly measures whether Themis's `pass`/`review`/`fail` classification matches human expert judgment on the same conversations, with appropriate penalties for severity of disagreement.
 
 ---
 
 ## Input Format
 
-Planned input format (conversation level):
-
 ```json
-{"conversation_id":"conv-001","human_label":"pass","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
-{"conversation_id":"conv-002","human_label":"fail","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
-{"conversation_id":"conv-003","human_label":"review","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-001","human_annotation":"pass","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-002","human_annotation":"fail","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
+{"conversation_id":"conv-003","human_annotation":"review","agent":{"name":"my-agent","version":"1.0"},"turns":[...]}
 ```
 
-`human_label` must be one of: `"pass"`, `"review"`, `"fail"`.
+`human_annotation` must be one of: `"pass"`, `"review"`, `"fail"`.
 
----
+The CLI computes weighted κ automatically when annotations are present:
 
-## Computing Manually (Current Approach)
-
-**Step 1 — Run batch evaluation:**
 ```bash
-./bin/themis-cli evaluate -input annotated-dataset.jsonl -output results.jsonl
-```
-
-**Step 2 — Compute κ:**
-```python
-import json
-from sklearn.metrics import cohen_kappa_score
-
-# Load
-themis = {r['conversation_id']: r['verdict']
-          for r in (json.loads(l) for l in open('results.jsonl'))}
-human  = {r['conversation_id']: r['human_label']
-          for r in (json.loads(l) for l in open('annotated-dataset.jsonl'))
-          if 'human_label' in r}
-
-ids = sorted(set(themis) & set(human))
-t = [themis[i] for i in ids]
-h = [human[i]  for i in ids]
-
-kappa = cohen_kappa_score(h, t, labels=['pass', 'review', 'fail'])
-print(f"Cohen's κ = {kappa:.3f}  (n = {len(ids)})")
+go run cmd/batch/main.go evaluate -i resources/annotated_sample.jsonl -f summary
 ```
 
 ---
 
-## Weighted Kappa
+## Why Weighted (Not Unweighted)
 
-For ordered labels (fail < review < pass), a disagreement of `fail` vs `pass` is worse than `fail` vs `review`. Use **linear weighted kappa** to penalize larger disagreements more:
-
-```python
-kappa_weighted = cohen_kappa_score(h, t,
-                                   labels=['fail', 'review', 'pass'],
-                                   weights='linear')
-print(f"Weighted κ = {kappa_weighted:.3f}")
-```
-
-Weighted kappa is usually more informative than unweighted for a 3-class ordered classification.
+Themis uses **linear weighted kappa** exclusively. The verdict labels have a natural ordering (`fail < review < pass`), so unweighted kappa — which treats all mismatches equally — discards useful information. Weighted kappa reflects that misclassifying `fail` as `pass` is a worse error than misclassifying it as `review`.
 
 ---
 

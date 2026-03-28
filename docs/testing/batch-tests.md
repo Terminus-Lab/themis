@@ -81,7 +81,6 @@ When annotations are present, the CLI automatically computes:
 | Metric | Measures | When useful |
 |--------|----------|-------------|
 | Kendall's τ | Score rank correlation (continuous) | Is Themis score ordering consistent with human score ordering? |
-| Cohen's κ | Label agreement (fail/review/pass) | Overall verdict match rate, chance-corrected |
 | Weighted κ | Label agreement, severity-penalized | Distinguishes small errors (review↔pass) from large ones (fail↔pass) — useful for cross-version tracking |
 | Confusion matrix | Per-class breakdown | Where exactly are the disagreements? |
 
@@ -180,7 +179,6 @@ go run cmd/batch/main.go evaluate \
   "correlation_report": {
     "annotated_count": 15,
     "kendall_tau": 0.72,
-    "cohens_kappa": 0.65,
     "weighted_kappa": 0.71,
     "confusion_matrix": {
       "labels": ["fail", "review", "pass"],
@@ -206,7 +204,7 @@ go run cmd/batch/main.go evaluate \
 The final line of the JSONL output (`-o`) will contain the correlation report:
 
 ```json
-{"_type":"correlation_report","annotated_count":15,"kendall_tau":0.72,"cohens_kappa":0.65,"weighted_kappa":0.71,"confusion_matrix":{...}}
+{"_type":"correlation_report","annotated_count":15,"kendall_tau":0.72,"weighted_kappa":0.71,"confusion_matrix":{...}}
 ```
 
 ### Test Case 5: Custom Worker Count
