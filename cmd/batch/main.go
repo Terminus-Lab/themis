@@ -212,6 +212,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 		if len(annotations) > 0 {
 			report := batch.ComputeCorrelationReport(allResults, annotations)
 			logCorrelationReport(&report)
+			logDisagreements(&report)
 			summaryWriter.SetCorrelationReport(&report)
 		}
 		if err := summaryWriter.Close(); err != nil {
@@ -231,6 +232,7 @@ func runEvaluate(cmd *cobra.Command, args []string) error {
 		if len(annotations) > 0 {
 			report := batch.ComputeCorrelationReport(allResults, annotations)
 			logCorrelationReport(&report)
+			logDisagreements(&report)
 			// Write correlation report as a final JSON line with a marker field
 			type correlationReportLine struct {
 				Type string `json:"_type"`
@@ -277,6 +279,30 @@ func writeSummary(path string, results []models.ConversationEvaluationResult, an
 	}
 
 	return summaryWriter.Close()
+}
+
+func logDisagreements(report *batch.CorrelationReport) {
+	if report.ConfusionMatrix == nil {
+		return
+	}
+	labels := report.ConfusionMatrix.Labels
+	matrix := report.ConfusionMatrix.Matrix
+	for i, humanLabel := range labels {
+		for j, themisLabel := range labels {
+			if i == j {
+				continue
+			}
+			count := matrix[i][j]
+			if count == 0 {
+				continue
+			}
+			log.Info().
+				Str("human", humanLabel).
+				Str("themis", themisLabel).
+				Int("count", count).
+				Msg("judge disagreement")
+		}
+	}
 }
 
 func logCorrelationReport(report *batch.CorrelationReport) {
