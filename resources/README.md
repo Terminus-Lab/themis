@@ -14,7 +14,7 @@ Three sample multi-turn conversations in the current evaluation format. Use this
 
 ### annotated_sample.jsonl
 
-Fifteen conversations with `human_label` (pass/review/fail) and `human_score` (0.0–1.0) annotations. When evaluated with the CLI, Themis automatically computes Kendall's τ-b, Weighted κ, and a confusion matrix.
+Fifteen conversations with `human_annotation` (pass/review/fail) and `human_score` (0.0–1.0) annotations. When evaluated with the CLI, Themis automatically computes Kendall's τ-b, Weighted κ, and a confusion matrix.
 
 ```bash
 ./bin/themis-cli evaluate -i resources/annotated_sample.jsonl -o /tmp/results.jsonl
@@ -46,7 +46,7 @@ Optional fields for human annotation workflows:
 ```json
 {
   "conversation_id": "conv-001",
-  "human_label": "pass",
+  "human_annotation": "pass",
   "human_score": 0.91,
   "agent": {"name": "my-agent", "version": "1.0"},
   "turns": [...]
